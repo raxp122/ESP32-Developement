@@ -11,8 +11,11 @@
 /* ================= faccia (personaggio originale) ================= */
 // Espressioni in stile emoticon, disegnate da noi.
 enum { M_WAKE, M_LOOK, M_HAPPY, M_EXCITED, M_BORED, M_SLEEP, M_COOL, N_MOODS };
-static const char *eyes[N_MOODS]  = {"o   o", "·   ·", "^   ^", "*   *", "-   -", "z   z", "◆   ◆"};
-static const char *mouth[N_MOODS] = {"  ___  ", "   ‿   ", "  \\_/  ", "  \\O/  ", "   —   ", "  ...  ", "  ‾‾‾  "};
+// NB: gli occhi usano font_xl (solo codepoint 32–95: maiuscole, cifre, simboli)
+// e le bocche font_l (ASCII + pochi simboli). Qui si usano solo glifi presenti
+// in quei font, altrimenti il carattere non viene disegnato.
+static const char *eyes[N_MOODS]  = {"O   O", "'   '", "^   ^", "*   *", "-   -", "Z   Z", "=   ="};
+static const char *mouth[N_MOODS] = {"  ___  ", "   u   ", "  \\_/  ", "  \\O/  ", "   —   ", "  ...  ", "  ~~~  "};
 static const char *quip[N_MOODS]  = {
     "mi sveglio…", "guardo in giro", "che bella rete!", "handshake!!", "qui è tranquillo", "zzz… poca gente", "modalità caccia",
 };
