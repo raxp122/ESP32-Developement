@@ -203,7 +203,7 @@ static void do_auto(void)
     do_check();
     __atomic_store_n(&busy, false, __ATOMIC_RELEASE);
     if (state == OTA_AVAILABLE) {
-        char t[80];
+        char t[112];
         snprintf(t, sizeof(t), "Aggiornamento %s disponibile: Impostazioni › Sistema", latest);
         display_lock();
         ui_toast(t);
