@@ -1,0 +1,43 @@
+name: Build firmware
+
+# Compila il firmware e allega il .bin pronto da flashare come artifact.
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+  workflow_dispatch:   # permette di avviarlo a mano dalla tab Actions
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Scarica LVGL
+        run: git clone -b v9.2.2 --depth 1 https://github.com/lvgl/lvgl components/lvgl
+
+      - name: Compila (ESP-IDF 5.4.2) e crea l'immagine unica
+        uses: espressif/esp-idf-ci-action@v1
+        with:
+          esp_idf_version: v5.4.2
+          target: esp32s3
+          command: >-
+            idf.py set-target esp32s3 &&
+            idf.py build &&
+            esptool.py --chip esp32s3 merge_bin -o gadget.bin
+            --flash_mode dio --flash_size 16MB
+            0x0 build/bootloader/bootloader.bin
+            0x8000 build/partition_table/partition-table.bin
+            0x10000 build/gadget.bin
+
+      - name: Allega il firmware
+        uses: actions/upload-artifact@v4
+        with:
+          name: gadget-firmware
+          if-no-files-found: error
+          path: |
+            gadget.bin
+            build/gadget.bin
+            build/bootloader/bootloader.bin
+            build/partition_table/partition-table.bin
