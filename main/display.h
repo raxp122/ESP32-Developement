@@ -10,6 +10,7 @@ void display_init(bool flipped);          // flipped = ruotato di 180°
 void display_set_flipped(bool flipped);
 bool display_is_flipped(void);
 void display_set_brightness(int percent); // 0–100
+bool display_is_dark(void);               // retroilluminazione spenta (inutile disegnare)
 void display_lock(void);
 void display_unlock(void);
 void display_start_task(void);

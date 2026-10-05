@@ -40,8 +40,17 @@ void art_px(int x, int y, uint32_t rgb)
 
 void art_rect(int x, int y, int w, int h, uint32_t rgb)
 {
-    for (int j = 0; j < h; j++)
-        for (int i = 0; i < w; i++) art_px(x + i, y + j, rgb);
+    // ritaglio e riempimento a righe intere: è la funzione più usata (fondale, barre)
+    if (x < 0) { w += x; x = 0; }
+    if (y < 0) { h += y; y = 0; }
+    if (x + w > S.lw) w = S.lw - x;
+    if (y + h > S.lh) h = S.lh - y;
+    if (w <= 0 || h <= 0 || rgb == TR) return;
+    uint16_t c = c565(rgb);
+    int pw = w * S.sc;
+    uint16_t *row = S.buf + (y * S.sc) * S.stride + x * S.sc;
+    for (int j = 0; j < h * S.sc; j++, row += S.stride)
+        for (int i = 0; i < pw; i++) row[i] = c;
 }
 
 void art_fill(uint32_t rgb) { art_rect(0, 0, S.lw, S.lh, rgb); }
