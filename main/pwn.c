@@ -252,12 +252,49 @@ static void task(void *arg)
 
 /* ---------------- stato persistente ---------------- */
 
+// L'elenco delle reti (il Pokédex) sta su microSD. I contatori aggregati
+// (XP, livello, totali) restano in NVS. Il file ha una piccola intestazione con
+// magic + sizeof(pwn_net_t): se il formato cambia, il vecchio file viene ignorato.
+#define POKEDEX_PATH  SD_MOUNT "/pwn/pokedex.dat"
+#define POKEDEX_MAGIC 0x314E5750u   // "PWN1"
+
+static void pokedex_load(void)
+{
+    if (!sd_ok()) return;
+    FILE *f = fopen(POKEDEX_PATH, "rb");
+    if (!f) return;
+    uint32_t hdr[3];
+    if (fread(hdr, sizeof(hdr), 1, f) == 1 &&
+        hdr[0] == POKEDEX_MAGIC && hdr[1] == sizeof(pwn_net_t)) {
+        int cnt = (int)hdr[2];
+        if (cnt > PWN_MAX_NETS) cnt = PWN_MAX_NETS;
+        if (cnt < 0) cnt = 0;
+        n_nets = (int)fread(nets, sizeof(pwn_net_t), cnt, f);
+    }
+    fclose(f);
+}
+
+static void pokedex_save(void)
+{
+    if (!sd_ok()) return;
+    mkdir(SD_MOUNT "/pwn", 0777);
+    FILE *f = fopen(POKEDEX_PATH, "wb");
+    if (!f) return;
+    int cnt = n_nets;   // snapshot: una rete aggiunta durante la scrittura verrà dal prossimo salvataggio
+    if (cnt > PWN_MAX_NETS) cnt = PWN_MAX_NETS;
+    uint32_t hdr[3] = { POKEDEX_MAGIC, (uint32_t)sizeof(pwn_net_t), (uint32_t)cnt };
+    fwrite(hdr, sizeof(hdr), 1, f);
+    fwrite(nets, sizeof(pwn_net_t), cnt, f);
+    fclose(f);
+}
+
 static void load(void)
 {
     nvs_handle_t h;
     memset(&stats, 0, sizeof(stats));
     strlcpy(stats.name, "Gadget", sizeof(stats.name));
     if (g_set_pwn_name()[0]) strlcpy(stats.name, g_set_pwn_name(), sizeof(stats.name));
+    pokedex_load();
     if (nvs_open("pwn", NVS_READONLY, &h) != ESP_OK) return;
     nvs_get_u32(h, "xp", &stats.xp);
     uint16_t lv = 0; nvs_get_u16(h, "lv", &lv); stats.level = lv;
@@ -270,6 +307,7 @@ static void load(void)
 
 void pwn_save(void)
 {
+    pokedex_save();
     nvs_handle_t h;
     if (nvs_open("pwn", NVS_READWRITE, &h) != ESP_OK) return;
     nvs_set_u32(h, "xp", stats.xp);
