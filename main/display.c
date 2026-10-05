@@ -1,0 +1,217 @@
+// display.c — driver QSPI, rotazione software e task LVGL
+#include "display.h"
+#include "board.h"
+#include <string.h>
+#include "freertos/FreeRTOS.h"
+#include "freertos/semphr.h"
+#include "driver/gpio.h"
+#include "driver/ledc.h"
+#include "driver/spi_master.h"
+#include "esp_heap_caps.h"
+#include "esp_lcd_panel_io.h"
+#include "esp_lcd_panel_ops.h"
+#include "esp_lcd_axs15231b.h"
+#include "esp_timer.h"
+#include "esp_log.h"
+
+#define LCD_HOST      SPI3_HOST
+#define CHUNK_ROWS    64
+#define CHUNK_BYTES   (LCD_W * CHUNK_ROWS * 2)
+#define FRAME_BYTES   (LCD_W * LCD_H * 2)
+
+static esp_lcd_panel_handle_t panel;
+static SemaphoreHandle_t flush_sem, lv_mux;
+static uint16_t *dma_buf;
+static uint8_t *rot_buf;
+static lv_display_t *disp;
+static bool is_flipped;
+static int keep_y0 = -1, keep_y1 = -1; // righe fisiche che LVGL non deve sovrascrivere
+static uint8_t *lv_tmp;                // frame ruotato di LVGL quando ci sono righe protette
+
+static const axs15231b_lcd_init_cmd_t init_cmds[] = {
+    {0x11, (uint8_t[]){0x00}, 0, 100},
+    {0x29, (uint8_t[]){0x00}, 0, 100},
+};
+
+static bool on_trans_done(esp_lcd_panel_io_handle_t io, esp_lcd_panel_io_event_data_t *e, void *ctx)
+{
+    BaseType_t woken = pdFALSE;
+    xSemaphoreGiveFromISR(flush_sem, &woken);
+    return woken == pdTRUE;
+}
+
+static void push_frame(const uint16_t *src)
+{
+    // Il pannello in QSPI non accetta RASET: ogni frame va scritto intero partendo dalla riga 0
+    xSemaphoreGive(flush_sem);
+    for (int y = 0; y < LCD_H; y += CHUNK_ROWS) {
+        xSemaphoreTake(flush_sem, portMAX_DELAY);
+        memcpy(dma_buf, src, CHUNK_BYTES);
+        esp_lcd_panel_draw_bitmap(panel, 0, y, LCD_W, y + CHUNK_ROWS, dma_buf);
+        src += LCD_W * CHUNK_ROWS;
+    }
+    xSemaphoreTake(flush_sem, portMAX_DELAY);
+}
+
+static void flush_cb(lv_display_t *d, const lv_area_t *area, uint8_t *px)
+{
+    int32_t w = lv_area_get_width(area), h = lv_area_get_height(area);
+    lv_draw_sw_rgb565_swap(px, w * h);
+
+    // Ruota il frame orizzontale (640×172) nel formato fisico verticale (172×640)
+    lv_area_t ra = *area;
+    lv_display_rotate_area(d, &ra);
+    uint32_t src_stride = lv_draw_buf_width_to_stride(w, LV_COLOR_FORMAT_RGB565);
+    uint32_t dst_stride = lv_draw_buf_width_to_stride(lv_area_get_width(&ra), LV_COLOR_FORMAT_RGB565);
+    uint8_t *dst = keep_y0 >= 0 ? lv_tmp : rot_buf;
+    lv_draw_sw_rotate(px, dst, w, h, src_stride, dst_stride, lv_display_get_rotation(d), LV_COLOR_FORMAT_RGB565);
+    if (keep_y0 >= 0) {
+        // copia solo le righe fuori dalla zona protetta (es. l'area di gioco di Doom)
+        const size_t row = LCD_W * 2;
+        if (keep_y0 > 0) memcpy(rot_buf, lv_tmp, keep_y0 * row);
+        if (keep_y1 < LCD_H - 1) memcpy(rot_buf + (keep_y1 + 1) * row, lv_tmp + (keep_y1 + 1) * row, (LCD_H - 1 - keep_y1) * row);
+    }
+    push_frame((uint16_t *)rot_buf);
+    lv_display_flush_ready(d);
+}
+
+uint16_t *display_frame(void) { return (uint16_t *)rot_buf; }
+void display_push(void) { push_frame((uint16_t *)rot_buf); }
+
+void display_keep_rows(int y0, int y1)
+{
+    if (!lv_tmp) lv_tmp = heap_caps_malloc(FRAME_BYTES, MALLOC_CAP_SPIRAM);
+    keep_y0 = y0;
+    keep_y1 = y1;
+}
+
+static void tick_cb(void *arg) { lv_tick_inc(2); }
+
+static void backlight_init(void)
+{
+    ledc_timer_config_t t = {
+        .speed_mode = LEDC_LOW_SPEED_MODE,
+        .duty_resolution = LEDC_TIMER_8_BIT,
+        .timer_num = LEDC_TIMER_3,
+        .freq_hz = 50000,
+        .clk_cfg = LEDC_SLOW_CLK_RC_FAST,
+    };
+    ledc_timer_config(&t);
+    ledc_channel_config_t c = {
+        .gpio_num = PIN_LCD_BL,
+        .speed_mode = LEDC_LOW_SPEED_MODE,
+        .channel = LEDC_CHANNEL_1,
+        .timer_sel = LEDC_TIMER_3,
+        .duty = 255, // logica invertita: 255 = spento
+    };
+    ledc_channel_config(&c);
+}
+
+void display_set_brightness(int pct)
+{
+    if (pct < 0) pct = 0;
+    if (pct > 100) pct = 100;
+    uint32_t duty = 255 - (pct * 255) / 100;
+    ledc_set_duty(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_1, duty);
+    ledc_update_duty(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_1);
+}
+
+void display_init(bool flipped)
+{
+    backlight_init();
+    flush_sem = xSemaphoreCreateBinary();
+    lv_mux = xSemaphoreCreateRecursiveMutex();
+
+    gpio_config_t rst = {.pin_bit_mask = 1ULL << PIN_LCD_RST, .mode = GPIO_MODE_OUTPUT, .pull_up_en = 1};
+    gpio_config(&rst);
+
+    spi_bus_config_t bus = {
+        .sclk_io_num = PIN_LCD_PCLK,
+        .data0_io_num = PIN_LCD_D0,
+        .data1_io_num = PIN_LCD_D1,
+        .data2_io_num = PIN_LCD_D2,
+        .data3_io_num = PIN_LCD_D3,
+        .max_transfer_sz = CHUNK_BYTES,
+    };
+    ESP_ERROR_CHECK(spi_bus_initialize(LCD_HOST, &bus, SPI_DMA_CH_AUTO));
+
+    esp_lcd_panel_io_handle_t io = NULL;
+    esp_lcd_panel_io_spi_config_t ioc = {
+        .cs_gpio_num = PIN_LCD_CS,
+        .dc_gpio_num = -1,
+        .spi_mode = 3,
+        .pclk_hz = 40 * 1000 * 1000,
+        .trans_queue_depth = 10,
+        .on_color_trans_done = on_trans_done,
+        .lcd_cmd_bits = 32,
+        .lcd_param_bits = 8,
+        .flags.quad_mode = true,
+    };
+    ESP_ERROR_CHECK(esp_lcd_new_panel_io_spi(LCD_HOST, &ioc, &io));
+
+    axs15231b_vendor_config_t vc = {
+        .init_cmds = init_cmds,
+        .init_cmds_size = sizeof(init_cmds) / sizeof(init_cmds[0]),
+        .flags.use_qspi_interface = 1,
+    };
+    esp_lcd_panel_dev_config_t pc = {
+        .reset_gpio_num = -1,
+        .rgb_ele_order = LCD_RGB_ELEMENT_ORDER_RGB,
+        .bits_per_pixel = 16,
+        .vendor_config = &vc,
+    };
+    ESP_ERROR_CHECK(esp_lcd_new_panel_axs15231b(io, &pc, &panel));
+
+    gpio_set_level(PIN_LCD_RST, 1); vTaskDelay(pdMS_TO_TICKS(30));
+    gpio_set_level(PIN_LCD_RST, 0); vTaskDelay(pdMS_TO_TICKS(250));
+    gpio_set_level(PIN_LCD_RST, 1); vTaskDelay(pdMS_TO_TICKS(30));
+    ESP_ERROR_CHECK(esp_lcd_panel_init(panel));
+
+    lv_init();
+    disp = lv_display_create(LCD_W, LCD_H);
+    lv_display_set_color_format(disp, LV_COLOR_FORMAT_RGB565);
+    lv_display_set_flush_cb(disp, flush_cb);
+    // La rotazione va impostata PRIMA dei buffer: LVGL calcola larghezza e stride
+    // dei buffer dalla risoluzione già ruotata (640×172). Il passaggio 90°↔270°
+    // non cambia la risoluzione, quindi dopo si può ruotare liberamente.
+    display_set_flipped(flipped);
+    uint8_t *b1 = heap_caps_malloc(FRAME_BYTES, MALLOC_CAP_SPIRAM);
+    uint8_t *b2 = heap_caps_malloc(FRAME_BYTES, MALLOC_CAP_SPIRAM);
+    rot_buf = heap_caps_malloc(FRAME_BYTES, MALLOC_CAP_SPIRAM);
+    dma_buf = heap_caps_malloc(CHUNK_BYTES, MALLOC_CAP_DMA | MALLOC_CAP_INTERNAL);
+    assert(b1 && b2 && rot_buf && dma_buf);
+    lv_display_set_buffers(disp, b1, b2, FRAME_BYTES, LV_DISPLAY_RENDER_MODE_FULL);
+
+    const esp_timer_create_args_t ta = {.callback = tick_cb, .name = "lv_tick"};
+    esp_timer_handle_t th;
+    esp_timer_create(&ta, &th);
+    esp_timer_start_periodic(th, 2000);
+}
+
+void display_set_flipped(bool flipped)
+{
+    is_flipped = flipped;
+    lv_display_set_rotation(disp, flipped ? LV_DISPLAY_ROTATION_270 : LV_DISPLAY_ROTATION_90);
+}
+
+bool display_is_flipped(void) { return is_flipped; }
+
+void display_lock(void) { xSemaphoreTakeRecursive(lv_mux, portMAX_DELAY); }
+void display_unlock(void) { xSemaphoreGiveRecursive(lv_mux); }
+
+static void lvgl_task(void *arg)
+{
+    for (;;) {
+        display_lock();
+        uint32_t wait = lv_timer_handler();
+        display_unlock();
+        if (wait < 5) wait = 5;
+        if (wait > 50) wait = 50;
+        vTaskDelay(pdMS_TO_TICKS(wait));
+    }
+}
+
+void display_start_task(void)
+{
+    xTaskCreatePinnedToCore(lvgl_task, "lvgl", 12 * 1024, NULL, 4, NULL, 1);
+}

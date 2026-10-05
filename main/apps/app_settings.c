@@ -1,0 +1,248 @@
+// app_settings.c — menu Impostazioni e sottomenu
+#include "apps.h"
+#include "settings.h"
+#include "wifi_mgr.h"
+#include "ble_mgr.h"
+#include "board.h"
+#include <stdio.h>
+#include <time.h>
+#include "esp_system.h"
+#include "esp_heap_caps.h"
+#include "esp_timer.h"
+#include "esp_idf_version.h"
+
+#define FW_VERSION "0.13.1"
+
+static const char *onoff(bool v) { return v ? "Acceso" : "Spento"; }
+
+/* ---------------- Wi-Fi ---------------- */
+
+static void v_wifi_toggle(char *b, int n) { snprintf(b, n, "%s", onoff(g_set.wifi_on)); }
+static void a_wifi_toggle(void) { g_set.wifi_on = !g_set.wifi_on; settings_save(); wifi_mgr_apply(); }
+
+static void v_wifi_net(char *b, int n)
+{
+    snprintf(b, n, "%s", g_set.wifi_ssid[0] ? g_set.wifi_ssid : "Nessuna rete salvata");
+}
+
+static void v_wifi_state(char *b, int n)
+{
+    switch (wifi_mgr_state()) {
+    case WIFI_CONNECTED:  snprintf(b, n, "Connesso · %s", wifi_mgr_ip()); break;
+    case WIFI_CONNECTING: snprintf(b, n, "Connessione a %s…", g_set.wifi_ssid); break;
+    case WIFI_NO_NETWORK: snprintf(b, n, "Nessuna rete configurata"); break;
+    default:              snprintf(b, n, "Wi-Fi spento"); break;
+    }
+}
+
+static void v_wifi_rssi(char *b, int n)
+{
+    int r = wifi_mgr_rssi();
+    if (r) snprintf(b, n, "%d dBm", r);
+    else snprintf(b, n, "—");
+}
+
+static void a_wifi_forget(void) { wifi_mgr_forget(); ui_toast("Rete dimenticata"); }
+
+static const menu_item_t wifi_items[] = {
+    {.icon = LV_SYMBOL_WIFI, .label = "Wi-Fi", .value = v_wifi_toggle, .on_select = a_wifi_toggle},
+    {.icon = ICON_MOBILE, .label = "Configura dal telefono", .value = v_wifi_net, .app = &app_portal},
+    {.icon = ICON_INFO, .label = "Stato", .value = v_wifi_state},
+    {.icon = ICON_TOWER, .label = "Segnale", .value = v_wifi_rssi},
+    {.icon = LV_SYMBOL_TRASH, .label = "Dimentica rete", .on_select = a_wifi_forget, .confirm = true},
+};
+static menu_t wifi_menu = {"Impostazioni › Wi-Fi", wifi_items, sizeof(wifi_items) / sizeof(wifi_items[0])};
+
+/* ---------------- Bluetooth ---------------- */
+
+static void v_ble(char *b, int n) { snprintf(b, n, "%s", onoff(g_set.ble_on)); }
+static void a_ble(void) { g_set.ble_on = !g_set.ble_on; settings_save(); ble_mgr_apply(); }
+static void v_ble_vis(char *b, int n) { snprintf(b, n, "%s", g_set.ble_visible ? "Sì" : "No"); }
+static void a_ble_vis(void)
+{
+    g_set.ble_visible = !g_set.ble_visible;
+    settings_save();
+    ble_mgr_apply();
+    if (g_set.ble_visible && !g_set.ble_on) ui_toast("Accendi il Bluetooth per essere visibile");
+}
+static void v_ble_name(char *b, int n) { snprintf(b, n, "%s", ble_mgr_name()); }
+static void v_ble_addr(char *b, int n) { ble_mgr_addr(b, n); }
+
+static const menu_item_t ble_items[] = {
+    {.icon = LV_SYMBOL_BLUETOOTH, .label = "Bluetooth", .value = v_ble, .on_select = a_ble},
+    {.icon = ICON_EYE, .label = "Visibile agli altri", .value = v_ble_vis, .on_select = a_ble_vis},
+    {.icon = LV_SYMBOL_EDIT, .label = "Nome", .value = v_ble_name},
+    {.icon = ICON_CHIP, .label = "Indirizzo", .value = v_ble_addr},
+};
+static menu_t ble_menu = {"Impostazioni › Bluetooth", ble_items, sizeof(ble_items) / sizeof(ble_items[0])};
+
+/* ---------------- Schermo ---------------- */
+
+static void v_bright(char *b, int n) { snprintf(b, n, "%d%%", g_set.brightness); }
+static void j_bright(int d)
+{
+    int v = g_set.brightness + d * 10;
+    if (v < 5) v = 5;
+    if (v > 100) v = 100;
+    if (g_set.brightness == 5 && d > 0) v = 10;
+    g_set.brightness = v;
+    display_set_brightness(v);
+    settings_save();
+}
+
+static const uint16_t sleeps[] = {15, 30, 60, 120, 300, 0};
+#define NSLEEP (int)(sizeof(sleeps) / sizeof(sleeps[0]))
+static void v_sleep(char *b, int n)
+{
+    if (!g_set.sleep_s) snprintf(b, n, "Mai");
+    else if (g_set.sleep_s < 60) snprintf(b, n, "%d secondi", g_set.sleep_s);
+    else snprintf(b, n, "%d minut%s", g_set.sleep_s / 60, g_set.sleep_s == 60 ? "o" : "i");
+}
+static void j_sleep(int d)
+{
+    int i = 0;
+    while (i < NSLEEP && sleeps[i] != g_set.sleep_s) i++;
+    if (i == NSLEEP) i = 2;
+    i += d;
+    if (i < 0) i = 0;
+    if (i >= NSLEEP) i = NSLEEP - 1;
+    g_set.sleep_s = sleeps[i];
+    settings_save();
+}
+
+static void v_flip(char *b, int n) { snprintf(b, n, "%s", g_set.flipped ? "Sì" : "No"); }
+static void a_flip(void)
+{
+    g_set.flipped = !g_set.flipped;
+    display_set_flipped(g_set.flipped);
+    settings_save();
+}
+
+static void v_invert(char *b, int n) { snprintf(b, n, "%s", g_set.invert_scroll ? "Sì" : "No"); }
+static void a_invert(void) { g_set.invert_scroll = !g_set.invert_scroll; settings_save(); }
+
+static void v_accent(char *b, int n) { snprintf(b, n, "%s", ui_accent_name(g_set.accent)); }
+static void j_accent(int d)
+{
+    int c = ui_accent_count();
+    g_set.accent = (g_set.accent + d + c) % c;
+    settings_save();
+}
+
+static const menu_item_t screen_items[] = {
+    {.icon = ICON_SUN, .label = "Luminosità", .value = v_bright, .on_adjust = j_bright},
+    {.icon = ICON_MOON, .label = "Spegnimento automatico", .value = v_sleep, .on_adjust = j_sleep},
+    {.icon = LV_SYMBOL_REFRESH, .label = "Ruota di 180°", .value = v_flip, .on_select = a_flip},
+    {.icon = ICON_SLIDERS, .label = "Inverti scorrimento", .value = v_invert, .on_select = a_invert},
+    {.icon = ICON_PALETTE, .label = "Colore", .value = v_accent, .on_adjust = j_accent},
+};
+static menu_t screen_menu = {"Impostazioni › Schermo", screen_items, sizeof(screen_items) / sizeof(screen_items[0])};
+
+/* ---------------- Data e ora ---------------- */
+
+static void v_time(char *b, int n)
+{
+    time_t now = time(NULL);
+    struct tm t;
+    localtime_r(&now, &t);
+    if (t.tm_year < 124) snprintf(b, n, "Non impostata");
+    else snprintf(b, n, "%02d:%02d:%02d", t.tm_hour, t.tm_min, t.tm_sec);
+}
+static void v_date(char *b, int n)
+{
+    time_t now = time(NULL);
+    struct tm t;
+    localtime_r(&now, &t);
+    if (t.tm_year < 124) snprintf(b, n, "—");
+    else snprintf(b, n, "%02d/%02d/%04d", t.tm_mday, t.tm_mon + 1, t.tm_year + 1900);
+}
+static void v_tsrc(char *b, int n)
+{
+    snprintf(b, n, "%s", wifi_mgr_time_synced() ? "Internet (NTP), salvata nell'RTC" : "Orologio interno (RTC)");
+}
+static void a_sync(void)
+{
+    if (wifi_mgr_state() != WIFI_CONNECTED) { ui_toast("Serve il Wi-Fi collegato"); return; }
+    wifi_mgr_sync_time();
+    ui_toast("Sincronizzazione avviata");
+}
+static void v_tz(char *b, int n) { snprintf(b, n, "Europa/Roma"); }
+
+static const menu_item_t time_items[] = {
+    {.icon = ICON_CLOCK, .label = "Ora", .value = v_time},
+    {.icon = LV_SYMBOL_LIST, .label = "Data", .value = v_date},
+    {.icon = ICON_SYNC, .label = "Sincronizza ora", .value = v_tsrc, .on_select = a_sync},
+    {.icon = LV_SYMBOL_GPS, .label = "Fuso orario", .value = v_tz},
+};
+static menu_t time_menu = {"Impostazioni › Data e ora", time_items, sizeof(time_items) / sizeof(time_items[0])};
+
+/* ---------------- Sistema ---------------- */
+
+static void v_batt(char *b, int n)
+{
+    float v = board_battery_volts();
+    if (v > 2.5f) snprintf(b, n, "%.2f V · %d%%", v, board_battery_percent(v));
+    else snprintf(b, n, "Nessuna batteria rilevata");
+}
+static void v_mem(char *b, int n)
+{
+    snprintf(b, n, "RAM %u KB · PSRAM %.1f MB",
+             (unsigned)(heap_caps_get_free_size(MALLOC_CAP_INTERNAL) / 1024),
+             heap_caps_get_free_size(MALLOC_CAP_SPIRAM) / 1048576.0);
+}
+static void v_fw(char *b, int n) { snprintf(b, n, "Gadget %s · ESP-IDF %s", FW_VERSION, esp_get_idf_version()); }
+static void v_up(char *b, int n)
+{
+    int s = (int)(esp_timer_get_time() / 1000000);
+    snprintf(b, n, "%dh %02dm %02ds", s / 3600, (s / 60) % 60, s % 60);
+}
+static void a_restart(void) { esp_restart(); }
+static void a_off(void) { ui_power_off(); }
+static void a_reset(void)
+{
+    settings_reset();
+    display_set_flipped(g_set.flipped);
+    display_set_brightness(g_set.brightness);
+    wifi_mgr_apply();
+    ble_mgr_apply();
+    ui_toast("Impostazioni ripristinate");
+}
+
+static const menu_item_t sys_items[] = {
+    {.icon = LV_SYMBOL_BATTERY_FULL, .label = "Batteria", .value = v_batt},
+    {.icon = ICON_CHIP, .label = "Memoria libera", .value = v_mem},
+    {.icon = ICON_INFO, .label = "Firmware", .value = v_fw},
+    {.icon = ICON_CLOCK, .label = "Acceso da", .value = v_up},
+    {.icon = LV_SYMBOL_REFRESH, .label = "Riavvia", .on_select = a_restart, .confirm = true},
+    {.icon = LV_SYMBOL_POWER, .label = "Spegni", .on_select = a_off, .confirm = true},
+    {.icon = LV_SYMBOL_WARNING, .label = "Ripristina impostazioni", .on_select = a_reset, .confirm = true},
+};
+static menu_t sys_menu = {"Impostazioni › Sistema", sys_items, sizeof(sys_items) / sizeof(sys_items[0])};
+
+/* ---------------- Impostazioni ---------------- */
+
+static void v_wifi_sum(char *b, int n)
+{
+    switch (wifi_mgr_state()) {
+    case WIFI_CONNECTED: snprintf(b, n, "%s", g_set.wifi_ssid); break;
+    case WIFI_CONNECTING: snprintf(b, n, "Connessione…"); break;
+    case WIFI_NO_NETWORK: snprintf(b, n, "Da configurare"); break;
+    default: snprintf(b, n, "Spento");
+    }
+}
+static void v_quick(char *b, int n) { snprintf(b, n, "Tieni premuto: %s", settings_quick_name(g_set.quick_action)); }
+static void j_quick(int d)
+{
+    g_set.quick_action = (g_set.quick_action + d + QUICK_COUNT) % QUICK_COUNT;
+    settings_save();
+}
+
+static const menu_item_t settings_items[] = {
+    {.icon = LV_SYMBOL_WIFI, .label = "Wi-Fi", .value = v_wifi_sum, .app = &app_menu, .arg = &wifi_menu},
+    {.icon = LV_SYMBOL_BLUETOOTH, .label = "Bluetooth", .value = v_ble, .app = &app_menu, .arg = &ble_menu},
+    {.icon = ICON_SUN, .label = "Schermo", .app = &app_menu, .arg = &screen_menu},
+    {.icon = ICON_BOLT, .label = "Azione rapida", .value = v_quick, .on_adjust = j_quick},
+    {.icon = ICON_CLOCK, .label = "Data e ora", .value = v_time, .app = &app_menu, .arg = &time_menu},
+    {.icon = ICON_CHIP, .label = "Sistema", .value = v_fw, .app = &app_menu, .arg = &sys_menu},
+};
+menu_t settings_menu = {"Impostazioni", settings_items, sizeof(settings_items) / sizeof(settings_items[0])};
