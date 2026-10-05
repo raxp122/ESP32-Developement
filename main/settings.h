@@ -48,7 +48,15 @@ typedef struct {
     char     pwn_name[21];    // nome del "pet"
     uint8_t  pwn_pcap;        // 0 = non salvare pcap, 1 = salva handshake
     uint8_t  pwn_ai;          // 0 = statico, 1 = reattivo all'ambiente
+    // v10
+    uint8_t  boot_app;        // app aperta all'accensione: indice in boot_apps (0 = nessuna)
+    uint8_t  pet_time;        // polipetto: 0 tempo reale, 1 solo a scheda accesa, 2 solo con l'app aperta
+    uint8_t  pet_sound;       // versi del polipetto
+    uint8_t  pet_steps;       // contapassi
+    uint8_t  pet_tilt_inv;    // inverte l'inclinazione nel minigioco
 } settings_t;
+
+enum { PET_TIME_REAL = 0, PET_TIME_DEVICE, PET_TIME_APP, PET_TIME_COUNT };
 
 const char *g_set_pwn_name(void);
 

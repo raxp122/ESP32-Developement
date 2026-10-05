@@ -21,3 +21,10 @@ extern menu_t tuner_menu;
 extern const app_t app_tuner;
 void tuner_menu_init(void);
 extern menu_t radar_menu;
+extern const app_t app_pet;
+extern menu_t pet_settings_menu;
+
+// App all'avvio (Impostazioni): elenco con indici stabili, salvati in g_set.boot_app
+int  boot_app_count(void);
+const char *boot_app_name(int i);
+void boot_app_launch(void);   // apre l'app scelta sopra la home (da chiamare con LVGL bloccato)

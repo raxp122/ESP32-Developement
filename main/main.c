@@ -14,6 +14,8 @@
 #include "logcon.h"
 #include "sd.h"
 #include "doom_app.h"
+#include "pet.h"
+#include "apps/apps.h"
 
 static const char *TAG = "main";
 
@@ -60,6 +62,14 @@ void app_main(void)
 
     wifi_mgr_init();
     ble_mgr_apply();
+
+    // il polipetto vive in sottofondo; poi l'eventuale app scelta per l'avvio
+    // (dopo Wi-Fi e Bluetooth, che gli scanner usano subito)
+    display_lock();
+    pet_init();
+    boot_app_launch();
+    display_unlock();
+
     logcon_start();
     ESP_LOGI(TAG, "pronto · comandi dal monitor seriale: L log, I info, R riavvia");
 }

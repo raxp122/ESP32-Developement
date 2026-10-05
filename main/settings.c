@@ -5,7 +5,7 @@
 #include "nvs.h"
 #include "esp_log.h"
 
-#define SETTINGS_VERSION 9
+#define SETTINGS_VERSION 10
 settings_t g_set;
 
 static void defaults(void)
@@ -30,6 +30,11 @@ static void defaults(void)
     strcpy(g_set.pwn_name, "Gadget");
     g_set.pwn_pcap = 1;
     g_set.pwn_ai = 1;
+    g_set.boot_app = 0;
+    g_set.pet_time = PET_TIME_REAL;
+    g_set.pet_sound = 1;
+    g_set.pet_steps = 1;
+    g_set.pet_tilt_inv = 0;
 }
 
 void settings_load(void)
@@ -58,6 +63,14 @@ void settings_load(void)
         if (old < 7 || g_set.a4_x10 < 3500 || g_set.a4_x10 > 5000) g_set.a4_x10 = 4400;
         if (old < 8) { g_set.doom_inv_steer = true; g_set.doom_inv_pitch = true; }
         if (old < 9) { strcpy(g_set.pwn_name, "Gadget"); g_set.pwn_pcap = 1; g_set.pwn_ai = 1; }
+        if (old < 10) {
+            g_set.boot_app = 0;
+            g_set.pet_time = PET_TIME_REAL;
+            g_set.pet_sound = 1;
+            g_set.pet_steps = 1;
+            g_set.pet_tilt_inv = 0;
+        }
+        if (g_set.pet_time >= PET_TIME_COUNT) g_set.pet_time = PET_TIME_REAL;
         if (old < SETTINGS_VERSION) {
             g_set.version = SETTINGS_VERSION;
             nvs_close(h);

@@ -114,6 +114,9 @@ void audio_start(audio_synth_t s)
 
 void audio_stop(void) { synth = NULL; }
 
+audio_synth_t audio_current(void) { return synth; }
+bool audio_mic_active(void) { return rx_on; }
+
 bool audio_mic_start(void)
 {
     if (!ok || !mic_ok) return false;
