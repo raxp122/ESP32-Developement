@@ -34,3 +34,7 @@ CONFIG_LV_BUILD_EXAMPLES=n
 CONFIG_FATFS_LFN_HEAP=y
 CONFIG_SPIRAM_ALLOW_BSS_SEG_EXTERNAL_MEMORY=y
 # CONFIG_LV_ATTRIBUTE_FAST_MEM_USE_IRAM is not set
+# Aggiornamenti OTA: se il nuovo firmware non arriva ad avviarsi torna da solo al precedente
+CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE=y
+# TLS (download da GitHub): buffer in PSRAM per non togliere RAM interna a Wi-Fi e LVGL
+CONFIG_MBEDTLS_EXTERNAL_MEM_ALLOC=y
