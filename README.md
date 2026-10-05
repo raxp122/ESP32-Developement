@@ -33,6 +33,24 @@ Configurazione e salvataggi vanno in `doom/` sulla microSD. Audio non ancora imp
 
 Il motore è prboom (dal progetto retro-go, GPL): il firmware che lo include è distribuito sotto GPL.
 
+## Polipetto
+Un Tamagotchi originale con un polpetto arancione in pixel art. Dal launcher: Polipetto (al primo avvio compare un uovo che si schiude in un minuto).
+
+| Comando | Azione |
+|---|---|
+| Swipe su / giù | sceglie l'icona: Cibo, Gioca, Pulisci, Medicina, Luce, Sgrida, Stato |
+| Swipe a destra | conferma; nei sottomenu sceglie (Pasto, Spuntino, Acqua…) |
+| Swipe a sinistra · BOOT | indietro / esce |
+| Dito tenuto premuto | coccole |
+| Scuotere la scheda | lo fa ridere (se dorme lo svegli!) |
+
+Cresce da neonato a bimbo, ragazzo e adulto; la forma adulta (saggio, esploratore, normale, goloso, pasticcione) dipende dalle cure. Fame, sete, felicità, disciplina, peso, inchiostro da pulire, malattie, nanna con la luce: se lo trascuri può morire e si ricomincia da un nuovo uovo.
+Giochi: *Da che parte?*, *Pesca* (inclinando la scheda) e *Passeggiata* (contapassi: i passi lo rendono felice e sbloccano l'esploratore).
+Impostazioni › Polipetto: scorrere del tempo (reale, anche a scheda spenta / solo a scheda accesa / solo con l'app aperta), versi, contapassi, verso dell'inclinazione, nuovo uovo.
+
+## App all'avvio
+Impostazioni › App all'avvio: se scegli un'app, all'accensione si apre quella; swipe indietro torna al menu. "Nessuna" lascia tutto com'era.
+
 ## Monitor seriale
 Il firmware conserva in RAM gli ultimi 16 KB di log dall'accensione. Dal monitor seriale (115200) invia:
 `L` ristampa il log dall'accensione · `I` info di sistema · `R` riavvio software · `H` aiuto.
@@ -54,7 +72,8 @@ Immagine unica per il flasher web (indirizzo 0x0):
 - `main/menu.c` menu generico (usato da home e impostazioni)
 - `main/wifi_mgr.*` Wi-Fi, scansione, portale captive per configurare la rete dal telefono, NTP
 - `main/ble_mgr.*` NimBLE: visibilità e scansione
-- `main/apps/` le app
+- `main/pet_core.*` regole del Polipetto (pure, senza hardware) · `main/pet.*` tempo reale, salvataggio, contapassi, versi
+- `main/apps/` le app (`app_pet.c` + `pet_art.c` per il Polipetto)
 - `components/axs15231b` driver Waveshare inclusi nel progetto
 
 ## Aggiungere un'app
