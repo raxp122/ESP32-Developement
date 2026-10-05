@@ -127,7 +127,7 @@ SPR(SPR_PILL, 6, 3, ".rrww.", "rrrwww", ".rrww.");
 SPR(SPR_BUBBLE, 3, 3, ".c.", "c.c", ".c.");
 SPR(SPR_SPARK, 3, 3, ".y.", "yyy", ".y.");
 SPR(SPR_JELLY, 5, 5, ".qqq.", "qQqQq", "qqqqq", "q.q.q", ".q.q.");
-SPR(SPR_Z, 3, 3, "zzz", ".z.", "zzz");
+SPR(SPR_Z, 4, 4, "zzzz", "..z.", ".z..", "zzzz");
 SPR(SPR_BANG, 1, 5, "r", "r", "r", ".", "r");
 SPR(SPR_QUESTION, 3, 5, "zz.", "..z", ".z.", "...", ".z.");
 SPR(SPR_ANGER, 3, 3, "r.r", ".r.", "r.r");

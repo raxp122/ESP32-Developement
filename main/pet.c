@@ -253,6 +253,7 @@ static void timer_cb(lv_timer_t *tm)
         events |= ev;
     }
     int64_t since = us - last_save_us;
+    if (P.stage == PET_NONE) return;   // niente da salvare finché non c'è un uovo
     if ((ev & (EV_HATCH | EV_EVOLVE | EV_DEATH)) || (dirty && since > SAVE_DIRTY_US) || since > SAVE_EVERY_US)
         pet_save();
 }

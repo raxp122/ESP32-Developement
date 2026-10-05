@@ -482,10 +482,11 @@ static void draw_panel(const pet_t *p)
         fmt_age(p->best_age_s, b, sizeof(b));
         snprintf(t, sizeof(t), "generazione %u · record %s", p->generation, b);
         set_text(l_info, t);
-        static const char *const why[] = {"", "Morto di fame", "Morto di sete", "Morto di malattia", "Tornato negli abissi"};
+        static const char *const why[] = {"", "Di fame…", "Di sete…", "Di malattia…", "Negli abissi"};
         set_text(l_main, why[p->death <= DEATH_OLD ? p->death : 0]);
         fmt_age(p->age_s, a, sizeof(a));
-        snprintf(t, sizeof(t), "Visse %s · swipe a destra: nuovo uovo", a);
+        snprintf(t, sizeof(t), "%s · visse %s · swipe a destra: nuovo uovo",
+                 p->death == DEATH_OLD ? "È tornato nel grande oceano" : "È diventato un angioletto", a);
         set_text(l_hint, t);
         lv_obj_set_style_text_color(l_hint, C_DIM, 0);
         return;
