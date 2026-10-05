@@ -1,0 +1,5 @@
+# Le variabili globali di prboom (≈45 KB) vanno in PSRAM: la RAM interna serve al launcher
+[mapping:prboom_extram]
+archive: libprboom.a
+entries:
+    * (extram_bss)
