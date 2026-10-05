@@ -237,11 +237,21 @@ static void j_quick(int d)
     settings_save();
 }
 
+static void v_boot(char *b, int n) { snprintf(b, n, "%s", boot_app_name(g_set.boot_app)); }
+static void j_boot(int d)
+{
+    int c = boot_app_count();
+    g_set.boot_app = (g_set.boot_app + d + c) % c;
+    settings_save();
+}
+
 static const menu_item_t settings_items[] = {
     {.icon = LV_SYMBOL_WIFI, .label = "Wi-Fi", .value = v_wifi_sum, .app = &app_menu, .arg = &wifi_menu},
     {.icon = LV_SYMBOL_BLUETOOTH, .label = "Bluetooth", .value = v_ble, .app = &app_menu, .arg = &ble_menu},
     {.icon = ICON_SUN, .label = "Schermo", .app = &app_menu, .arg = &screen_menu},
     {.icon = ICON_BOLT, .label = "Azione rapida", .value = v_quick, .on_adjust = j_quick},
+    {.icon = LV_SYMBOL_HOME, .label = "App all'avvio", .value = v_boot, .on_adjust = j_boot},
+    {.icon = ICON_GAMEPAD, .label = "Polipetto", .app = &app_menu, .arg = &pet_settings_menu},
     {.icon = ICON_CLOCK, .label = "Data e ora", .value = v_time, .app = &app_menu, .arg = &time_menu},
     {.icon = ICON_CHIP, .label = "Sistema", .value = v_fw, .app = &app_menu, .arg = &sys_menu},
 };

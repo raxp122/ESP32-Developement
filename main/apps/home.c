@@ -1,6 +1,7 @@
 // home.c — menu principale: "Cerca" in cima, poi le app in ordine alfabetico
 #include "apps.h"
 #include "textnorm.h"
+#include "settings.h"
 #include <stdlib.h>
 #include <string.h>
 
@@ -17,6 +18,7 @@ static menu_item_t items[] = {
     {.icon = ICON_BULB,     .label = "Torcia",            .app = &app_torch},
     {.icon = ICON_BOLT,     .label = "Spada laser",       .app = &app_menu, .arg = &saber_menu},
     {.icon = ICON_GHOST,    .label = "Doom",              .app = &app_menu, .arg = &doom_menu},
+    {.icon = ICON_GAMEPAD,  .label = "Polipetto",         .app = &app_pet},
     {.icon = LV_SYMBOL_SETTINGS, .label = "Impostazioni", .app = &app_menu, .arg = &settings_menu},
 };
 
@@ -38,4 +40,36 @@ void home_init(void)
 {
     tuner_menu_init();
     qsort(items + 1, home_menu.count - 1, sizeof(menu_item_t), by_label);
+}
+
+/* ---------------- app all'avvio ----------------
+ * L'indice è salvato nelle impostazioni: le voci nuove vanno aggiunte in fondo.
+ * Doom è escluso perché riavvia la scheda in una modalità a parte.
+ */
+typedef struct { const char *name; const app_t *app; void *arg; } boot_app_t;
+
+static const boot_app_t boot_apps[] = {
+    {"Nessuna", NULL, NULL},
+    {"Polipetto", &app_pet, NULL},
+    {"Orologio", &app_clock, NULL},
+    {"Torcia", &app_torch, NULL},
+    {"Scanner Wi-Fi", &app_wifiscan, NULL},
+    {"Scanner Bluetooth", &app_blescan, NULL},
+    {"Radar", &app_menu, &radar_menu},
+    {"Berciometro", &app_bercio, NULL},
+    {"Accordatore", &app_menu, &tuner_menu},
+    {"Dadi", &app_menu, &dice_menu},
+    {"Spada laser", &app_menu, &saber_menu},
+    {"Cerca", &app_search, NULL},
+};
+#define N_BOOT (int)(sizeof(boot_apps) / sizeof(boot_apps[0]))
+
+int boot_app_count(void) { return N_BOOT; }
+
+const char *boot_app_name(int i) { return (i > 0 && i < N_BOOT) ? boot_apps[i].name : boot_apps[0].name; }
+
+void boot_app_launch(void)
+{
+    int i = g_set.boot_app;
+    if (i > 0 && i < N_BOOT) ui_push(boot_apps[i].app, boot_apps[i].arg);
 }
