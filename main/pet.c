@@ -188,12 +188,27 @@ static void sound_for_events(uint32_t ev)
 
 /* ---------------- tempo ---------------- */
 
+// orologio per le regole: in modalità ibrida valgono gli orari scelti e la notte è protetta
+static pet_clock_t clock_at(int hour)
+{
+    pet_clock_t c = {.hour = (int8_t)hour, .sleep_h = -1, .wake_h = -1, .safe_night = false};
+    if (g_set.pet_time == PET_TIME_HYBRID) {
+        c.sleep_h = g_set.pet_sleep_h;
+        c.wake_h = g_set.pet_wake_h;
+        c.safe_night = true;
+    }
+    return c;
+}
+
+// il tempo a scheda spenta si recupera in modalità reale e ibrida (serve un'ora valida)
+static bool real_time_mode(void) { return g_set.pet_time == PET_TIME_REAL || g_set.pet_time == PET_TIME_HYBRID; }
+
 // recupera il tempo trascorso a scheda spenta (solo in modalità "tempo reale")
 static void catch_up(void)
 {
     struct tm lt;
     int64_t now;
-    if (g_set.pet_time != PET_TIME_REAL || P.last_epoch <= 0) return;
+    if (!real_time_mode() || P.last_epoch <= 0) return;
     if (P.stage != PET_EGG && !pet_core_alive(&P)) return;
     if (!local_now(&lt, &now) || now <= P.last_epoch) return;
     int64_t gap = now - P.last_epoch;
@@ -206,12 +221,13 @@ static void catch_up(void)
     int64_t left = gap;
     while (left > 0 && P.stage != PET_DEAD) {
         uint32_t dt = left > 60 ? 60 : (uint32_t)left;
-        ev |= pet_core_step(&P, dt, sod / 3600);
+        pet_clock_t c = clock_at(sod / 3600);
+        ev |= pet_core_step(&P, dt, &c);
         sod = (sod + dt) % 86400;
         left -= dt;
     }
     // le novità importanti si vedono (e si sentono) quando si apre l'app
-    events |= ev & (EV_HATCH | EV_EVOLVE | EV_DEATH);
+    events |= ev & (EV_HATCH | EV_EVOLVE | EV_DEATH | EV_ELDER);
     P.last_epoch = now;
     ESP_LOGI(TAG, "recuperati %lld s di vita a scheda spenta", (long long)gap);
     pet_save();
@@ -232,7 +248,10 @@ static void timer_cb(lv_timer_t *tm)
 
     bool runs = (P.stage == PET_EGG || pet_core_alive(&P)) && (g_set.pet_time != PET_TIME_APP || fg);
     if (runs && dt) {
-        ev |= pet_core_step(&P, dt, known ? lt.tm_hour : -1);
+        // senza un'ora valida la modalità ibrida non sa quando è notte: avanza come
+        // "solo a scheda accesa" (nessun recupero, nessun orario)
+        pet_clock_t c = clock_at(known ? lt.tm_hour : -1);
+        ev |= pet_core_step(&P, dt, &c);
         dirty = true;
     }
 
@@ -350,6 +369,17 @@ uint32_t pet_do(pet_action_t a, pet_result_t *res)
         snd = SND_NO;
     }
     if (snd >= 0) pet_play(snd);
+    return ev;
+}
+
+uint32_t pet_release(void)
+{
+    uint32_t ev = pet_core_release(&P);
+    if (ev) {
+        events |= ev;
+        pet_play(SND_EVOLVE);
+        pet_save();
+    }
     return ev;
 }
 

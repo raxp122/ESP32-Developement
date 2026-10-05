@@ -15,6 +15,7 @@ void     pet_init(void);                 // all'avvio, con LVGL bloccato
 pet_t   *pet_get(void);
 void     pet_new_egg(void);
 uint32_t pet_do(pet_action_t a, pet_result_t *res);   // azione + verso + salvataggio
+uint32_t pet_release(void);              // dai 25 giorni: lo lascia tornare nell'oceano (0 se non può)
 uint32_t pet_take_events(void);          // EV_* accumulati dall'ultima chiamata
 uint32_t pet_take_shakes(void);          // scossoni rilevati con l'app aperta
 void     pet_set_foreground(bool on);    // l'app del polipetto è aperta

@@ -20,6 +20,7 @@ typedef enum {
     FORM_MESSY,      // molti errori di cura
 } pet_form_t;
 
+// DEATH_OLD: non è una morte, è il saluto quando il giocatore lo lascia tornare nell'oceano
 typedef enum { DEATH_NONE = 0, DEATH_HUNGER, DEATH_THIRST, DEATH_SICK, DEATH_OLD } pet_death_t;
 
 // Bisogni che lo fanno "chiamare"
@@ -44,7 +45,15 @@ enum {
     EV_WAKE    = 1 << 7,
     EV_MISTAKE = 1 << 8,
     EV_HAPPY   = 1 << 9,   // cuore guadagnato camminando
+    EV_ELDER   = 1 << 10,  // ha compiuto PET_RELEASE_S: ora si può lasciarlo andare
 };
+
+// Orologio e orari passati a ogni passo
+typedef struct {
+    int8_t hour;              // ora locale, -1 se non nota (allora non dorme mai)
+    int8_t sleep_h, wake_h;   // orari personalizzati (modalità ibrida); -1 = quelli dell'età
+    bool   safe_night;        // ibrida: mentre dorme non può succedergli niente
+} pet_clock_t;
 
 typedef enum {
     ACT_MEAL, ACT_SNACK, ACT_WATER, ACT_CLEAN, ACT_MEDICINE, ACT_LIGHT,
@@ -78,7 +87,7 @@ typedef struct {
     uint16_t generation;
     uint16_t steps_yday;                          // giorno a cui si riferisce steps_today
     uint32_t rng;
-    uint32_t age_s, stage_s, lifespan_s, best_age_s;
+    uint32_t age_s, stage_s, lifespan_s, best_age_s;   // lifespan_s: non più usato (vive per sempre)
     uint32_t t_hunger, t_thirst, t_happy, t_poop; // conti alla rovescia (s)
     uint32_t t_tantrum, t_tantrum_on, t_check;
     uint32_t t_needs;                             // da quanto una chiamata attende risposta
@@ -92,12 +101,14 @@ typedef struct {
 } pet_t;
 
 void     pet_core_new_egg(pet_t *p, uint32_t seed);                 // conserva generazione e record
-uint32_t pet_core_step(pet_t *p, uint32_t dt, int hour);            // hour = -1 se l'ora non è nota
+uint32_t pet_core_step(pet_t *p, uint32_t dt, const pet_clock_t *c);
 uint32_t pet_core_action(pet_t *p, pet_action_t a, pet_result_t *res);
 uint32_t pet_core_steps(pet_t *p, uint32_t n, bool walking);
 uint8_t  pet_core_base_weight(int stage);
 bool     pet_core_alive(const pet_t *p);                            // nato e non morto
 uint32_t pet_core_egg_left(const pet_t *p);                         // secondi alla schiusa
+bool     pet_core_can_release(const pet_t *p);                      // ha almeno PET_RELEASE_S
+uint32_t pet_core_release(pet_t *p);                                // lo lascia tornare nell'oceano
 
 // Durate (s), esposte per UI e test
 #define PET_EGG_S        60u
@@ -107,3 +118,4 @@ uint32_t pet_core_egg_left(const pet_t *p);                         // secondi a
 #define PET_CALL_S       900u      // 15 minuti per rispondere a una chiamata
 #define PET_STARVE_S     (8u * 3600u)
 #define PET_SICK_DEATH_S (8u * 3600u)
+#define PET_RELEASE_S    (25u * 86400u)   // da qui in poi vive finché non lo lasci andare
