@@ -281,8 +281,20 @@ void pwn_save(void)
     nvs_close(h);
 }
 
+// Crea il mutex (e la coda pcap) la prima volta che servono. Va chiamata da ogni
+// funzione pubblica che prende il lock: il menu Radar legge statistiche e Pokédex
+// anche quando il radar non è mai partito, quindi "mtx" non può essere ancora NULL.
+static void pwn_ensure(void)
+{
+    if (!mtx) {
+        mtx = xSemaphoreCreateMutex();
+        pcap_q = xQueueCreate(16, sizeof(pcap_item_t));
+    }
+}
+
 void pwn_reset_pokedex(void)
 {
+    pwn_ensure();
     xSemaphoreTake(mtx, portMAX_DELAY);
     n_nets = 0;
     stats.xp = 0; stats.level = 0; stats.nets_total = 0; stats.handshakes = 0; stats.uptime_s = 0;
@@ -295,7 +307,7 @@ void pwn_reset_pokedex(void)
 void pwn_start(void)
 {
     if (running) return;
-    if (!mtx) { mtx = xSemaphoreCreateMutex(); pcap_q = xQueueCreate(16, sizeof(pcap_item_t)); }
+    pwn_ensure();
     load();
     snprintf(last_event, sizeof(last_event), "in ascolto…");
     pkts_total = 0;
@@ -322,6 +334,7 @@ bool pwn_running(void) { return running; }
 
 void pwn_get_stats(pwn_stats_t *out)
 {
+    pwn_ensure();
     xSemaphoreTake(mtx, portMAX_DELAY);
     *out = stats;
     xSemaphoreGive(mtx);
@@ -344,6 +357,7 @@ int pwn_aps_near(void)
 {
     int64_t now = esp_timer_get_time();
     int c = 0;
+    pwn_ensure();
     xSemaphoreTake(mtx, portMAX_DELAY);
     for (int i = 0; i < n_nets; i++)
         if (now - (int64_t)nets[i].last_seen * 0 >= 0 && esp_timer_get_time() / 1000000 - nets[i].last_seen < 30) c++;
