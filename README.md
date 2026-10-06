@@ -77,6 +77,9 @@ Il Bluetooth è predisposto per collegarsi nei due sensi (le funzioni vere arriv
 
 Limite dell'hardware: l'ESP32-S3 ha solo il Bluetooth Low Energy. Casse e cuffie riproducono l'audio col Bluetooth "classico" (A2DP), che questo chip non ha: per l'audio servirebbe un modulo esterno.
 
+## 8-Ball veggente
+Dal launcher: **8-Ball veggente**. Pensa a una domanda (da sì o no), scuoti la scheda o fai swipe a destra: la sfera ondeggia e dalla finestrella affiora il triangolo con una delle 20 risposte classiche (10 sì, 5 vaghe, 5 no; verde, colore d'accento, rosso). Mai la stessa due volte di fila.
+
 ## Appunti (testo dal PC → tastiera USB)
 Serve per ridigitare codici e stringhe su un PC facendo da tastiera USB. Dal launcher: **Appunti**.
 

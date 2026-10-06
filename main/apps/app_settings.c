@@ -52,13 +52,13 @@ static void a_wifi_forget(void) { wifi_mgr_forget(); ui_toast("Rete dimenticata"
 
 static const menu_item_t wifi_items[] = {
     {.icon = LV_SYMBOL_WIFI, .label = "Wi-Fi", .value = v_wifi_toggle, .on_select = a_wifi_toggle},
-    {.icon = ICON_SEARCH, .label = "Cerca reti e collegati", .value = v_wifi_net, .app = &app_wifiscan, .arg = "Wi-Fi › Reti"},
+    {.icon = ICON_SEARCH, .label = "Cerca reti e collegati", .value = v_wifi_net, .app = &app_wifiscan, .arg = "Wi-Fi » Reti"},
     {.icon = ICON_MOBILE, .label = "Configura dal telefono", .hint = "Hotspot con pagina web", .app = &app_portal},
     {.icon = ICON_INFO, .label = "Stato", .value = v_wifi_state},
     {.icon = ICON_TOWER, .label = "Segnale", .value = v_wifi_rssi},
     {.icon = LV_SYMBOL_TRASH, .label = "Dimentica rete", .on_select = a_wifi_forget, .confirm = true},
 };
-static menu_t wifi_menu = {"Impostazioni › Wi-Fi", wifi_items, sizeof(wifi_items) / sizeof(wifi_items[0]), 0, NULL};
+static menu_t wifi_menu = {"Impostazioni » Wi-Fi", wifi_items, sizeof(wifi_items) / sizeof(wifi_items[0]), 0, NULL};
 
 /* ---------------- Bluetooth ---------------- */
 
@@ -89,14 +89,14 @@ static void a_ble_forget_all(void) { ble_mgr_forget_all(); ui_toast("Associazion
 static const menu_item_t ble_items[] = {
     {.icon = LV_SYMBOL_BLUETOOTH, .label = "Bluetooth", .value = v_ble, .on_select = a_ble},
     {.icon = ICON_MOBILE, .label = "Collega a telefono o computer", .hint = "Il Gadget si fa trovare per 2 minuti", .app = &app_ble_pair},
-    {.icon = ICON_SEARCH, .label = "Collega un dispositivo", .hint = "Cerca sensori, tastiere, telecomandi…", .app = &app_blescan, .arg = "Bluetooth › Cerca"},
+    {.icon = ICON_SEARCH, .label = "Collega un dispositivo", .hint = "Cerca sensori, tastiere, telecomandi…", .app = &app_blescan, .arg = "Bluetooth » Cerca"},
     {.icon = LV_SYMBOL_LIST, .label = "Dispositivi", .value = v_ble_conns, .app = &app_ble_conns},
     {.icon = ICON_EYE, .label = "Visibile agli altri", .value = v_ble_vis, .on_select = a_ble_vis},
     {.icon = LV_SYMBOL_EDIT, .label = "Nome", .value = v_ble_name},
     {.icon = ICON_CHIP, .label = "Indirizzo", .value = v_ble_addr},
     {.icon = LV_SYMBOL_TRASH, .label = "Dimentica tutti i dispositivi", .on_select = a_ble_forget_all, .confirm = true},
 };
-static menu_t ble_menu = {"Impostazioni › Bluetooth", ble_items, sizeof(ble_items) / sizeof(ble_items[0]), 0, NULL};
+static menu_t ble_menu = {"Impostazioni » Bluetooth", ble_items, sizeof(ble_items) / sizeof(ble_items[0]), 0, NULL};
 
 /* ---------------- Schermo ---------------- */
 
@@ -158,7 +158,7 @@ static const menu_item_t screen_items[] = {
     {.icon = ICON_SLIDERS, .label = "Inverti scorrimento", .value = v_invert, .on_select = a_invert},
     {.icon = ICON_PALETTE, .label = "Colore", .value = v_accent, .on_adjust = j_accent},
 };
-static menu_t screen_menu = {"Impostazioni › Schermo", screen_items, sizeof(screen_items) / sizeof(screen_items[0]), 0, NULL};
+static menu_t screen_menu = {"Impostazioni » Schermo", screen_items, sizeof(screen_items) / sizeof(screen_items[0]), 0, NULL};
 
 /* ---------------- Data e ora ---------------- */
 
@@ -196,7 +196,7 @@ static const menu_item_t time_items[] = {
     {.icon = ICON_SYNC, .label = "Sincronizza ora", .value = v_tsrc, .on_select = a_sync},
     {.icon = LV_SYMBOL_GPS, .label = "Fuso orario", .value = v_tz},
 };
-static menu_t time_menu = {"Impostazioni › Data e ora", time_items, sizeof(time_items) / sizeof(time_items[0]), 0, NULL};
+static menu_t time_menu = {"Impostazioni » Data e ora", time_items, sizeof(time_items) / sizeof(time_items[0]), 0, NULL};
 
 /* ---------------- Sistema ---------------- */
 
@@ -252,7 +252,7 @@ static const menu_item_t sys_items[] = {
     {.icon = LV_SYMBOL_POWER, .label = "Spegni", .on_select = a_off, .confirm = true},
     {.icon = LV_SYMBOL_WARNING, .label = "Ripristina impostazioni", .on_select = a_reset, .confirm = true},
 };
-static menu_t sys_menu = {"Impostazioni › Sistema", sys_items, sizeof(sys_items) / sizeof(sys_items[0]), 0, NULL};
+static menu_t sys_menu = {"Impostazioni » Sistema", sys_items, sizeof(sys_items) / sizeof(sys_items[0]), 0, NULL};
 
 /* ---------------- Impostazioni ---------------- */
 

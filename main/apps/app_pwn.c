@@ -214,7 +214,7 @@ static const menu_item_t set_items[] = {
     {.icon = LV_SYMBOL_SD_CARD, .label = "Stato microSD", .value = v_sd},
     {.icon = LV_SYMBOL_WARNING, .label = "Azzera Pokédex e livelli", .on_select = a_reset, .confirm = true},
 };
-static menu_t set_menu = {"Radar › Impostazioni", set_items, sizeof(set_items) / sizeof(set_items[0]), 0, NULL};
+static menu_t set_menu = {"Radar » Impostazioni", set_items, sizeof(set_items) / sizeof(set_items[0]), 0, NULL};
 
 /* ================= menu principale del radar ================= */
 

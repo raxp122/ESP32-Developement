@@ -1,6 +1,6 @@
 // app_blescan.c — dispositivi Bluetooth LE nei paraggi; swipe a destra = collegati,
 // tocco prolungato (o BOOT tenuto) = nuova scansione (come lo scanner Wi-Fi). Si apre anche da
-// Impostazioni › Bluetooth (arg = titolo da mostrare).
+// Impostazioni » Bluetooth (arg = titolo da mostrare).
 #include "apps.h"
 #include "ble_mgr.h"
 #include "settings.h"

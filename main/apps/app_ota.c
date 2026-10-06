@@ -1,4 +1,4 @@
-// app_ota.c — Impostazioni › Sistema › Aggiornamento firmware.
+// app_ota.c — Impostazioni » Sistema » Aggiornamento firmware.
 // All'apertura controlla se su GitHub c'è una versione nuova; swipe a destra la installa
 // (serve un secondo swipe di conferma). A fine download la scheda si riavvia da sola.
 #include "apps.h"
@@ -100,7 +100,7 @@ static bool nav(nav_t ev)
     return true;
 }
 
-static const char *title(void *arg) { return "Impostazioni › Aggiornamento firmware"; }
+static const char *title(void *arg) { return "Impostazioni » Aggiornamento firmware"; }
 
 const app_t app_ota = {
     .name = "Aggiornamento", .icon = LV_SYMBOL_DOWNLOAD,

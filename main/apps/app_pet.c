@@ -847,7 +847,7 @@ static bool nav(nav_t ev)
             else if (sub == 1) {
                 if (board_imu_ok()) fish_start(p);
                 else say("Accelerometro non disponibile", true);
-            } else if (!g_set.pet_steps) say("Attiva il contapassi in Impostazioni › Polipetto", true);
+            } else if (!g_set.pet_steps) say("Attiva il contapassi in Impostazioni » Polipetto", true);
             else walk_start(p);
         }
         return true;
@@ -955,7 +955,7 @@ const app_t app_pet = {
     .flags = APP_FULLSCREEN | APP_OWN_QUICK,
 };
 
-/* ---------------- Impostazioni › Polipetto ---------------- */
+/* ---------------- Impostazioni » Polipetto ---------------- */
 
 // ordine in cui le modalità compaiono scorrendo (i valori salvati restano quelli dell'enum)
 static const uint8_t time_order[PET_TIME_COUNT] = {PET_TIME_HYBRID, PET_TIME_REAL, PET_TIME_DEVICE, PET_TIME_APP};
@@ -1042,4 +1042,4 @@ static const menu_item_t pet_items[] = {
     {.icon = LV_SYMBOL_UPLOAD, .label = "Lascialo tornare nell'oceano", .value = v_release, .on_select = a_release, .confirm = true},
     {.icon = LV_SYMBOL_REFRESH, .label = "Ricomincia da un uovo", .hint = "Il polipetto attuale se ne va", .on_select = a_egg, .confirm = true},
 };
-menu_t pet_settings_menu = {"Impostazioni › Polipetto", pet_items, sizeof(pet_items) / sizeof(pet_items[0]), 0, NULL};
+menu_t pet_settings_menu = {"Impostazioni » Polipetto", pet_items, sizeof(pet_items) / sizeof(pet_items[0]), 0, NULL};

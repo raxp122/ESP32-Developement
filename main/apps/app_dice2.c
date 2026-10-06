@@ -314,7 +314,7 @@ static const menu_item_t dh_items[] = {
     {.icon = ICON_SLIDERS, .label = "Modificatore", .value = v_dh_mod, .on_adjust = j_dh_mod},
     {.icon = ICON_BOLT, .label = "Vantaggio", .value = v_dh_adv, .on_adjust = j_dh_adv},
 };
-static menu_t dh_menu = {"Dadi › Daggerheart", dh_items, sizeof(dh_items) / sizeof(dh_items[0]), 0, NULL};
+static menu_t dh_menu = {"Dadi » Daggerheart", dh_items, sizeof(dh_items) / sizeof(dh_items[0]), 0, NULL};
 
 /* ================= menu Dadi ================= */
 

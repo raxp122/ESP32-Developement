@@ -520,8 +520,8 @@ const app_t app_tuner = {
 #define MAX_ITEMS 12
 static menu_item_t gtr_items[MAX_ITEMS], bass_items[MAX_ITEMS], uke_items[MAX_ITEMS];
 static char hints[3][MAX_ITEMS][32];
-static menu_t gtr_menu = {.title = "Accordatore › Chitarra"}, bass_menu = {.title = "Accordatore › Basso"},
-              uke_menu = {.title = "Accordatore › Ukulele"};
+static menu_t gtr_menu = {.title = "Accordatore » Chitarra"}, bass_menu = {.title = "Accordatore » Basso"},
+              uke_menu = {.title = "Accordatore » Ukulele"};
 
 static void fill(menu_t *m, menu_item_t *items, const tuning_t *t, int n, char h[][32], const char *icon)
 {
@@ -563,7 +563,7 @@ static void pick_pitch(void *arg)
     ui_toast(b);
 }
 
-static menu_t pitch_menu = {.title = "Accordatore › LA storici"};
+static menu_t pitch_menu = {.title = "Accordatore » LA storici"};
 
 static void v_a4(char *b, int n) { snprintf(b, n, "%.1f Hz", a4()); }
 static void j_a4(int d)

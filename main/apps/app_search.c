@@ -15,7 +15,7 @@ typedef struct {
     menu_t *menu;        // menu che contiene la voce
     int idx;             // posizione nel menu
     char norm[48];       // etichetta normalizzata
-    char where[40];      // es. "Impostazioni › Schermo"
+    char where[40];      // es. "Impostazioni » Schermo"
 } entry_t;
 
 #define MAX_ENTRIES 256   // ~150 voci oggi: con 120 metà delle app non si trovavano

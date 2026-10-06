@@ -346,7 +346,7 @@ static bool c_nav(nav_t ev)
 
 static const char *c_titlef(void *arg)
 {
-    snprintf(c_title, sizeof(c_title), "Bluetooth › Dispositivi · %d", n_ents);
+    snprintf(c_title, sizeof(c_title), "Bluetooth » Dispositivi · %d", n_ents);
     return c_title;
 }
 
