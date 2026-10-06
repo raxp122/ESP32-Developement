@@ -11,10 +11,12 @@
 
 #define BTN_Y   112
 #define BTN_H   56
-#define NBTN    5
+#define NANS    5               // risposte
+#define NBTN    6               // pulsanti al massimo: le risposte + "indietro"
+#define BACK_W  64              // il pulsante "indietro" è più stretto
 
 // pulsanti delle risposte (in partita) o delle scelte (tentativo, fine)
-static const struct { const char *txt; int a; } answers[NBTN] = {
+static const struct { const char *txt; int a; } answers[NANS] = {
     {"Sì", Q20_YES}, {"Forse sì", Q20_PROB_YES}, {"Non so", Q20_DUNNO}, {"Forse no", Q20_PROB_NO}, {"No", Q20_NO},
 };
 
@@ -24,6 +26,7 @@ static int cur_q = -1, cur_guess = -1;
 static lv_obj_t *l_top, *l_main, *l_hint;
 static lv_obj_t *btn[NBTN], *btn_l[NBTN];
 static int btn_n;                       // pulsanti visibili
+static bool has_back;                   // il primo pulsante è "indietro"
 static int btn_x[NBTN], btn_w[NBTN];
 static lv_timer_t *touch_tmr;
 
@@ -42,14 +45,19 @@ static void cap(const char *in, char *out, int n)
 static void set_buttons(const char *const *labels, int n)
 {
     btn_n = n;
-    int gap = 6, w = (SCR_W - 24 - gap * (n - 1)) / n;
+    // con "indietro" in testa: lui stretto, gli altri si dividono il resto
+    int gap = 6, first = has_back && n > 1 ? BACK_W : 0;
+    int rest = n - (first ? 1 : 0);
+    int w = (SCR_W - 24 - first - gap * (n - 1)) / (rest ? rest : 1);
+    int x = 12;
     for (int i = 0; i < NBTN; i++) {
         if (i >= n) { lv_obj_add_flag(btn[i], LV_OBJ_FLAG_HIDDEN); continue; }
-        btn_x[i] = 12 + i * (w + gap);
-        btn_w[i] = w;
+        btn_x[i] = x;
+        btn_w[i] = (i == 0 && first) ? first : w;
+        x += btn_w[i] + gap;
         lv_obj_clear_flag(btn[i], LV_OBJ_FLAG_HIDDEN);
         lv_obj_set_pos(btn[i], btn_x[i], BTN_Y);
-        lv_obj_set_size(btn[i], w, BTN_H);
+        lv_obj_set_size(btn[i], btn_w[i], BTN_H);
         lv_label_set_text(btn_l[i], labels[i]);
         lv_obj_center(btn_l[i]);
     }
@@ -65,6 +73,7 @@ static void press_style(int i, bool down)
 
 static void show_intro(void)
 {
+    has_back = false;
     st = S_INTRO;
     char t[160];
     int g, w;
@@ -92,10 +101,14 @@ static void show_question(void)
     snprintf(t, sizeof(t), "Domanda %d", q20_asked() + 1);
     ui_set_text(l_top, t);
     ui_set_text(l_main, q20_question(cur_q));
-    ui_set_text(l_hint, q20_asked() ? "BOOT: annulla l'ultima risposta" : "");
+    ui_set_text(l_hint, "");
+    // dalla seconda domanda: "indietro" (←) per cambiare l'ultima risposta
+    has_back = q20_asked() > 0;
     static const char *b[NBTN];
-    for (int i = 0; i < NBTN; i++) b[i] = answers[i].txt;
-    set_buttons(b, NBTN);
+    int n = 0;
+    if (has_back) b[n++] = LV_SYMBOL_LEFT;
+    for (int i = 0; i < NANS; i++) b[n++] = answers[i].txt;
+    set_buttons(b, n);
 }
 
 static void show_guess(void)
@@ -109,12 +122,14 @@ static void show_guess(void)
     ui_set_text(l_top, top);
     ui_set_text(l_main, t);
     ui_set_text(l_hint, "");
-    static const char *const b[] = {"Sì, indovinato!", "No"};
-    set_buttons(b, 2);
+    has_back = true;   // si torna all'ultima domanda
+    static const char *const b[] = {LV_SYMBOL_LEFT, "Sì, indovinato!", "No"};
+    set_buttons(b, 3);
 }
 
 static void show_win(void)
 {
+    has_back = false;
     st = S_WIN;
     char name[48], t[96];
     cap(q20_name(cur_guess), name, sizeof(name));
@@ -128,6 +143,7 @@ static void show_win(void)
 
 static void show_lose(void)
 {
+    has_back = false;
     st = S_LOSE;
     ui_set_text(l_top, "Q-20");
     ui_set_text(l_main, "Mi hai battuto! A cosa pensavi?");
@@ -271,11 +287,16 @@ static void on_button(int i)
         next();
         break;
     case S_ASK:
+        if (has_back) {
+            if (i == 0) { q20_undo(); next(); break; }   // cambia idea sull'ultima risposta
+            i--;
+        }
         q20_answer(cur_q, answers[i].a);
         next();
         break;
     case S_GUESS:
-        if (i == 0) { q20_win(cur_guess); show_win(); break; }
+        if (i == 0) { q20_undo(); next(); break; }        // indietro: di nuovo l'ultima domanda
+        if (i == 1) { q20_win(cur_guess); show_win(); break; }
         q20_wrong(cur_guess);
         if (q20_over()) show_lose();
         else next();
