@@ -34,7 +34,7 @@ th_cfg_t th_cfg;
 static void cfg_defaults(void)
 {
     th_cfg = (th_cfg_t){
-        .magic = CFG_MAGIC, .wave = TH_WAVE_THEREMIN, .octave = 0, .span = 2, .glide = 2,
+        .magic = CFG_MAGIC, .wave = TH_WAVE_THEREMIN, .low = 57, .high = 81, .glide = 2,
         .vib_depth = 2, .vib_rate = 5, .scale = TH_SCALE_FREE, .root = 0, .echo = 0, .echo_fb = 1,
         .tone = 3, .roll_fn = TH_ROLL_VOLUME, .sens = 1, .always = 0, .mic = 0, .mic_gain = 2, .level = 80,
     };
@@ -52,8 +52,9 @@ void th_cfg_load(void)
         memcpy(&th_cfg, &tmp, len);
         // valori fuori misura (backup rovinato) tornano ai predefiniti
         if (th_cfg.wave >= TH_WAVE_COUNT) th_cfg.wave = TH_WAVE_THEREMIN;
-        if (th_cfg.octave < -2 || th_cfg.octave > 2) th_cfg.octave = 0;
-        if (th_cfg.span < 1 || th_cfg.span > 3) th_cfg.span = 2;
+        // (anche il salvataggio della prima versione, che qui aveva ottava ed estensione)
+        if (th_cfg.low < TH_NOTE_MIN || th_cfg.high > TH_NOTE_MAX || th_cfg.high - th_cfg.low < TH_RANGE_MIN)
+            th_range_default();
         if (th_cfg.glide > 4) th_cfg.glide = 2;
         if (th_cfg.vib_depth > 10) th_cfg.vib_depth = 2;
         if (th_cfg.vib_rate < 3 || th_cfg.vib_rate > 8) th_cfg.vib_rate = 5;
@@ -66,9 +67,12 @@ void th_cfg_load(void)
         if (th_cfg.sens > 2) th_cfg.sens = 1;
         if (th_cfg.mic_gain < 1 || th_cfg.mic_gain > 4) th_cfg.mic_gain = 2;
         if (th_cfg.level < 10 || th_cfg.level > 100) th_cfg.level = 80;
+        if (th_cfg.swap > 1) th_cfg.swap = 0;
     }
     nvs_close(h);
 }
+
+void th_range_default(void) { th_cfg.low = 57; th_cfg.high = 81; }
 
 void th_cfg_save(void)
 {
@@ -244,9 +248,8 @@ void th_control(float p, float r, bool gate)
     if (p > 1) p = 1;
     if (r < -1) r = -1;
     if (r > 1) r = 1;
-    // nota: posizione zero = La della propria ottava (La4 con ottava 0); estensione divisa a metà
-    float center = 69 + 12 * th_cfg.octave;
-    float note = snap(center + p * th_cfg.span * 6.0f);
+    // nota: dalla più bassa (tutto da una parte) alla più alta; posizione zero = a metà
+    float note = snap(th_cfg.low + (p + 1) * 0.5f * (th_cfg.high - th_cfg.low));
     t_freq = a4() * powf(2.0f, (note - 69) / 12.0f);
 
     float vib = th_cfg.vib_depth * 0.1f;
