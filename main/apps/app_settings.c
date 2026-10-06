@@ -51,7 +51,7 @@ static const menu_item_t wifi_items[] = {
     {.icon = ICON_TOWER, .label = "Segnale", .value = v_wifi_rssi},
     {.icon = LV_SYMBOL_TRASH, .label = "Dimentica rete", .on_select = a_wifi_forget, .confirm = true},
 };
-static menu_t wifi_menu = {"Impostazioni › Wi-Fi", wifi_items, sizeof(wifi_items) / sizeof(wifi_items[0])};
+static menu_t wifi_menu = {"Impostazioni › Wi-Fi", wifi_items, sizeof(wifi_items) / sizeof(wifi_items[0]), 0};
 
 /* ---------------- Bluetooth ---------------- */
 
@@ -74,7 +74,7 @@ static const menu_item_t ble_items[] = {
     {.icon = LV_SYMBOL_EDIT, .label = "Nome", .value = v_ble_name},
     {.icon = ICON_CHIP, .label = "Indirizzo", .value = v_ble_addr},
 };
-static menu_t ble_menu = {"Impostazioni › Bluetooth", ble_items, sizeof(ble_items) / sizeof(ble_items[0])};
+static menu_t ble_menu = {"Impostazioni › Bluetooth", ble_items, sizeof(ble_items) / sizeof(ble_items[0]), 0};
 
 /* ---------------- Schermo ---------------- */
 
@@ -136,7 +136,7 @@ static const menu_item_t screen_items[] = {
     {.icon = ICON_SLIDERS, .label = "Inverti scorrimento", .value = v_invert, .on_select = a_invert},
     {.icon = ICON_PALETTE, .label = "Colore", .value = v_accent, .on_adjust = j_accent},
 };
-static menu_t screen_menu = {"Impostazioni › Schermo", screen_items, sizeof(screen_items) / sizeof(screen_items[0])};
+static menu_t screen_menu = {"Impostazioni › Schermo", screen_items, sizeof(screen_items) / sizeof(screen_items[0]), 0};
 
 /* ---------------- Data e ora ---------------- */
 
@@ -174,7 +174,7 @@ static const menu_item_t time_items[] = {
     {.icon = ICON_SYNC, .label = "Sincronizza ora", .value = v_tsrc, .on_select = a_sync},
     {.icon = LV_SYMBOL_GPS, .label = "Fuso orario", .value = v_tz},
 };
-static menu_t time_menu = {"Impostazioni › Data e ora", time_items, sizeof(time_items) / sizeof(time_items[0])};
+static menu_t time_menu = {"Impostazioni › Data e ora", time_items, sizeof(time_items) / sizeof(time_items[0]), 0};
 
 /* ---------------- Sistema ---------------- */
 
@@ -230,7 +230,7 @@ static const menu_item_t sys_items[] = {
     {.icon = LV_SYMBOL_POWER, .label = "Spegni", .on_select = a_off, .confirm = true},
     {.icon = LV_SYMBOL_WARNING, .label = "Ripristina impostazioni", .on_select = a_reset, .confirm = true},
 };
-static menu_t sys_menu = {"Impostazioni › Sistema", sys_items, sizeof(sys_items) / sizeof(sys_items[0])};
+static menu_t sys_menu = {"Impostazioni › Sistema", sys_items, sizeof(sys_items) / sizeof(sys_items[0]), 0};
 
 /* ---------------- Impostazioni ---------------- */
 
@@ -265,7 +265,8 @@ static const menu_item_t settings_items[] = {
     {.icon = ICON_BOLT, .label = "Azione rapida", .value = v_quick, .on_adjust = j_quick},
     {.icon = LV_SYMBOL_HOME, .label = "App all'avvio", .value = v_boot, .on_adjust = j_boot},
     {.icon = ICON_GAMEPAD, .label = "Polipetto", .app = &app_menu, .arg = &pet_settings_menu},
+    {.icon = LV_SYMBOL_SD_CARD, .label = "Backup e ripristino", .app = &app_menu, .arg = &backup_menu},
     {.icon = ICON_CLOCK, .label = "Data e ora", .value = v_time, .app = &app_menu, .arg = &time_menu},
     {.icon = ICON_CHIP, .label = "Sistema", .value = v_fw, .app = &app_menu, .arg = &sys_menu},
 };
-menu_t settings_menu = {"Impostazioni", settings_items, sizeof(settings_items) / sizeof(settings_items[0])};
+menu_t settings_menu = {"Impostazioni", settings_items, sizeof(settings_items) / sizeof(settings_items[0]), 0};

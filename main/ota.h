@@ -23,3 +23,4 @@ int         ota_progress(void);
 const char *ota_current(void);          // versione in uso
 const char *ota_latest(void);           // ultima versione trovata ("" se non nota)
 const char *ota_error(void);
+int         ota_compare(const char *a, const char *b);   // >0 se la versione a è più nuova di b

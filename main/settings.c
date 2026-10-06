@@ -6,7 +6,7 @@
 #include "nvs.h"
 #include "esp_log.h"
 
-#define SETTINGS_VERSION 11
+#define SETTINGS_VERSION 12
 settings_t g_set;
 
 static void defaults(void)
@@ -39,7 +39,10 @@ static void defaults(void)
     g_set.pet_sleep_h = 22;
     g_set.pet_wake_h = 8;
     g_set.ota_auto = 1;
+    g_set.backup_before_ota = 1;
 }
+
+int settings_version(void) { return SETTINGS_VERSION; }
 
 /* ---------------- migrazione dalla vecchia tabella delle partizioni ----------------
  * Fino alla 0.13 l'NVS stava a 0x9000, proprio dove l'immagine unica gadget.bin (che
@@ -145,6 +148,7 @@ void settings_load(void)
             g_set.pet_tilt_inv = 0;
         }
         if (old < 11) { g_set.pet_sleep_h = 22; g_set.pet_wake_h = 8; g_set.ota_auto = 1; }
+        if (old < 12) g_set.backup_before_ota = 1;
         if (g_set.pet_time >= PET_TIME_COUNT) g_set.pet_time = PET_TIME_REAL;
         if (g_set.pet_sleep_h > 23) g_set.pet_sleep_h = 22;
         if (g_set.pet_wake_h > 23) g_set.pet_wake_h = 8;

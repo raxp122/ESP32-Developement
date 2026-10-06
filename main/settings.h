@@ -58,6 +58,8 @@ typedef struct {
     uint8_t  pet_sleep_h;     // modalità ibrida: ora della nanna (0–23)
     uint8_t  pet_wake_h;      // modalità ibrida: ora della sveglia (0–23)
     uint8_t  ota_auto;        // controlla gli aggiornamenti quando c'è internet
+    // v12
+    uint8_t  backup_before_ota;   // backup automatico sulla microSD prima di ogni aggiornamento
 } settings_t;
 
 // i valori sono salvati: quelli nuovi vanno in fondo
@@ -70,4 +72,5 @@ extern settings_t g_set;
 void settings_load(void);
 void settings_save(void);
 void settings_reset(void);
+int  settings_version(void);   // versione del formato delle impostazioni (per i backup)
 const char *settings_quick_name(int q);
