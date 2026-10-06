@@ -169,6 +169,8 @@ void settings_load(void)
         if (g_set.pet_time >= PET_TIME_COUNT) g_set.pet_time = PET_TIME_REAL;
         if (g_set.pet_sleep_h > 23) g_set.pet_sleep_h = 22;
         if (g_set.pet_wake_h > 23) g_set.pet_wake_h = 8;
+        // Wi-Fi e Bluetooth mai accesi insieme (dalla v14 del firmware): vince il Wi-Fi
+        if (g_set.wifi_on && g_set.ble_on) g_set.ble_on = false;
         // un blob da un backup rovinato non deve lasciare lo schermo spento o stringhe aperte
         if (g_set.brightness < 5 || g_set.brightness > 100) g_set.brightness = 70;
         if (g_set.quick_action >= QUICK_COUNT) g_set.quick_action = QUICK_TORCH;

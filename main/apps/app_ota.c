@@ -5,10 +5,13 @@
 #include "ota.h"
 #include "wifi_mgr.h"
 #include "ble_mgr.h"
+#include "radio.h"
+#include "settings.h"
 #include <stdio.h>
 
 static lv_obj_t *l_ver, *l_state, *l_hint, *bar;
 static bool ble_paused;   // il Bluetooth era acceso ed è in pausa finché si resta qui
+static bool want_check;   // controllo da fare appena il Wi-Fi è collegato
 static uint32_t confirm_until;
 
 static lv_obj_t *mk(lv_obj_t *root, const lv_font_t *f, lv_color_t c, int y)
@@ -25,6 +28,8 @@ static lv_obj_t *mk(lv_obj_t *root, const lv_font_t *f, lv_color_t c, int y)
 
 static void render(void)
 {
+    // il controllo parte quando c'è la connessione (subito dopo aver acceso il Wi-Fi ci vuole un attimo)
+    if (want_check && wifi_mgr_state() == WIFI_CONNECTED) { want_check = false; ota_check(); }
     char t[128];
     ota_state_t s = ota_state();
     const char *latest = ota_latest();
@@ -36,7 +41,11 @@ static void render(void)
     const char *state = "", *hint = "";
     lv_color_t col = C_TEXT;
     switch (s) {
-    case OTA_IDLE:       state = "Pronto"; hint = "Swipe a destra: controlla"; break;
+    case OTA_IDLE:
+        if (want_check && !g_set.wifi_ssid[0]) { state = "Nessuna rete Wi-Fi"; hint = "Configurala in Impostazioni » Wi-Fi"; }
+        else if (want_check) { state = "Collegamento al Wi-Fi…"; hint = ""; }
+        else { state = "Pronto"; hint = "Swipe a destra: controlla"; }
+        break;
     case OTA_CHECKING:   state = "Controllo in corso…"; break;
     case OTA_UP_TO_DATE: state = "È già l'ultima versione"; col = C_OK; hint = "Swipe a destra: controlla di nuovo"; break;
     case OTA_AVAILABLE:
@@ -81,8 +90,15 @@ static void enter(lv_obj_t *root, void *arg)
     // Wi-Fi e Bluetooth condividono la radio: durante controllo e download tutta al Wi-Fi
     ble_paused = ble_mgr_on();
     ble_mgr_suspend(true);
+    // serve il Wi-Fi: se era attivo il Bluetooth (uno dei due alla volta) si passa al Wi-Fi
+    if (!g_set.wifi_on) {
+        radio_only_wifi();
+        g_set.wifi_on = true;
+        settings_save();
+        wifi_mgr_apply();
+    }
     ota_state_t s = ota_state();
-    if (s == OTA_IDLE || s == OTA_UP_TO_DATE || s == OTA_ERROR) ota_check();
+    want_check = s == OTA_IDLE || s == OTA_UP_TO_DATE || s == OTA_ERROR;
     render();
 }
 

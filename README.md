@@ -70,6 +70,8 @@ Dal launcher: Livella. La prima volta chiede una calibrazione in due passi (appo
 Impostazioni › Wi-Fi › **Cerca reti e collegati**: elenco delle reti vicine, swipe a destra per collegarti (con la tastiera per la password). È la stessa schermata dello Scanner Wi-Fi, che funziona anche mentre sei connesso. Tocco prolungato: nuova scansione. In alternativa "Configura dal telefono" apre un hotspot con una pagina web.
 
 ## Bluetooth
+**Wi-Fi e Bluetooth non sono mai accesi insieme**: l'ESP32-S3 ha una sola radio e con tutti e due attivi il Wi-Fi diventa lento e instabile. Di predefinito è acceso il Wi-Fi; accendere il Bluetooth (anche da Appunti › Ricevi dal PC o collegando un dispositivo) spegne il Wi-Fi, e viceversa. La schermata di aggiornamento riaccende da sola il Wi-Fi. Gli scanner funzionano comunque, finché sono aperti.
+
 Il Bluetooth è predisposto per collegarsi nei due sensi (le funzioni vere arriveranno sopra):
 - **Collega a telefono o computer** (il Gadget è l'accessorio): per 2 minuti il Gadget si fa trovare col suo nome; sceglilo nelle impostazioni Bluetooth dell'altro dispositivo. Se l'altro ha una tastiera, sul Gadget compare un codice da digitare. Dopo l'associazione si ricollega da solo; nessun altro può associarsi a finestra chiusa. Base per la futura tastiera Bluetooth. Nota: iPhone elenca nelle impostazioni solo accessori di tipo noto (tastiera, cuffie…), quindi il Gadget comparirà lì quando avrà il profilo tastiera.
 - **Collega un dispositivo** (il Gadget comanda): scansione, swipe a destra su un dispositivo collegabile per collegarti e vedere i servizi che offre (batteria, battito cardiaco, tastiera…).
@@ -85,6 +87,7 @@ Dal launcher: **Q-20**. Pensa a qualcosa (animale, oggetto, cibo, luogo, persona
 
 - Conosce all'inizio 250 cose e 100 domande (tabella generata da `tools/q20_gen.py`).
 - Una risposta sbagliata non lo manda fuori strada: ogni risposta pesa, nessuna elimina.
+- **Imparate**: dalla schermata iniziale, l'elenco delle cose che ha imparato da te; swipe a destra (due volte) per fargliene dimenticare una.
 - Quello che impara sta in `q20/kb.txt` sulla microSD ed entra nei backup. Senza microSD si gioca, ma non impara.
 - Ampliare la conoscenza iniziale: modifica `tools/q20_gen.py` (le domande nuove solo in fondo), lancia `python3 tools/q20_gen.py` e aumenta `SEED_VERSION`: il Gadget aggiunge le cose nuove al suo file senza toccare quello che ha imparato.
 

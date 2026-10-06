@@ -3,6 +3,7 @@
 #include "settings.h"
 #include "wifi_mgr.h"
 #include "ble_mgr.h"
+#include "radio.h"
 #include "board.h"
 #include <stdio.h>
 #include <time.h>
@@ -20,6 +21,7 @@ static const char *onoff(bool v) { return v ? "Acceso" : "Spento"; }
 static void v_wifi_toggle(char *b, int n) { snprintf(b, n, "%s", onoff(g_set.wifi_on)); }
 static void a_wifi_toggle(void)
 {
+    if (!g_set.wifi_on) radio_only_wifi();   // uno dei due alla volta
     g_set.wifi_on = !g_set.wifi_on;
     settings_save();
     wifi_mgr_apply();
@@ -63,7 +65,13 @@ static menu_t wifi_menu = {"Impostazioni » Wi-Fi", wifi_items, sizeof(wifi_item
 /* ---------------- Bluetooth ---------------- */
 
 static void v_ble(char *b, int n) { snprintf(b, n, "%s", onoff(g_set.ble_on)); }
-static void a_ble(void) { g_set.ble_on = !g_set.ble_on; settings_save(); ble_mgr_apply(); }
+static void a_ble(void)
+{
+    if (!g_set.ble_on) radio_only_ble();   // uno dei due alla volta
+    g_set.ble_on = !g_set.ble_on;
+    settings_save();
+    ble_mgr_apply();
+}
 static void v_ble_vis(char *b, int n) { snprintf(b, n, "%s", g_set.ble_visible ? "Sì" : "No"); }
 static void a_ble_vis(void)
 {

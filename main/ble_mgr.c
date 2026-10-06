@@ -3,6 +3,7 @@
 // aggiornano tabelle protette da mutex che l'interfaccia legge quando vuole.
 #include "ble_mgr.h"
 #include "settings.h"
+#include "radio.h"
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -267,7 +268,7 @@ static void pair_timer_cb(void *arg)
 
 void ble_mgr_pair_start(int seconds)
 {
-    if (!g_set.ble_on) { g_set.ble_on = true; settings_save(); }
+    if (!g_set.ble_on) { radio_only_ble(); g_set.ble_on = true; settings_save(); }
     pair_until_us = esp_timer_get_time() + (int64_t)seconds * 1000000;
     esp_timer_stop(pair_timer);
     esp_timer_start_once(pair_timer, (uint64_t)seconds * 1000000);
@@ -678,7 +679,7 @@ void ble_mgr_addr(char *buf, int n)
 
 bool ble_mgr_connect(const ble_dev_t *dv)
 {
-    if (!g_set.ble_on) { g_set.ble_on = true; settings_save(); ble_mgr_apply(); }
+    if (!g_set.ble_on) { radio_only_ble(); g_set.ble_on = true; settings_save(); ble_mgr_apply(); }
     lock();
     memcpy(link.addr, dv->addr, 6);
     snprintf(link.name, sizeof(link.name), "%s", dv->name);

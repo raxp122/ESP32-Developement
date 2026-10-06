@@ -4,6 +4,7 @@
 #include "apps.h"
 #include "ble_mgr.h"
 #include "settings.h"
+#include "radio.h"
 #include <stdio.h>
 #include <string.h>
 
@@ -86,7 +87,7 @@ static bool nav(nav_t ev)
         if (!n) { pending = true; render(0); return true; }   // elenco vuoto: nuova scansione
         if (!list[sel].connectable) { ui_toast("Questo dispositivo non accetta collegamenti"); return true; }
         // i collegamenti vivono col Bluetooth acceso (lo scanner da solo lo accende solo per sé)
-        if (!g_set.ble_on) { g_set.ble_on = true; settings_save(); ble_mgr_apply(); }
+        if (!g_set.ble_on) { radio_only_ble(); g_set.ble_on = true; settings_save(); ble_mgr_apply(); }
         ui_push(&app_ble_device, &list[sel]);
         return true;
     case NAV_QUICK: pending = true; render(0); return true;   // tocco prolungato (o BOOT tenuto) = nuova scansione

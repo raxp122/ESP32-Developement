@@ -36,3 +36,7 @@ void q20_wrong(int i);               // non era quella
 bool q20_over(void);                 // finite le domande: ha perso
 void q20_win(int i);                 // era quella: impara e salva
 int  q20_teach(const char *name);    // ha perso: era "name" (nuova o già nota). -1 se non valida
+
+// registro delle cose imparate (quelle che non c'erano nella conoscenza iniziale)
+int  q20_learned(int *out, int max); // indici, nell'ordine in cui le ha imparate
+bool q20_forget(int i);              // la dimentica (e salva); interrompe la partita in corso
