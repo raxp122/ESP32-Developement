@@ -23,6 +23,7 @@ static menu_item_t items[] = {
     {.icon = LV_SYMBOL_COPY, .label = "Appunti",           .app = &app_menu, .arg = &clips_menu},
     {.icon = ICON_EYE,      .label = "8-Ball veggente",   .app = &app_8ball},
     {.icon = ICON_GAMEPAD,  .label = "Q-20",              .app = &app_q20},
+    {.icon = ICON_TUNER,    .label = "Theremin",          .app = &app_theremin},
     {.icon = LV_SYMBOL_SETTINGS, .label = "Impostazioni", .app = &app_menu, .arg = &settings_menu},
 };
 
@@ -69,6 +70,7 @@ static const boot_app_t boot_apps[] = {
     {"Appunti", &app_menu, &clips_menu},
     {"8-Ball veggente", &app_8ball, NULL},
     {"Q-20", &app_q20, NULL},
+    {"Theremin", &app_theremin, NULL},
 };
 #define N_BOOT (int)(sizeof(boot_apps) / sizeof(boot_apps[0]))
 

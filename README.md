@@ -82,6 +82,17 @@ Limite dell'hardware: l'ESP32-S3 ha solo il Bluetooth Low Energy. Casse e cuffie
 ## 8-Ball veggente
 Dal launcher: **8-Ball veggente**. Pensa a una domanda (da sì o no), scuoti la scheda o fai swipe a destra: la sfera ondeggia e dalla finestrella affiora il triangolo con una delle 20 risposte classiche (10 sì, 5 vaghe, 5 no; verde, colore d'accento, rosso). Mai la stessa due volte di fila.
 
+## Theremin
+Dal launcher: **Theremin**. Inclina la scheda avanti/indietro per cambiare la nota, ruotala a destra/sinistra per il volume (a sinistra fino al silenzio). Suona finché tieni il dito sulla zona grande a sinistra; **BOOT** imposta la posizione zero (la nota di partenza è il La della tua ottava).
+
+Pulsanti a destra:
+- **Suono**: forma d'onda (Theremin, Sinusoide, Triangolo, Dente di sega, Quadra), ottava, estensione (1–3 ottave), glide, vibrato e sua velocità, volume.
+- **Scala**: libera (glissando, come il theremin vero) oppure agganciata a cromatica, maggiore, minore, pentatonica o blues, con la tonica a scelta. Il LA di riferimento è quello dell'Accordatore.
+- **Effetti**: eco (corta, media, lunga) e ripetizioni, timbro (da scuro a brillante).
+- **Comandi**: cosa fa la rotazione (volume, vibrato, timbro o niente), sensibilità, inversione di nota e rotazione, "suona sempre", volume del microfono.
+- **Registra**: registra quello che suoni in un file WAV nella cartella `theremin` della microSD. Con **Mic: sì** mixa anche il microfono, per cantare mentre suoni (il microfono sente anche l'altoparlante).
+- **Registrazioni**: elenco per riascoltarle (swipe a destra) o cancellarle (BOOT due volte).
+
 ## Q-20
 Dal launcher: **Q-20**. Pensa a qualcosa (animale, oggetto, cibo, luogo, persona…) e rispondi alle domande toccando *Sì*, *Forse sì*, *Non so*, *Forse no*, *No*. Dopo una ventina di domande (prima, se è sicuro) prova a indovinare; se sbaglia continua, fino a 30. Se vince lui, ricorda ancora meglio quella cosa; se perde ti chiede cosa pensavi e la impara. Il pulsante ← (o BOOT) torna indietro all'ultima domanda se cambi idea, anche quando sta già provando a indovinare.
 
