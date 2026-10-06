@@ -33,12 +33,16 @@ static void render(int dir)
     list_view_set(&lv, it->icon ? it->icon : LV_SYMBOL_RIGHT, item_label(m->sel - 1), it->label, sub,
                   item_label(m->sel + 1), m->sel, m->count, dir);
 
-    // in modifica il valore diventa una "pillola" piena
-    lv_obj_set_style_bg_opa(lv.sub, editing ? LV_OPA_COVER : LV_OPA_TRANSP, 0);
-    lv_obj_set_style_bg_color(lv.sub, ui_accent(), 0);
-    lv_obj_set_style_text_color(lv.sub, editing ? C_BG : (confirm_idx == m->sel ? C_WARN : ui_accent()), 0);
-    lv_obj_set_style_pad_hor(lv.sub, editing ? 8 : 0, 0);
-    lv_obj_set_width(lv.sub, editing ? LV_SIZE_CONTENT : SCR_W - 100);
+    // in modifica il valore diventa una "pillola" piena. Ogni stile si tocca solo se cambia:
+    // questa funzione gira ogni secondo e ogni modifica ridisegna lo schermo.
+    lv_opa_t opa = editing ? LV_OPA_COVER : LV_OPA_TRANSP;
+    if (lv_obj_get_style_bg_opa(lv.sub, 0) != opa) lv_obj_set_style_bg_opa(lv.sub, opa, 0);
+    if (!lv_color_eq(lv_obj_get_style_bg_color(lv.sub, 0), ui_accent())) lv_obj_set_style_bg_color(lv.sub, ui_accent(), 0);
+    ui_set_text_color(lv.sub, editing ? C_BG : (confirm_idx == m->sel ? C_WARN : ui_accent()));
+    int32_t pad = editing ? 8 : 0;
+    if (lv_obj_get_style_pad_left(lv.sub, 0) != pad) lv_obj_set_style_pad_hor(lv.sub, pad, 0);
+    int32_t w = editing ? LV_SIZE_CONTENT : SCR_W - 100;
+    if (lv_obj_get_style_width(lv.sub, 0) != w) lv_obj_set_width(lv.sub, w);
 }
 
 static void enter(lv_obj_t *root, void *arg)

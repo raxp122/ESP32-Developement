@@ -12,19 +12,24 @@ static const char *mesi[] = {"gennaio", "febbraio", "marzo", "aprile", "maggio",
 
 static void update(void)
 {
+    // chiamata 5 volte al secondo: le etichette si toccano solo quando cambiano
+    char b[48];
     time_t now = time(NULL);
     struct tm t;
     localtime_r(&now, &t);
     if (t.tm_year < 124) {
-        lv_label_set_text(l_time, "--:--");
-        lv_label_set_text(l_sec, "");
-        lv_label_set_text(l_date, "Ora non impostata: collega il Wi-Fi");
+        ui_set_text(l_time, "--:--");
+        ui_set_text(l_sec, "");
+        ui_set_text(l_date, "Ora non impostata: collega il Wi-Fi");
         return;
     }
-    lv_label_set_text_fmt(l_time, "%02d:%02d", t.tm_hour, t.tm_min);
-    if (show_sec) lv_label_set_text_fmt(l_sec, "%02d", t.tm_sec);
-    else lv_label_set_text(l_sec, "");
-    lv_label_set_text_fmt(l_date, "%s %d %s", giorni[t.tm_wday], t.tm_mday, mesi[t.tm_mon]);
+    snprintf(b, sizeof(b), "%02d:%02d", t.tm_hour, t.tm_min);
+    ui_set_text(l_time, b);
+    if (show_sec) snprintf(b, sizeof(b), "%02d", t.tm_sec);
+    else b[0] = 0;
+    ui_set_text(l_sec, b);
+    snprintf(b, sizeof(b), "%s %d %s", giorni[t.tm_wday], t.tm_mday, mesi[t.tm_mon]);
+    ui_set_text(l_date, b);
 }
 
 static void enter(lv_obj_t *root, void *arg)
