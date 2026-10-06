@@ -143,7 +143,13 @@ static void do_check(void)
 {
     state = OTA_CHECKING;
     if (wifi_mgr_state() != WIFI_CONNECTED) { fail("Collega il Wi-Fi a internet"); return; }
-    if (!fetch_latest()) return;
+    // un secondo tentativo: subito dopo il collegamento al Wi-Fi la prima richiesta
+    // (DNS, orologio non ancora sincronizzato per i certificati) può fallire
+    if (!fetch_latest()) {
+        vTaskDelay(pdMS_TO_TICKS(3000));
+        state = OTA_CHECKING;
+        if (!fetch_latest()) return;
+    }
     state = newer(latest, ota_current()) ? OTA_AVAILABLE : OTA_UP_TO_DATE;
     ESP_LOGI(TAG, "in uso %s, disponibile %s", ota_current(), latest);
 }
@@ -172,18 +178,31 @@ static void do_install(void)
     };
     esp_https_ota_config_t cfg = {.http_config = &http};
     esp_https_ota_handle_t h = NULL;
-    if (esp_https_ota_begin(&cfg, &h) != ESP_OK) { fail("Download non riuscito"); return; }
-
-    // controllo di sicurezza: deve essere davvero un firmware di questo progetto
     esp_app_desc_t d;
-    if (esp_https_ota_get_img_desc(h, &d) != ESP_OK ||
-        strncmp(d.project_name, esp_app_get_description()->project_name, sizeof(d.project_name))) {
+    // Collegamento e lettura dell'intestazione, con qualche nuovo tentativo: GitHub
+    // rimanda a un altro server e una connessione ballerina può interrompersi proprio qui.
+    // Solo un'intestazione letta per intero e di un altro progetto vuol dire "file sbagliato".
+    esp_err_t r = ESP_FAIL;
+    for (int attempt = 1; attempt <= 3; attempt++) {
+        if (attempt > 1) { ESP_LOGW(TAG, "nuovo tentativo (%d/3)", attempt); vTaskDelay(pdMS_TO_TICKS(2000)); }
+        h = NULL;
+        r = esp_https_ota_begin(&cfg, &h);
+        if (r != ESP_OK) { ESP_LOGW(TAG, "collegamento non riuscito: %s", esp_err_to_name(r)); continue; }
+        r = esp_https_ota_get_img_desc(h, &d);
+        if (r == ESP_OK) break;
+        ESP_LOGW(TAG, "intestazione non letta: %s", esp_err_to_name(r));
+        esp_https_ota_abort(h);
+        h = NULL;
+    }
+    if (r != ESP_OK) { fail("Download non riuscito: controlla il Wi-Fi e riprova"); return; }
+    // controllo di sicurezza: deve essere davvero un firmware di questo progetto
+    if (strncmp(d.project_name, esp_app_get_description()->project_name, sizeof(d.project_name))) {
+        ESP_LOGW(TAG, "progetto \"%.32s\" invece di \"%s\"", d.project_name, esp_app_get_description()->project_name);
         esp_https_ota_abort(h);
         fail("Il file scaricato non è un firmware del Gadget");
         return;
     }
     int total = esp_https_ota_get_image_size(h);
-    esp_err_t r;
     while ((r = esp_https_ota_perform(h)) == ESP_ERR_HTTPS_OTA_IN_PROGRESS) {
         int got = esp_https_ota_get_image_len_read(h);
         if (total > 0) progress = got * 100 / total;
