@@ -158,7 +158,7 @@ static float yin(const float *x, yin_work_t *w)
     int lo = 2 * best - 3, hi = 2 * best + 3;
     if (lo < TAU_MIN) lo = TAU_MIN;
     if (hi > TAU_MAX - 1) hi = TAU_MAX - 1;
-    float r[16];
+    float r[16] = {0};   // lo..hi ha al massimo 7 valori, più i due vicini
     int bt = lo;
     for (int tau = lo - 1; tau <= hi + 1; tau++) r[tau - lo + 1] = sqdiff(x, tau, W1);
     for (int tau = lo; tau <= hi; tau++) if (r[tau - lo + 1] < r[bt - lo + 1]) bt = tau;
