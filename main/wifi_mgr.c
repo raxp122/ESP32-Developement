@@ -30,6 +30,10 @@ static wifi_mode_t cur_mode = WIFI_MODE_NULL;
 static volatile wifi_state_t state = WIFI_OFF;
 static char ip_str[16];
 static volatile bool scanning;
+// un tentativo di connessione è davvero in corso (tra esp_wifi_connect e l'esito). Lo stato
+// resta WIFI_CONNECTING anche nelle pause tra un tentativo e l'altro, quando la radio è
+// libera e si può scansionare: lontano dalla rete salvata lo scanner deve funzionare.
+static volatile bool attempt;
 static volatile bool conn_fail;   // tentativi esauriti
 static volatile uint8_t conn_reason;
 static int conn_try;
@@ -48,6 +52,12 @@ static volatile int portal_clients;
 static char ap_ssid[24];
 
 static bool want_sta(void) { return g_set.wifi_on && g_set.wifi_ssid[0]; }
+
+static void sta_connect(void)
+{
+    attempt = true;
+    if (esp_wifi_connect() != ESP_OK) attempt = false;
+}
 
 /* ---------------- NTP ---------------- */
 
@@ -84,12 +94,23 @@ static void apply_sta_config(void)
     strlcpy((char *)c.sta.password, g_set.wifi_pass, sizeof(c.sta.password));
     c.sta.threshold.authmode = g_set.wifi_pass[0] ? WIFI_AUTH_WPA_PSK : WIFI_AUTH_OPEN;
     c.sta.pmf_cfg.capable = true;
+    // Riscrivere la stessa configurazione da connessi fa cadere la connessione (e con lei
+    // la scansione appena partita): lo scanner la riapplicava a ogni apertura.
+    wifi_config_t cur;
+    if (started && esp_wifi_get_config(WIFI_IF_STA, &cur) == ESP_OK &&
+        !strncmp((char *)cur.sta.ssid, (char *)c.sta.ssid, sizeof(c.sta.ssid)) &&
+        !strncmp((char *)cur.sta.password, (char *)c.sta.password, sizeof(c.sta.password)) &&
+        cur.sta.threshold.authmode == c.sta.threshold.authmode)
+        return;
     esp_wifi_set_config(WIFI_IF_STA, &c);
 }
 
 static void reconnect_cb(void *arg)
 {
-    if (started && want_sta() && state != WIFI_CONNECTED && !conn_fail) esp_wifi_connect();
+    if (!started || !want_sta() || state == WIFI_CONNECTED || conn_fail) return;
+    // una scansione in corso verrebbe interrotta: riprova appena finisce
+    if (scanning) { esp_timer_start_once(reconnect_timer, 1500 * 1000); return; }
+    sta_connect();
 }
 
 static void on_event(void *arg, esp_event_base_t base, int32_t id, void *data)
@@ -97,10 +118,11 @@ static void on_event(void *arg, esp_event_base_t base, int32_t id, void *data)
     if (base == WIFI_EVENT) {
         switch (id) {
         case WIFI_EVENT_STA_START:
-            if (want_sta()) { state = WIFI_CONNECTING; esp_wifi_connect(); }
+            if (want_sta()) { state = WIFI_CONNECTING; sta_connect(); }
             break;
         case WIFI_EVENT_STA_DISCONNECTED: {
             wifi_event_sta_disconnected_t *d = data;
+            attempt = false;
             conn_reason = d ? d->reason : 0;
             ip_str[0] = 0;
             if (started && want_sta()) {
@@ -127,7 +149,7 @@ static void on_event(void *arg, esp_event_base_t base, int32_t id, void *data)
         }
         case WIFI_EVENT_SCAN_DONE: {
             scanning = false;
-            if (state == WIFI_CONNECTING) { esp_wifi_clear_ap_list(); scan_gen++; break; }
+            if (attempt) { esp_wifi_clear_ap_list(); scan_gen++; break; }
             uint16_t n = 32;
             wifi_ap_record_t *rec = calloc(n, sizeof(*rec));
             if (rec && esp_wifi_scan_get_ap_records(&n, rec) == ESP_OK) {
@@ -157,6 +179,7 @@ static void on_event(void *arg, esp_event_base_t base, int32_t id, void *data)
         ip_event_got_ip_t *e = data;
         snprintf(ip_str, sizeof(ip_str), IPSTR, IP2STR(&e->ip_info.ip));
         state = WIFI_CONNECTED;
+        attempt = false;
         retry_ms = 1000;
         conn_fail = false;
         conn_try = 0;
@@ -196,7 +219,7 @@ void wifi_mgr_sniff_stop(void)
     sniff_cb = NULL;
     sniff_on = false;
     update_mode();   // ripristina il Wi-Fi normale
-    if (started && want_sta()) { state = WIFI_CONNECTING; esp_wifi_connect(); }
+    if (started && want_sta()) { state = WIFI_CONNECTING; sta_connect(); }
 }
 
 void wifi_mgr_sniff_channel(int ch)
@@ -213,6 +236,7 @@ static void update_mode(void)
     if (!need) {
         if (started) { esp_wifi_stop(); started = false; }
         state = WIFI_OFF;
+        attempt = scanning = false;
         ip_str[0] = 0;
         return;
     }
@@ -236,7 +260,7 @@ static void update_mode(void)
         return;
     }
     if (want_sta()) {
-        if (state != WIFI_CONNECTED && state != WIFI_CONNECTING) { state = WIFI_CONNECTING; esp_wifi_connect(); }
+        if (state != WIFI_CONNECTED && state != WIFI_CONNECTING) { state = WIFI_CONNECTING; sta_connect(); }
     } else {
         if (state == WIFI_CONNECTED || state == WIFI_CONNECTING) esp_wifi_disconnect();
         state = g_set.wifi_on ? WIFI_NO_NETWORK : WIFI_OFF;
@@ -304,9 +328,16 @@ bool wifi_mgr_scan_start(void)
 {
     // non scansionare durante un tentativo di connessione: i due usi della radio si
     // escludono a vicenda e lascerebbero il Wi-Fi bloccato
-    if (!started || scanning || state == WIFI_CONNECTING) return false;
+    if (!started || scanning || attempt) return false;
     wifi_scan_config_t sc = {.show_hidden = false};
-    if (esp_wifi_scan_start(&sc, false) != ESP_OK) return false;
+    if (state == WIFI_CONNECTED) {
+        // da connessi la radio torna sul canale della rete tra un canale e l'altro:
+        // tempi per canale più corti, così la connessione non risente della scansione
+        sc.scan_time.active.min = 60;
+        sc.scan_time.active.max = 120;
+    }
+    esp_err_t r = esp_wifi_scan_start(&sc, false);
+    if (r != ESP_OK) { ESP_LOGD(TAG, "scansione non avviata: %s", esp_err_to_name(r)); return false; }
     scanning = true;
     return true;
 }
@@ -346,7 +377,7 @@ bool wifi_mgr_connect(const char *ssid, const char *pass)
     conn_try = 0;
     state = WIFI_CONNECTING;
     apply_sta_config();
-    esp_wifi_connect();
+    sta_connect();
     return true;
 }
 

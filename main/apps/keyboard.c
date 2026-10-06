@@ -15,6 +15,12 @@
 #define KEY_W    64
 #define ROW3_W   56                     // tasti lettera della terza riga (lascia spazio ai comandi)
 #define MAX_SHOW 46                     // caratteri visibili nella riga del testo
+// Il controller del touch a volte "perde" il dito per qualche lettura anche se è fermo:
+// se bastassero due letture vuote, un solo tocco diventerebbe due lettere. Il dito conta
+// come sollevato solo dopo RELEASE_MS senza letture; un tocco più corto di PRESS_MIN_MS
+// (un rimbalzo del pannello) non scrive nulla.
+#define RELEASE_MS   70
+#define PRESS_MIN_MS 25
 
 enum { P_LOWER, P_UPPER, P_NUM, P_SYM, P_ACC, P_COUNT };
 // ogni scheda: 10 + 9 + 7 caratteri (seconda riga + cancella, terza + comandi)
@@ -219,32 +225,35 @@ static int hit(int x, int y)
     return -1;
 }
 
+static bool t_isdown, t_moved;
+static int t_sx, t_sy;
+static uint32_t t_down, t_seen;
+
 static void touch_cb(lv_timer_t *t)
 {
-    static bool down, moved;
-    static int sx, sy, rel;
     int x, y;
+    uint32_t now = lv_tick_get();
     if (input_touch(&x, &y)) {
-        rel = 0;
-        if (!down) {
-            down = true; moved = false; sx = x; sy = y;
+        t_seen = now;
+        if (!t_isdown) {
+            t_isdown = true; t_moved = false; t_sx = x; t_sy = y; t_down = now;
             key_down = hit(x, y);
             if (key_down >= 0) style(key_down, true);
             return;
         }
-        if (abs(x - sx) > 26 || abs(y - sy) > 26) {
-            moved = true;   // è uno swipe: annulla il tasto
+        if (abs(x - t_sx) > 26 || abs(y - t_sy) > 26) {
+            t_moved = true;   // è uno swipe: annulla il tasto
             if (key_down >= 0) { style(key_down, false); key_down = -1; }
         }
         return;
     }
-    if (!down || ++rel < 2) return;
-    down = false;
+    if (!t_isdown || now - t_seen < RELEASE_MS) return;
+    t_isdown = false;
     if (key_down >= 0) {
         int k = key_down;
         key_down = -1;
         if (keys[k].obj) style(k, false);
-        if (!moved) press(k);   // può ricostruire i tasti o chiudere la schermata
+        if (!t_moved && t_seen - t_down >= PRESS_MIN_MS) press(k);   // può ricostruire i tasti o chiudere la schermata
     }
 }
 
@@ -284,6 +293,7 @@ void keyboard_open(lv_obj_t *root, const char *title, const char *initial, bool 
 
     rebuild();
     key_down = -1;
+    t_isdown = false;
     tmr = lv_timer_create(touch_cb, 15, NULL);
 }
 

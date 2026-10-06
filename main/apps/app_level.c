@@ -7,6 +7,8 @@
 // L'orientamento dell'accelerometro rispetto allo schermo non è documentato, quindi si
 // misura una volta con la calibrazione guidata (piatta, poi in piedi): da lì si ricavano
 // gli assi dello schermo in modo esatto. "Azzera" fissa lo zero sulla superficie attuale.
+// Ogni passo della calibrazione parte con lo swipe ma misura dopo: aspetta che la scheda
+// smetta di muoversi (lo swipe stesso la sposta), poi fa la media di quasi un secondo.
 #include "apps.h"
 #include "board.h"
 #include "settings.h"
@@ -21,6 +23,10 @@
 #define FULL_DEG  10.0f      // inclinazione a fondo scala della bolla
 #define LEVEL_DEG 0.25f      // sotto questa soglia è "in bolla"
 #define CAL_MAGIC 0x314C564Cu   // "LVL1"
+#define MEAS_SETTLE_MS 600       // dopo lo swipe: lascia assestare la scheda
+#define MEAS_SAMPLES   40        // ~0,8 s di campioni fermi
+#define MEAS_SHAKE     0.06f     // scarto (g) oltre cui la misura ricomincia
+#define MEAS_TIMEOUT   8000
 
 typedef struct {
     uint32_t magic;
@@ -35,6 +41,9 @@ enum { U_DEG, U_PCT, U_MMM, U_COUNT };
 
 static level_cal_t cal;
 static int state, mode = -1, pending_mode = -1, unit;
+// misura di un passo della calibrazione in corso
+static struct { bool on; uint32_t t0; int n; float sum[3]; vec3_t prev; } meas;
+static void meas_feed(const vec3_t *g);
 static uint32_t pending_since;
 static vec3_t lp, cal_flat;
 static float motion = 1;
@@ -241,9 +250,16 @@ static void render(void)
         set_color(l_big, ui_accent(), false);
         set_text(l_mode, state == ST_CAL_FLAT ? "Calibrazione 1 di 2" : "Calibrazione 2 di 2");
         set_color(l_mode, ui_accent(), false);
+        if (meas.on) {
+            uint32_t el = lv_tick_get() - meas.t0;
+            if (el < MEAS_SETTLE_MS) snprintf(t, sizeof(t), "Lascia la scheda ferma…");
+            else snprintf(t, sizeof(t), "Misuro… %d%%", meas.n * 100 / MEAS_SAMPLES);
+            set_text(l_hint, t);
+            return;
+        }
         set_text(l_hint, state == ST_CAL_FLAT
-                 ? "Appoggia la scheda su un piano, schermo in su, e tienila ferma. Poi swipe a destra"
-                 : "Ora mettila in piedi sul lato lungo in basso, schermo verso di te. Poi swipe a destra");
+                 ? "Appoggia la scheda su un piano, schermo in su. Poi swipe a destra e non toccarla per un secondo"
+                 : "Ora mettila in piedi sul lato lungo in basso, schermo verso di te. Poi swipe a destra e lasciala");
         return;
     }
     if (mode < 0) return;
@@ -292,6 +308,7 @@ static void sample_cb(lv_timer_t *t)
     lp.y += (g.y - lp.y) * k;
     lp.z += (g.z - lp.z) * k;
 
+    if (meas.on) meas_feed(&g);
     if (state == ST_RUN && !held) {
         float v[3];
         if (screen_vec(v)) {
@@ -315,15 +332,13 @@ static void sample_cb(lv_timer_t *t)
 
 /* ---------------- azioni ---------------- */
 
-static bool still(void) { return motion < 0.012f; }
-
-static void cal_step(void)
+// applica un passo della calibrazione con la gravità media misurata (a, in g)
+static void cal_apply(const float a[3])
 {
-    float a[3] = {lp.x, lp.y, lp.z};
     float mag = sqrtf(dot(a, a));
-    if (!still() || mag < 0.85f || mag > 1.15f) { ui_toast("Tienila ferma un attimo"); return; }
+    if (mag < 0.8f || mag > 1.2f) { ui_toast("Misura strana: riprova tenendola ferma"); return; }
     if (state == ST_CAL_FLAT) {
-        cal_flat = lp;
+        cal_flat = (vec3_t){a[0], a[1], a[2]};
         state = ST_CAL_EDGE;
         return;
     }
@@ -333,7 +348,8 @@ static void cal_step(void)
     norm(z);
     norm(up);
     float dz = dot(up, z);
-    if (fabsf(dz) > 0.3f) { ui_toast("Non sembra in piedi sul lato: riprova"); return; }
+    // tollerante: basta che sia più in piedi che sdraiata (si corregge con l'ortogonalizzazione)
+    if (fabsf(dz) > 0.5f) { ui_toast("Non sembra in piedi sul lato: riprova"); return; }
     float y[3] = {-(up[0] - dz * z[0]), -(up[1] - dz * z[1]), -(up[2] - dz * z[2])}, x[3];
     norm(y);
     cross(z, y, x);   // x = z × y: destra dello schermo
@@ -347,6 +363,40 @@ static void cal_step(void)
     state = ST_RUN;
     mode = pending_mode = -1;
     ui_toast("Livella calibrata");
+}
+
+static void meas_start(void)
+{
+    meas.on = true;
+    meas.t0 = lv_tick_get();
+    meas.n = 0;
+}
+
+// un campione grezzo: si accumula solo se la scheda è ferma, altrimenti si ricomincia
+static void meas_feed(const vec3_t *g)
+{
+    uint32_t now = lv_tick_get();
+    if (now - meas.t0 > MEAS_TIMEOUT) {
+        meas.on = false;
+        ui_toast("Si muove ancora: appoggiala e riprova");
+        return;
+    }
+    if (now - meas.t0 < MEAS_SETTLE_MS) { meas.prev = *g; return; }
+    float d = fabsf(g->x - meas.prev.x) + fabsf(g->y - meas.prev.y) + fabsf(g->z - meas.prev.z);
+    meas.prev = *g;
+    if (meas.n > 0) {
+        // scarto dalla media finora: un urto o la mano che la sposta fanno ripartire
+        float m[3] = {meas.sum[0] / meas.n, meas.sum[1] / meas.n, meas.sum[2] / meas.n};
+        float dm = fabsf(g->x - m[0]) + fabsf(g->y - m[1]) + fabsf(g->z - m[2]);
+        if (dm > MEAS_SHAKE || d > MEAS_SHAKE) { meas.n = 0; }
+    }
+    if (meas.n == 0) { meas.sum[0] = meas.sum[1] = meas.sum[2] = 0; }
+    meas.sum[0] += g->x; meas.sum[1] += g->y; meas.sum[2] += g->z;
+    if (++meas.n < MEAS_SAMPLES) return;
+    meas.on = false;
+    float a[3] = {meas.sum[0] / meas.n, meas.sum[1] / meas.n, meas.sum[2] / meas.n};
+    cal_apply(a);
+    render();
 }
 
 static void set_zero(void)
@@ -363,8 +413,9 @@ static void set_zero(void)
 static bool nav(nav_t ev)
 {
     if (state != ST_RUN) {
-        if (ev == NAV_SELECT) { cal_step(); render(); return true; }
+        if (ev == NAV_SELECT) { if (!meas.on) meas_start(); render(); return true; }
         if (ev == NAV_BACK || ev == NAV_BTN) {
+            if (meas.on) { meas.on = false; render(); return true; }   // annulla la misura
             if (cal.magic != CAL_MAGIC) return false;   // mai calibrata: si esce
             state = ST_RUN;
             mode = pending_mode = -1;
@@ -377,7 +428,7 @@ static bool nav(nav_t ev)
     case NAV_NEXT:   unit = (unit + 1) % U_COUNT; render(); return true;
     case NAV_PREV:   unit = (unit + U_COUNT - 1) % U_COUNT; render(); return true;
     case NAV_BTN:    held = !held; render(); return true;
-    case NAV_QUICK:  held = false; state = ST_CAL_FLAT; render(); return true;
+    case NAV_QUICK:  held = false; meas.on = false; state = ST_CAL_FLAT; render(); return true;
     default:         return false;
     }
 }
@@ -439,6 +490,7 @@ static void enter(lv_obj_t *root, void *arg)
     state = cal.magic == CAL_MAGIC ? ST_RUN : ST_CAL_FLAT;
     mode = pending_mode = -1;
     held = have_lp = false;
+    meas.on = false;
     motion = 1;
     ui_div = 0;
     if (!board_imu_ok()) {

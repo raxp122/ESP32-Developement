@@ -38,3 +38,5 @@ CONFIG_SPIRAM_ALLOW_BSS_SEG_EXTERNAL_MEMORY=y
 CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE=y
 # TLS (download da GitHub): buffer in PSRAM per non togliere RAM interna a Wi-Fi e LVGL
 CONFIG_MBEDTLS_EXTERNAL_MEM_ALLOC=y
+# associazioni Bluetooth salvate nell'NVS (ricollegamento automatico)
+CONFIG_BT_NIMBLE_NVS_PERSIST=y

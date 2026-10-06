@@ -53,7 +53,7 @@ Impostazioni › Polipetto: scorrere del tempo, orari di nanna e sveglia, versi,
 Dai 25 giorni non invecchia più: vive per sempre, oppure da Impostazioni puoi lasciarlo tornare nell'oceano e ricominciare da un uovo.
 
 ## Livella
-Dal launcher: Livella. La prima volta chiede una calibrazione in due passi (appoggiata, poi in piedi sul lato lungo): così sa come è montato l'accelerometro. Poi riconosce da sola il modo:
+Dal launcher: Livella. La prima volta chiede una calibrazione in due passi (appoggiata, poi in piedi sul lato lungo): così sa come è montato l'accelerometro. A ogni passo fai lo swipe e lascia la scheda: aspetta che smetta di muoversi e misura per circa un secondo (se la tocchi ricomincia). Poi riconosce da sola il modo:
 - **appoggiata**: bolla circolare con inclinazione X e Y;
 - **sul lato lungo**: tubo orizzontale;
 - **sul lato corto**: filo a piombo.
@@ -65,6 +65,17 @@ Dal launcher: Livella. La prima volta chiede una calibrazione in due passi (appo
 | BOOT | blocca / sblocca la lettura |
 | Dito tenuto premuto | rifà la calibrazione |
 | Swipe a sinistra | esce |
+
+## Wi-Fi
+Impostazioni › Wi-Fi › **Cerca reti e collegati**: elenco delle reti vicine, swipe a destra per collegarti (con la tastiera per la password). È la stessa schermata dello Scanner Wi-Fi, che funziona anche mentre sei connesso. Tocco prolungato: nuova scansione. In alternativa "Configura dal telefono" apre un hotspot con una pagina web.
+
+## Bluetooth
+Il Bluetooth è predisposto per collegarsi nei due sensi (le funzioni vere arriveranno sopra):
+- **Collega a telefono o computer** (il Gadget è l'accessorio): per 2 minuti il Gadget si fa trovare col suo nome; sceglilo nelle impostazioni Bluetooth dell'altro dispositivo. Se l'altro ha una tastiera, sul Gadget compare un codice da digitare. Dopo l'associazione si ricollega da solo; nessun altro può associarsi a finestra chiusa. Base per la futura tastiera Bluetooth. Nota: iPhone elenca nelle impostazioni solo accessori di tipo noto (tastiera, cuffie…), quindi il Gadget comparirà lì quando avrà il profilo tastiera.
+- **Collega un dispositivo** (il Gadget comanda): scansione, swipe a destra su un dispositivo collegabile per collegarti e vedere i servizi che offre (batteria, battito cardiaco, tastiera…).
+- **Dispositivi**: collegamenti attivi e dispositivi associati; swipe a destra (due volte) per scollegare o dimenticare.
+
+Limite dell'hardware: l'ESP32-S3 ha solo il Bluetooth Low Energy. Casse e cuffie riproducono l'audio col Bluetooth "classico" (A2DP), che questo chip non ha: per l'audio servirebbe un modulo esterno.
 
 ## Backup e ripristino
 Impostazioni › Backup e ripristino:
@@ -104,7 +115,7 @@ Dalla 0.14 le impostazioni (NVS) stanno in fondo alla flash (`0xFF0000`): né l'
 - `main/ui.*` pila di schermate, barra di stato, spegnimento schermo, azione rapida, `list_view`
 - `main/menu.c` menu generico (usato da home e impostazioni)
 - `main/wifi_mgr.*` Wi-Fi, scansione, portale captive per configurare la rete dal telefono, NTP
-- `main/ble_mgr.*` NimBLE: visibilità e scansione
+- `main/ble_mgr.*` NimBLE: visibilità, scansione, collegamenti nei due sensi, associazioni, profili · `main/apps/app_bt.c` le schermate
 - `main/pet_core.*` regole del Polipetto (pure, senza hardware) · `main/pet.*` tempo reale, salvataggio, contapassi, versi
 - `main/backup.*` backup e ripristino su microSD · `main/ota.*` aggiornamenti via internet · `main/settings.*` impostazioni (con migrazione dalla vecchia tabella)
 - `main/apps/` le app (`app_pet.c` + `pet_art.c` per il Polipetto, `app_ota.c` per gli aggiornamenti, `app_backup.c`, `app_level.c` per la livella)

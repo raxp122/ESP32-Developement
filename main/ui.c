@@ -122,6 +122,7 @@ static void bar_update(void)
     float v = board_battery_volts();
     if (v > 2.5f) {
         int p = board_battery_percent(v);
+        ble_mgr_set_battery(p);
         const char *ic = p > 85 ? LV_SYMBOL_BATTERY_FULL : p > 60 ? LV_SYMBOL_BATTERY_3
                        : p > 35 ? LV_SYMBOL_BATTERY_2 : p > 12 ? LV_SYMBOL_BATTERY_1 : LV_SYMBOL_BATTERY_EMPTY;
         snprintf(t, sizeof(t), "%s %d%%", ic, p);
