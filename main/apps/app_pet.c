@@ -1042,4 +1042,4 @@ static const menu_item_t pet_items[] = {
     {.icon = LV_SYMBOL_UPLOAD, .label = "Lascialo tornare nell'oceano", .value = v_release, .on_select = a_release, .confirm = true},
     {.icon = LV_SYMBOL_REFRESH, .label = "Ricomincia da un uovo", .hint = "Il polipetto attuale se ne va", .on_select = a_egg, .confirm = true},
 };
-menu_t pet_settings_menu = {"Impostazioni › Polipetto", pet_items, sizeof(pet_items) / sizeof(pet_items[0]), 0};
+menu_t pet_settings_menu = {"Impostazioni › Polipetto", pet_items, sizeof(pet_items) / sizeof(pet_items[0]), 0, NULL};

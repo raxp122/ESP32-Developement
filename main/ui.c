@@ -186,10 +186,21 @@ static void show_top(int dir)
     bar_update();
 }
 
+static bool closing;   // leave_top per un ritorno indietro (ui_pop/ui_home)
+
+bool ui_closing(void) { return closing; }
+
 static void leave_top(void)
 {
     const frame_t *f = &stack[depth - 1];
     if (f->app->leave) f->app->leave();
+}
+
+static void close_top(void)
+{
+    closing = true;
+    leave_top();
+    closing = false;
 }
 
 void ui_push(const app_t *app, void *arg)
@@ -203,14 +214,14 @@ void ui_push(const app_t *app, void *arg)
 void ui_pop(void)
 {
     if (depth <= 1) return;
-    leave_top();
+    close_top();
     depth--;
     show_top(-1);
 }
 
 void ui_home(void)
 {
-    while (depth > 1) { leave_top(); depth--; }
+    while (depth > 1) { close_top(); depth--; }
     show_top(-1);
 }
 

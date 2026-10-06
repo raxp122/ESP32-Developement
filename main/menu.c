@@ -121,6 +121,7 @@ static void tick(void)
 static void leave(void)
 {
     active = false;
+    if (ui_closing() && m->on_close) m->on_close();
     if (editing) { editing = false; settings_defer(false); }   // salva quello che si stava regolando
 }
 

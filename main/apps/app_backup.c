@@ -125,4 +125,4 @@ static const menu_item_t items[] = {
     {.icon = ICON_INFO, .label = "Cosa contiene",
      .hint = "Impostazioni, Wi-Fi, polipetto, Radar, livella. Il file è in chiaro: tienilo al sicuro"},
 };
-menu_t backup_menu = {"Impostazioni › Backup", items, sizeof(items) / sizeof(items[0]), 0};
+menu_t backup_menu = {"Impostazioni › Backup", items, sizeof(items) / sizeof(items[0]), 0, NULL};

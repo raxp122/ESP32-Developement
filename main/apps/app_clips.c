@@ -406,4 +406,4 @@ static const menu_item_t clip_items[] = {
     {.icon = ICON_SLIDERS, .label = "Layout tastiera", .value = v_layout, .on_adjust = j_layout},
     {.icon = LV_SYMBOL_TRASH, .label = "Cancella tutti", .on_select = a_clear, .confirm = true},
 };
-menu_t clips_menu = {"Appunti", clip_items, sizeof(clip_items) / sizeof(clip_items[0]), 0};
+menu_t clips_menu = {"Appunti", clip_items, sizeof(clip_items) / sizeof(clip_items[0]), 0, NULL};

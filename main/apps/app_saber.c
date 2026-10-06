@@ -596,4 +596,4 @@ static const menu_item_t saber_items[] = {
     {.icon = ICON_BOLT, .label = "Sensibilità scontro", .value = v_clash, .on_adjust = j_clash},
     {.icon = ICON_INFO, .label = "Comandi", .value = v_help},
 };
-menu_t saber_menu = {"Spada laser", saber_items, sizeof(saber_items) / sizeof(saber_items[0]), 0};
+menu_t saber_menu = {"Spada laser", saber_items, sizeof(saber_items) / sizeof(saber_items[0]), 0, NULL};

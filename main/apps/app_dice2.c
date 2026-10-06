@@ -314,7 +314,7 @@ static const menu_item_t dh_items[] = {
     {.icon = ICON_SLIDERS, .label = "Modificatore", .value = v_dh_mod, .on_adjust = j_dh_mod},
     {.icon = ICON_BOLT, .label = "Vantaggio", .value = v_dh_adv, .on_adjust = j_dh_adv},
 };
-static menu_t dh_menu = {"Dadi › Daggerheart", dh_items, sizeof(dh_items) / sizeof(dh_items[0]), 0};
+static menu_t dh_menu = {"Dadi › Daggerheart", dh_items, sizeof(dh_items) / sizeof(dh_items[0]), 0, NULL};
 
 /* ================= menu Dadi ================= */
 
@@ -360,4 +360,4 @@ static const menu_item_t dice_items[] = {
     {.icon = LV_SYMBOL_TRASH, .label = "Svuota il pool", .on_select = a_clear},
     {.icon = ICON_GHOST, .label = "Daggerheart", .value = NULL, .app = &app_menu, .arg = &dh_menu},
 };
-menu_t dice_menu = {"Dadi", dice_items, sizeof(dice_items) / sizeof(dice_items[0]), 0};
+menu_t dice_menu = {"Dadi", dice_items, sizeof(dice_items) / sizeof(dice_items[0]), 0, NULL};

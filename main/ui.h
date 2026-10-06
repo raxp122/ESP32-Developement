@@ -71,6 +71,7 @@ void ui_init(void);
 void ui_push(const app_t *app, void *arg);
 void ui_pop(void);
 void ui_home(void);
+bool ui_closing(void);                 // dentro leave(): la schermata si chiude (indietro), non ne copre un'altra
 void ui_rebuild(void);                 // ricostruisce la schermata corrente
 void ui_toast(const char *msg);
 void ui_screen_off(void);
@@ -104,6 +105,7 @@ typedef struct {
     const menu_item_t *items;
     int count;
     int sel;
+    void (*on_close)(void);   // opzionale: si esce dal menu tornando indietro (non aprendo una voce)
 } menu_t;
 
 extern const app_t app_menu;           // arg = menu_t*

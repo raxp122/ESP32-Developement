@@ -583,7 +583,7 @@ static const menu_item_t tuner_items[] = {
     {.icon = LV_SYMBOL_LIST, .label = "LA storici", .hint = "440, 442, 432, 415 barocco…", .app = &app_menu, .arg = &pitch_menu},
     {.icon = LV_SYMBOL_REFRESH, .label = "Riporta il LA a 440 Hz", .on_select = a_a4_reset},
 };
-menu_t tuner_menu = {"Accordatore", tuner_items, sizeof(tuner_items) / sizeof(tuner_items[0]), 0};
+menu_t tuner_menu = {"Accordatore", tuner_items, sizeof(tuner_items) / sizeof(tuner_items[0]), 0, NULL};
 
 void tuner_menu_init(void)
 {
