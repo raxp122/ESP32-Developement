@@ -180,7 +180,12 @@ static void got_name(const char *t, void *arg)
 {
     keyboard_close();
     ui_pop();
-    if (t && t[0]) { strlcpy(g_set.pwn_name, t, sizeof(g_set.pwn_name)); settings_save(); ui_toast("Nome salvato"); }
+    if (t && t[0]) {
+        strlcpy(g_set.pwn_name, t, sizeof(g_set.pwn_name));
+        settings_save();
+        pwn_set_name(g_set.pwn_name);   // si vede subito, anche col radar acceso
+        ui_toast("Nome salvato");
+    }
 }
 static void name_enter(lv_obj_t *root, void *arg)
 {

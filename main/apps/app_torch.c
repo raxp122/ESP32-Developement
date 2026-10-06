@@ -26,6 +26,7 @@ static void apply(void)
         hide_timer = lv_timer_create(hide_label, 1200, NULL);
         lv_timer_set_repeat_count(hide_timer, 1);
     }
+    ui_set_brightness_override(on ? 100 : -1);   // vale anche dopo uno spegnimento dello schermo
     display_set_brightness(on ? 100 : g_set.brightness);
 }
 
@@ -45,6 +46,7 @@ static void enter(lv_obj_t *root, void *arg)
 static void leave(void)
 {
     if (hide_timer) { lv_timer_delete(hide_timer); hide_timer = NULL; }
+    ui_set_brightness_override(-1);
     display_set_brightness(g_set.brightness);
 }
 

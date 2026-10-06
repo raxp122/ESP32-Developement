@@ -410,11 +410,16 @@ static bool process(FILE *f, char *line, uint8_t *buf, bool apply)
         lineno++;
         size_t len = strlen(line);
         if (len == LINE_MAX - 1 && line[len - 1] != '\n') { if (out) fclose(out); return fail("Backup danneggiato (riga troppo lunga)"); }
-        if (!strncmp(line, "crc ", 4)) {
+        bool is_crc = !strncmp(line, "crc ", 4);
+        bool is_end = !strncmp(line, "end", 3);
+        // dopo il CRC può venire solo "end": righe aggiunte lì non sarebbero coperte dal controllo
+        if (crc_ok && !is_end) { if (out) fclose(out); return fail("Backup danneggiato (dati dopo il CRC)"); }
+        if (is_crc) {
             crc_ok = strtoul(line + 4, NULL, 16) == crc;
+            if (!crc_ok) { if (out) fclose(out); return fail("Backup danneggiato (controllo CRC fallito)"); }
             continue;
         }
-        if (!strncmp(line, "end", 3)) { ended = true; break; }
+        if (is_end) { ended = true; break; }
         crc = esp_rom_crc32_le(crc, (const uint8_t *)line, len);
         chomp(line);
         if (lineno <= 4) continue;   // intestazione, già letta

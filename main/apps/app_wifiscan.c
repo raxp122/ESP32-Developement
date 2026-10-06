@@ -75,7 +75,10 @@ static void tick(void)
 /* ---- schermata di esito della connessione ---- */
 
 static char pending_ssid[33];
+static bool pending_secure;   // la rete scelta chiede una password
 static lv_obj_t *res_icon, *res_main, *res_sub;
+static void result_tick(void);
+static const app_t app_wifi_pass;
 
 static void result_enter(lv_obj_t *root, void *arg)
 {
@@ -92,30 +95,34 @@ static void result_enter(lv_obj_t *root, void *arg)
     lv_label_set_long_mode(res_sub, LV_LABEL_LONG_WRAP);
     lv_obj_align(res_main, LV_ALIGN_LEFT_MID, 130, -16);
     lv_obj_align(res_sub, LV_ALIGN_LEFT_MID, 130, 22);
+    result_tick();   // subito il testo giusto, non quello predefinito di LVGL
 }
 
 static void result_tick(void)
 {
+    // tutto con ui_set_text*: senza cambiamenti niente ridisegno dello schermo intero
+    char sub[96];
     if (wifi_mgr_state() == WIFI_CONNECTED) {
-        lv_label_set_text(res_icon, LV_SYMBOL_OK);
-        lv_obj_set_style_text_color(res_icon, C_OK, 0);
-        lv_label_set_text(res_main, "Connesso");
-        lv_obj_set_style_text_color(res_main, C_OK, 0);
-        lv_label_set_text_fmt(res_sub, "%s · %s", pending_ssid, wifi_mgr_ip());
+        ui_set_text(res_icon, LV_SYMBOL_OK);
+        ui_set_text_color(res_icon, C_OK);
+        ui_set_text(res_main, "Connesso");
+        ui_set_text_color(res_main, C_OK);
+        snprintf(sub, sizeof(sub), "%s · %s", pending_ssid, wifi_mgr_ip());
+        ui_set_text(res_sub, sub);
     } else if (wifi_mgr_conn_failed()) {
         bool no_ap = wifi_mgr_conn_reason() == 201;
-        lv_label_set_text(res_icon, LV_SYMBOL_WARNING);
-        lv_obj_set_style_text_color(res_icon, C_WARN, 0);
-        lv_label_set_text(res_main, no_ap ? "Rete non trovata" : "Password errata");
-        lv_obj_set_style_text_color(res_main, C_WARN, 0);
-        lv_label_set_text(res_sub, no_ap ? "Controlla che la rete sia a portata e a 2,4 GHz. Swipe a destra per riprovare."
-                                         : "Swipe a destra per reinserire la password · sinistra per uscire");
+        ui_set_text(res_icon, LV_SYMBOL_WARNING);
+        ui_set_text_color(res_icon, C_WARN);
+        ui_set_text(res_main, no_ap ? "Rete non trovata" : "Password errata");
+        ui_set_text_color(res_main, C_WARN);
+        ui_set_text(res_sub, no_ap ? "Controlla che la rete sia a portata e a 2,4 GHz. Swipe a destra per riprovare."
+                                   : "Swipe a destra per reinserire la password · sinistra per uscire");
     } else {
-        lv_label_set_text(res_icon, LV_SYMBOL_REFRESH);
-        lv_obj_set_style_text_color(res_icon, ui_accent(), 0);
-        lv_label_set_text(res_main, "Connessione…");
-        lv_obj_set_style_text_color(res_main, C_TEXT, 0);
-        lv_label_set_text_fmt(res_sub, "%s", pending_ssid);
+        ui_set_text(res_icon, LV_SYMBOL_REFRESH);
+        ui_set_text_color(res_icon, ui_accent());
+        ui_set_text(res_main, "Connessione…");
+        ui_set_text_color(res_main, C_TEXT);
+        ui_set_text(res_sub, pending_ssid);
     }
 }
 
@@ -125,8 +132,9 @@ static bool result_nav(nav_t ev)
 {
     if (ev == NAV_SELECT) {
         if (wifi_mgr_state() == WIFI_CONNECTED) { ui_pop(); return true; }   // torna all'elenco
-        // riprova: se protetta richiede di nuovo la password
         ui_pop();
+        // password errata: di nuovo la tastiera, come promette il messaggio
+        if (wifi_mgr_conn_failed() && pending_secure && wifi_mgr_conn_reason() != 201) ui_push(&app_wifi_pass, NULL);
         return true;
     }
     return false;
@@ -173,6 +181,7 @@ static void connect_sel(void)
     if (!n) return;
     const wifi_ap_t *a = &list[sel];
     snprintf(pending_ssid, sizeof(pending_ssid), "%s", a->ssid);
+    pending_secure = a->auth != 0;
     if (a->auth == 0) start_connect("");   // rete aperta: niente password
     else ui_push(&app_wifi_pass, NULL);
 }

@@ -26,6 +26,7 @@ static uint8_t *rot_buf;
 static lv_display_t *disp;
 static bool is_flipped;
 static volatile bool dark;            // retroilluminazione spenta: niente invii al pannello
+static bool lv_task_on;               // c'è il task di LVGL (non in modalità Doom)
 static int keep_y0 = -1, keep_y1 = -1; // righe fisiche che LVGL non deve sovrascrivere
 static uint8_t *lv_tmp;                // frame ruotato di LVGL quando ci sono righe protette
 
@@ -44,14 +45,16 @@ static bool on_trans_done(esp_lcd_panel_io_handle_t io, esp_lcd_panel_io_event_d
 static void push_frame(const uint16_t *src)
 {
     // Il pannello in QSPI non accetta RASET: ogni frame va scritto intero partendo dalla riga 0
+    // Attese con timeout: se un trasferimento fallisce l'interrupt di fine non arriva, e
+    // un'attesa infinita (con il mutex di LVGL preso) bloccherebbe tutta l'interfaccia.
     xSemaphoreGive(flush_sem);
     for (int y = 0; y < LCD_H; y += CHUNK_ROWS) {
-        xSemaphoreTake(flush_sem, portMAX_DELAY);
+        if (xSemaphoreTake(flush_sem, pdMS_TO_TICKS(200)) != pdTRUE) return;
         memcpy(dma_buf, src, CHUNK_BYTES);
-        esp_lcd_panel_draw_bitmap(panel, 0, y, LCD_W, y + CHUNK_ROWS, dma_buf);
+        if (esp_lcd_panel_draw_bitmap(panel, 0, y, LCD_W, y + CHUNK_ROWS, dma_buf) != ESP_OK) return;
         src += LCD_W * CHUNK_ROWS;
     }
-    xSemaphoreTake(flush_sem, portMAX_DELAY);
+    xSemaphoreTake(flush_sem, pdMS_TO_TICKS(200));
 }
 
 static void flush_cb(lv_display_t *d, const lv_area_t *area, uint8_t *px)
@@ -88,6 +91,7 @@ void display_push(void) { push_frame((uint16_t *)rot_buf); }
 void display_keep_rows(int y0, int y1)
 {
     if (!lv_tmp) lv_tmp = heap_caps_malloc(FRAME_BYTES, MALLOC_CAP_SPIRAM);
+    if (!lv_tmp) return;   // senza memoria niente righe protette (meglio che scrivere su NULL)
     keep_y0 = y0;
     keep_y1 = y1;
 }
@@ -119,10 +123,23 @@ void display_set_brightness(int pct)
     if (pct < 0) pct = 0;
     if (pct > 100) pct = 100;
     if (dark && pct > 0 && rot_buf) {
-        // a schermo spento i frame non sono stati inviati: manda l'ultimo prima di riaccendere
         display_lock();
         dark = false;
-        push_frame((uint16_t *)rot_buf);
+        if (lv_task_on) {
+            // a schermo spento LVGL era fermo: riparte e disegna subito il frame attuale
+            // (orologio, stato…), che viene inviato prima di accendere la luce
+            lv_timer_resume(lv_display_get_refr_timer(disp));
+            lv_obj_invalidate(lv_screen_active());
+            lv_refr_now(disp);
+        } else {
+            push_frame((uint16_t *)rot_buf);   // l'ultimo frame, non inviato mentre era spento
+        }
+        display_unlock();
+    } else if (!dark && pct == 0 && lv_task_on) {
+        // schermo spento: niente disegno né rotazione dei frame (prima si calcolavano tutti
+        // e si scartava solo l'invio). Timer, tick e input delle app continuano a girare.
+        display_lock();
+        lv_timer_pause(lv_display_get_refr_timer(disp));
         display_unlock();
     }
     dark = pct == 0;
@@ -230,5 +247,6 @@ static void lvgl_task(void *arg)
 
 void display_start_task(void)
 {
+    lv_task_on = true;
     xTaskCreatePinnedToCore(lvgl_task, "lvgl", 12 * 1024, NULL, 4, NULL, 1);
 }

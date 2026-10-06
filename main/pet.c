@@ -24,11 +24,14 @@
 static const char *TAG = "pet";
 
 #define CATCHUP_MAX_S  (30LL * 86400)
-#define SAVE_DIRTY_US  60000000LL
-#define SAVE_EVERY_US  300000000LL
+#define SAVE_DIRTY_US  60000000LL    // dopo un'azione (pappa, pulizia…) o dei passi: entro 1 min
+#define SAVE_EVERY_US  900000000LL   // solo il tempo che passa: ogni 15 min (meno usura della flash;
+                                      // in modalità reale/ibrida il recupero rifà comunque il resto)
 
 static pet_t P;
 static bool fg, walking, dirty;
+static bool caught;              // recupero del tempo a scheda spenta già fatto (serve un'ora valida)
+static uint32_t sim_unknown;     // secondi già simulati mentre l'ora non era nota
 static uint32_t events;
 static int64_t last_us, last_save_us;
 static uint32_t acc_us;
@@ -64,7 +67,8 @@ static void load(void)
     memset(&tmp, 0, sizeof(tmp));
     size_t len = sizeof(tmp);
     if (nvs_get_blob(h, "st", &tmp, &len) == ESP_OK && len >= offsetof(pet_t, last_epoch) &&
-        tmp.magic == PET_MAGIC && tmp.version <= PET_VERSION) {
+        tmp.magic == PET_MAGIC && tmp.version <= PET_VERSION &&
+        tmp.stage <= PET_DEAD && tmp.form <= FORM_MESSY) {   // valori fuori misura indicizzerebbero tabelle
         tmp.version = PET_VERSION;
         P = tmp;
     }
@@ -170,7 +174,7 @@ static void pet_synth(int16_t *out, int n)
         if (++t >= len) { seq++; t = 0; }
     }
     // finito: libera l'uscita (a meno che nel frattempo sia arrivato un altro verso)
-    if (done && __atomic_load_n(&req_gen, __ATOMIC_ACQUIRE) == gen) audio_stop();
+    if (done && __atomic_load_n(&req_gen, __ATOMIC_ACQUIRE) == gen) audio_stop_if(pet_synth);
 }
 
 void pet_play(int snd)
@@ -217,7 +221,10 @@ static void catch_up(void)
     if (!real_time_mode() || P.last_epoch <= 0) return;
     if (P.stage != PET_EGG && !pet_core_alive(&P)) return;
     if (!local_now(&lt, &now) || now <= P.last_epoch) return;
-    int64_t gap = now - P.last_epoch;
+    caught = true;
+    // il tempo passato a scheda accesa prima che l'ora fosse nota è già stato simulato
+    int64_t gap = now - P.last_epoch - sim_unknown;
+    if (gap <= 0) { P.last_epoch = now; return; }
     if (gap > CATCHUP_MAX_S) gap = CATCHUP_MAX_S;
 
     time_t t0 = (time_t)P.last_epoch;
@@ -252,13 +259,16 @@ static void timer_cb(lv_timer_t *tm)
     bool known = local_now(&lt, &epoch);
     uint32_t ev = 0;
 
+    // l'ora è diventata valida solo ora (es. Wi-Fi dopo l'avvio): recupera lo spento adesso
+    if (known && !caught) catch_up();
+
     bool runs = (P.stage == PET_EGG || pet_core_alive(&P)) && (g_set.pet_time != PET_TIME_APP || fg);
     if (runs && dt) {
         // senza un'ora valida la modalità ibrida non sa quando è notte: avanza come
         // "solo a scheda accesa" (nessun recupero, nessun orario)
         pet_clock_t c = clock_at(known ? lt.tm_hour : -1);
         ev |= pet_core_step(&P, dt, &c);
-        dirty = true;
+        if (!known) sim_unknown += dt;
     }
 
     uint32_t n = __atomic_exchange_n(&steps_pending, 0, __ATOMIC_RELAXED);
@@ -270,16 +280,18 @@ static void timer_cb(lv_timer_t *tm)
         P.steps_yday = lt.tm_yday + 1;
         P.steps_today = 0;
     }
-    // senza un'ora valida non si sa quanto resta spenta: niente recupero al prossimo avvio
-    P.last_epoch = known ? epoch : 0;
+    // senza un'ora valida si tiene l'ultima nota: il recupero la userà quando l'ora arriva
+    if (known) P.last_epoch = epoch;
 
     if (ev) {
         sound_for_events(ev);
-        events |= ev;
+        // ad app chiusa si tengono solo le novità importanti: aprendola ore dopo non deve
+        // comparire "si è addormentato" di stamattina
+        events |= fg ? ev : ev & (EV_HATCH | EV_EVOLVE | EV_DEATH | EV_ELDER);
     }
     int64_t since = us - last_save_us;
     if (P.stage == PET_NONE) return;   // niente da salvare finché non c'è un uovo
-    if ((ev & (EV_HATCH | EV_EVOLVE | EV_DEATH)) || (dirty && since > SAVE_DIRTY_US) || since > SAVE_EVERY_US)
+    if ((ev & (EV_HATCH | EV_EVOLVE | EV_DEATH)) || (dirty && since > SAVE_DIRTY_US) || (runs && since > SAVE_EVERY_US))
         pet_save();
 }
 

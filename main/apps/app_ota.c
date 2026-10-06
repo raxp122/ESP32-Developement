@@ -27,7 +27,7 @@ static void render(void)
     ota_state_t s = ota_state();
     const char *latest = ota_latest();
     snprintf(t, sizeof(t), "In uso: %s%s%s", ota_current(), latest[0] ? " · ultima: " : "", latest);
-    lv_label_set_text(l_ver, t);
+    ui_set_text(l_ver, t);   // gira a ogni tick: solo i cambiamenti ridisegnano lo schermo
 
     bool confirming = lv_tick_get() < confirm_until && s == OTA_AVAILABLE;
     const char *state = "", *hint = "";
@@ -50,16 +50,16 @@ static void render(void)
     case OTA_DONE:       state = "Installato! Riavvio…"; col = C_OK; break;
     case OTA_ERROR:      state = ota_error(); col = C_WARN; hint = "Swipe a destra: riprova"; break;
     }
-    lv_label_set_text(l_state, state);
-    lv_obj_set_style_text_color(l_state, col, 0);
-    lv_label_set_text(l_hint, hint);
-    lv_obj_set_style_text_color(l_hint, confirming ? C_WARN : C_DIM, 0);
-    if (s == OTA_DOWNLOADING || s == OTA_DONE) {
-        lv_obj_clear_flag(bar, LV_OBJ_FLAG_HIDDEN);
-        lv_bar_set_value(bar, ota_progress(), LV_ANIM_OFF);
-    } else {
-        lv_obj_add_flag(bar, LV_OBJ_FLAG_HIDDEN);
+    ui_set_text(l_state, state);
+    ui_set_text_color(l_state, col);
+    ui_set_text(l_hint, hint);
+    ui_set_text_color(l_hint, confirming ? C_WARN : C_DIM);
+    bool show = s == OTA_DOWNLOADING || s == OTA_DONE;
+    if (show == lv_obj_has_flag(bar, LV_OBJ_FLAG_HIDDEN)) {
+        if (show) lv_obj_clear_flag(bar, LV_OBJ_FLAG_HIDDEN);
+        else lv_obj_add_flag(bar, LV_OBJ_FLAG_HIDDEN);
     }
+    if (show) lv_bar_set_value(bar, ota_progress(), LV_ANIM_OFF);
 }
 
 static void enter(lv_obj_t *root, void *arg)

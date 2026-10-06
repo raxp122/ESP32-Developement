@@ -18,28 +18,32 @@ static lv_obj_t *mk(lv_obj_t *p, const lv_font_t *f, lv_color_t c, int x, int y)
 static void tick(void)
 {
     char b[96];
+    lv_color_t c;
+    wifi_mgr_portal_poll();
     if (wifi_mgr_portal_saved()) {
         switch (wifi_mgr_state()) {
         case WIFI_CONNECTED:
             snprintf(b, sizeof(b), LV_SYMBOL_OK "  Connesso a %s · %s", g_set.wifi_ssid, wifi_mgr_ip());
-            lv_obj_set_style_text_color(l_status, C_OK, 0);
+            c = C_OK;
             break;
         case WIFI_CONNECTING:
             snprintf(b, sizeof(b), "Mi collego a %s…", g_set.wifi_ssid);
-            lv_obj_set_style_text_color(l_status, ui_accent(), 0);
+            c = ui_accent();
             break;
         default:
             snprintf(b, sizeof(b), "Connessione non riuscita: controlla la password");
-            lv_obj_set_style_text_color(l_status, C_WARN, 0);
+            c = C_WARN;
         }
     } else if (wifi_mgr_portal_clients() > 0) {
         snprintf(b, sizeof(b), "Telefono collegato: apri la pagina");
-        lv_obj_set_style_text_color(l_status, ui_accent(), 0);
+        c = ui_accent();
     } else {
         snprintf(b, sizeof(b), "In attesa del telefono…");
-        lv_obj_set_style_text_color(l_status, C_DIM, 0);
+        c = C_DIM;
     }
-    lv_label_set_text(l_status, b);
+    // solo se cambia: ogni modifica ridisegna e invia l'intero schermo
+    ui_set_text(l_status, b);
+    ui_set_text_color(l_status, c);
 }
 
 static void enter(lv_obj_t *root, void *arg)

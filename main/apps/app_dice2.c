@@ -27,9 +27,9 @@ static void pool_text(char *b, int n)
 {
     int o = 0;
     b[0] = 0;
-    for (int i = 0; i < NT; i++)
+    for (int i = 0; i < NT && o < n - 1; i++)
         if (counts[i]) o += snprintf(b + o, n - o, "%s%dd%d", o ? " + " : "", counts[i], faces[i]);
-    if (mod) o += snprintf(b + o, n - o, " %c %d", mod > 0 ? '+' : '-', mod > 0 ? mod : -mod);
+    if (mod && o < n - 1) o += snprintf(b + o, n - o, " %c %d", mod > 0 ? '+' : '-', mod > 0 ? mod : -mod);
     if (!o) snprintf(b, n, "Nessun dado: aggiungine qui sotto");
 }
 
@@ -69,14 +69,18 @@ static int hist[6], hist_n;
 static void r_show_final(void)
 {
     // dettaglio: "d6: 3 5 · d8: 7 · +2"
-    char d[160];
+    // con molti dadi il testo può superare il buffer: snprintf tronca, ma "o" crescerebbe
+    // oltre la fine e sizeof(d) - o diventerebbe enorme (scrittura fuori dal buffer)
+    char d[256];
     int o = 0, k = 0;
-    for (int i = 0; i < NT; i++) {
+#define ROOM() (o < (int)sizeof(d) - 1)
+    for (int i = 0; i < NT && ROOM(); i++) {
         if (!counts[i]) continue;
         o += snprintf(d + o, sizeof(d) - o, "%sd%d:", o ? "  ·  " : "", faces[i]);
-        for (int j = 0; j < counts[i] && k < r_nrolls; j++) o += snprintf(d + o, sizeof(d) - o, " %d", r_rolls[k++]);
+        for (int j = 0; j < counts[i] && k < r_nrolls && ROOM(); j++) o += snprintf(d + o, sizeof(d) - o, " %d", r_rolls[k++]);
     }
-    if (mod) snprintf(d + o, sizeof(d) - o, "  ·  %+d", mod);
+    if (mod && ROOM()) snprintf(d + o, sizeof(d) - o, "  ·  %+d", mod);
+#undef ROOM
     lv_label_set_text(r_detail, d);
 
     lv_label_set_text_fmt(r_total, "%d", r_result);

@@ -51,6 +51,9 @@ static uint32_t anim_t0;
 static int anim_arg;
 static char msg[80];
 static uint32_t msg_until;
+// confronti tra istanti di lv_tick_get() che restano giusti anche quando il contatore
+// ricomincia da zero (dopo ~49 giorni di accensione)
+static inline bool reached(uint32_t now, uint32_t when) { return (int32_t)(now - when) >= 0; }
 static bool msg_warn;
 static uint32_t now_ms, last_ms;
 static float pos_x = 20;
@@ -254,7 +257,7 @@ static void draw_main(const pet_t *p)
     if (anim == A_NONE && !p->asleep) {
         int maxx = right_limit(p) - w;
         if (maxx < 1) maxx = 1;
-        if (now_ms >= next_wander) {
+        if (reached(now_ms, next_wander)) {
             target_x = 1 + rnd(maxx);
             next_wander = now_ms + 2500 + rnd(3500);
         }
@@ -421,7 +424,7 @@ static void draw_fish(const pet_t *p)
         if (drops[i].on) art_sprite(drops[i].jelly ? &SPR_JELLY : &SPR_FISH, (int)drops[i].x, (int)drops[i].y, false);
     int w, h;
     pet_dims(p, &w, &h);
-    bool stun = now_ms < fish_stun;
+    bool stun = !reached(now_ms, fish_stun);
     expr_t e = stun ? EXPR_SICK : (now_ms - fish_last < 300 ? EXPR_EAT : EXPR_HAPPY);
     art_pet(p->stage, p->form, (int)fish_x, FLOOR - h + 1, e, now_ms / 200, false, 0, stun ? TINT_SICK : TINT_NONE);
 }
@@ -556,7 +559,7 @@ static void draw_panel(const pet_t *p)
         hint = t;
         break;
     }
-    if (now_ms < msg_until) { hint = msg; warn = msg_warn; }
+    if (!reached(now_ms, msg_until)) { hint = msg; warn = msg_warn; }
     set_text(l_hint, hint ? hint : "");
     lv_obj_set_style_text_color(l_hint, warn ? C_WARN : C_DIM, 0);
 }
@@ -620,7 +623,8 @@ static void fish_start(const pet_t *p)
     fish_score = 0;
     fish_t0 = now_ms;
     fish_next = now_ms + 600;
-    fish_stun = fish_last = 0;
+    fish_stun = now_ms;
+    fish_last = 0;
     memset(drops, 0, sizeof(drops));
     lv_timer_set_period(tmr, 40);
 }
@@ -639,10 +643,10 @@ static void fish_update(const pet_t *p, uint32_t dt)
     int w, h;
     pet_dims(p, &w, &h);
     if (dt > 100) dt = 100;
-    if (now_ms >= fish_stun) fish_x += tilt_now() * 0.045f * dt;
+    if (reached(now_ms, fish_stun)) fish_x += tilt_now() * 0.045f * dt;
     fish_x = clampf(fish_x, 0, LW - w);
 
-    if (now_ms >= fish_next) {
+    if (reached(now_ms, fish_next)) {
         fish_next = now_ms + 550 + rnd(500);
         for (int i = 0; i < 6; i++)
             if (!drops[i].on) {
@@ -807,6 +811,7 @@ static void frame_cb(lv_timer_t *t)
 
 static bool nav(nav_t ev)
 {
+    if (!scene_buf || !icon_buf) return false;   // memoria non disponibile: l'app non è partita
     pet_t *p = pet_get();
     if (p->stage == PET_DEAD) {
         if (ev == NAV_SELECT) {
@@ -892,6 +897,9 @@ static void enter(lv_obj_t *root, void *arg)
 {
     lv_obj_set_style_bg_color(root, C_BG, 0);
     lv_obj_set_style_bg_opa(root, LV_OPA_COVER, 0);
+    // scadenze "già passate" ma vicine: con il confronto che regge al giro del contatore,
+    // uno 0 sembrerebbe nel futuro dopo ~25 giorni di accensione
+    msg_until = next_wander = fish_stun = lv_tick_get();
     if (!scene_buf) {
         uint32_t ss = lv_draw_buf_width_to_stride(LW * SC, LV_COLOR_FORMAT_RGB565);
         uint32_t is = lv_draw_buf_width_to_stride(IC_LW * IC_SC, LV_COLOR_FORMAT_RGB565);

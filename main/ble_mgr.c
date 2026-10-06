@@ -61,7 +61,9 @@ static struct {
 
 static int64_t pair_until_us;       // finestra di associazione aperta fino a…
 static volatile uint32_t passkey;
-static esp_timer_handle_t pair_timer, kick_timer;
+static esp_timer_handle_t pair_timer, kick_timer, guard_timer;
+static volatile uint16_t guard_handle = BLE_HS_CONN_HANDLE_NONE;
+#define GUARD_US (6 * 1000000)   // tempo concesso a uno sconosciuto per farsi riconoscere
 static ble_store_write_fn *store_write_orig;
 
 static int gap_cb(struct ble_gap_event *ev, void *arg);
@@ -387,6 +389,28 @@ static int on_name(uint16_t h, const struct ble_gatt_error *e, struct ble_gatt_a
     return 0;
 }
 
+bool ble_mgr_conn_trusted(uint16_t h)
+{
+    if (!mtx) return false;
+    lock();
+    ble_conn_t *c = conn_get(h);
+    bool t = c && c->trusted;
+    unlock();
+    return t;
+}
+
+static void guard_cb(void *arg)
+{
+    uint16_t h = guard_handle;
+    if (h != BLE_HS_CONN_HANDLE_NONE && synced && !ble_mgr_conn_trusted(h)) {
+        struct ble_gap_conn_desc d;
+        if (ble_gap_conn_find(h, &d) == 0) {
+            ESP_LOGW(TAG, "dispositivo non associato: scollegato");
+            ble_gap_terminate(h, BLE_ERR_AUTH_FAIL);
+        }
+    }
+}
+
 /* ---------------- eventi GAP ---------------- */
 
 static void on_connect(uint16_t h)
@@ -406,6 +430,7 @@ static void on_connect(uint16_t h)
         memcpy(c->addr, d.peer_id_addr.val, 6);
         c->encrypted = d.sec_state.encrypted;
         c->bonded = d.sec_state.bonded;
+        c->trusted = central || pairing_open() || (c->encrypted && c->bonded);
         if (central && !memcmp(link.addr, d.peer_id_addr.val, 6)) {
             snprintf(c->name, sizeof(c->name), "%s", link.name);
             c->appearance = link.appearance;
@@ -415,6 +440,18 @@ static void on_connect(uint16_t h)
     unlock();
     if (slot < 0) { ble_gap_terminate(h, BLE_ERR_CONN_LIMIT); return; }
     ESP_LOGI(TAG, "collegato (%s)", central ? "centrale" : "periferica");
+    // Fuori dalla finestra di associazione il Gadget è collegabile solo perché un
+    // dispositivo associato possa tornare: chi non si fa riconoscere (cifratura con
+    // le chiavi salvate) entro pochi secondi viene scollegato.
+    if (!ble_mgr_conn_trusted(h)) {
+        guard_handle = h;
+        esp_timer_stop(guard_timer);
+        esp_timer_start_once(guard_timer, GUARD_US);
+        // non tutti i telefoni cifrano da soli al ricollegamento: lo chiede il Gadget, così
+        // chi è associato si fa riconoscere con le sue chiavi (uno sconosciuto non può
+        // salvarne di nuove a finestra chiusa e viene scollegato allo scadere)
+        ble_gap_security_initiate(h);
+    }
     BUMP(conn_gen);
     if (ble_gattc_read_by_uuid(h, 1, 0xFFFF, BLE_UUID16_DECLARE(0x2A00), on_name, NULL) != 0 && central)
         start_discovery(h);
@@ -472,6 +509,7 @@ static int gap_cb(struct ble_gap_event *ev, void *arg)
             if (c) {
                 c->encrypted = d.sec_state.encrypted;
                 c->bonded = d.sec_state.bonded;
+                if (c->encrypted && c->bonded) c->trusted = true;
                 memcpy(c->addr, d.peer_id_addr.val, 6);   // dopo l'associazione: indirizzo vero
             }
             unlock();
@@ -481,6 +519,7 @@ static int gap_cb(struct ble_gap_event *ev, void *arg)
         if (found && ev->enc_change.status == 0 && pairing_open() && d.role == BLE_GAP_ROLE_SLAVE && d.sec_state.bonded) {
             pair_until_us = 0;
             esp_timer_stop(pair_timer);
+            adv_refresh();   // torna agli annunci lenti (o a nessuno): niente più ogni 30 ms
         }
         BUMP(conn_gen);
         break;
@@ -570,7 +609,12 @@ static void stack_stop(void)
     if (scanning) ble_gap_disc_cancel();
     if (ble_gap_adv_active()) ble_gap_adv_stop();
     for (int i = 0; i < BLE_MAX_CONN; i++)
-        if (conn_used[i]) ble_gap_terminate(conns[i].handle, BLE_ERR_REM_USER_CONN_TERM);
+        if (conn_used[i]) {
+            // con lo stack fermo l'evento di scollegamento non arriverebbe: avvisa ora i profili
+            notify_profiles(conns[i].handle, false);
+            ble_gap_terminate(conns[i].handle, BLE_ERR_REM_USER_CONN_TERM);
+        }
+    esp_timer_stop(guard_timer);
     scanning = false;
     if (nimble_port_stop() == 0) nimble_port_deinit();
     running = false;
@@ -603,6 +647,8 @@ void ble_mgr_apply(void)
         esp_timer_create(&pt, &pair_timer);
         const esp_timer_create_args_t kt = {.callback = kick_cb, .arg = &kick_addr, .name = "ble_kick"};
         esp_timer_create(&kt, &kick_timer);
+        const esp_timer_create_args_t gt = {.callback = guard_cb, .name = "ble_guard"};
+        esp_timer_create(&gt, &guard_timer);
     }
     update();
 }
@@ -643,7 +689,15 @@ bool ble_mgr_connect(const ble_dev_t *dv)
     link.state = BLE_LINK_CONNECTING;
     unlock();
     int r = ble_gap_connect(own_addr_type, &a, 10000, NULL, gap_cb, NULL);
-    if (r == BLE_HS_EALREADY || r == BLE_HS_EDONE) {   // già collegati
+    if (r == BLE_HS_EALREADY) {   // un altro collegamento è già in corso
+        lock();
+        link.state = BLE_LINK_FAILED;
+        snprintf(link.err, sizeof(link.err), "Un altro collegamento è in corso");
+        unlock();
+        BUMP(conn_gen);
+        return false;
+    }
+    if (r == BLE_HS_EDONE) {   // già collegati
         lock();
         link.state = BLE_LINK_OK;
         unlock();

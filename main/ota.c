@@ -37,6 +37,7 @@ static volatile ota_state_t state = OTA_IDLE;
 static volatile int progress;
 static bool busy;   // un controllo o un'installazione in corso (accesso atomico)
 static char latest[32], err_msg[64];
+static volatile bool auto_on, auto_done;   // controllo automatico in attesa / già fatto
 
 ota_state_t ota_state(void) { return state; }
 int ota_progress(void) { return progress; }
@@ -207,11 +208,19 @@ static void do_install(void)
 
 static void do_auto(void)
 {
-    // aspetta internet (anche a lungo: il Wi-Fi può arrivare dopo), poi un controllo solo
-    while (wifi_mgr_state() != WIFI_CONNECTED) vTaskDelay(pdMS_TO_TICKS(5000));
+    // aspetta internet (anche a lungo: il Wi-Fi può arrivare dopo), poi un controllo solo.
+    // Con il Wi-Fi spento non si resta ad aspettare (8 KB di stack): riaccendendolo dalle
+    // impostazioni il controllo automatico riparte.
+    while (wifi_mgr_state() != WIFI_CONNECTED) {
+        if (!g_set.wifi_on) { auto_on = false; return; }
+        vTaskDelay(pdMS_TO_TICKS(5000));
+    }
     vTaskDelay(pdMS_TO_TICKS(20000));   // lascia finire NTP e il resto dell'avvio
+    auto_on = false;
+    if (wifi_mgr_state() != WIFI_CONNECTED) return;   // si riproverà alla prossima accensione del Wi-Fi
+    auto_done = true;
     // se nel frattempo l'utente ha già controllato (o sta installando), lascia stare
-    if (state != OTA_IDLE || wifi_mgr_state() != WIFI_CONNECTED) return;
+    if (state != OTA_IDLE) return;
     if (__atomic_exchange_n(&busy, true, __ATOMIC_ACQ_REL)) return;
     do_check();
     __atomic_store_n(&busy, false, __ATOMIC_RELEASE);
@@ -251,4 +260,10 @@ static void run(job_t j)
 
 void ota_check(void) { run(JOB_CHECK); }
 void ota_install(void) { run(JOB_INSTALL); }
-void ota_auto_start(void) { if (g_set.ota_auto) run(JOB_AUTO); }
+void ota_auto_start(void)
+{
+    // un solo controllo automatico in attesa per volta, e solo finché non se n'è fatto uno
+    if (!g_set.ota_auto || auto_on || auto_done) return;
+    auto_on = true;
+    run(JOB_AUTO);
+}

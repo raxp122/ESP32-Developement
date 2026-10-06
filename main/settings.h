@@ -78,6 +78,7 @@ extern settings_t g_set;
 
 void settings_load(void);
 void settings_save(void);
+void settings_defer(bool on);   // true: i salvataggi si rimandano; false: salva se serve
 void settings_reset(void);
 int  settings_version(void);   // versione del formato delle impostazioni (per i backup)
 const char *settings_quick_name(int q);

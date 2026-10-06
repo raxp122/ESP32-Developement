@@ -119,6 +119,13 @@ static void migrate_old_nvs(void)
     }
     nvs_flash_deinit_partition(OLD_NVS);
     if (copied) ESP_LOGI("settings", "migrate %d voci dalla vecchia partizione NVS", copied);
+    // segna la migrazione come fatta: senza questo, chi non ha mai cambiato un'impostazione
+    // (namespace "gadget" assente) ricopierebbe a ogni avvio i vecchi dati sopra i nuovi
+    if (nvs_open("gadget", NVS_READWRITE, &h) == ESP_OK) {
+        nvs_set_u8(h, "mig", 1);
+        nvs_commit(h);
+        nvs_close(h);
+    }
 }
 
 void settings_load(void)
@@ -162,6 +169,12 @@ void settings_load(void)
         if (g_set.pet_time >= PET_TIME_COUNT) g_set.pet_time = PET_TIME_REAL;
         if (g_set.pet_sleep_h > 23) g_set.pet_sleep_h = 22;
         if (g_set.pet_wake_h > 23) g_set.pet_wake_h = 8;
+        // un blob da un backup rovinato non deve lasciare lo schermo spento o stringhe aperte
+        if (g_set.brightness < 5 || g_set.brightness > 100) g_set.brightness = 70;
+        if (g_set.quick_action >= QUICK_COUNT) g_set.quick_action = QUICK_TORCH;
+        g_set.wifi_ssid[sizeof(g_set.wifi_ssid) - 1] = 0;
+        g_set.wifi_pass[sizeof(g_set.wifi_pass) - 1] = 0;
+        g_set.pwn_name[sizeof(g_set.pwn_name) - 1] = 0;
         if (old < SETTINGS_VERSION) {
             g_set.version = SETTINGS_VERSION;
             nvs_close(h);
@@ -172,8 +185,19 @@ void settings_load(void)
     nvs_close(h);
 }
 
+// Mentre si regola un valore nel menu (luminosità, sospensione…) ogni passo chiamerebbe
+// settings_save(): si rimanda e si salva una volta sola a fine modifica (meno usura).
+static bool defer, pending;
+
+void settings_defer(bool on)
+{
+    defer = on;
+    if (!on && pending) { pending = false; settings_save(); }
+}
+
 void settings_save(void)
 {
+    if (defer) { pending = true; return; }
     nvs_handle_t h;
     if (nvs_open("gadget", NVS_READWRITE, &h) != ESP_OK) return;
     nvs_set_blob(h, "cfg", &g_set, sizeof(g_set));

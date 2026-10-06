@@ -49,7 +49,8 @@ void wifi_mgr_portal_open(void);          // interna: avvia l'hotspot con la pag
 void wifi_mgr_portal_stop(void);          // chiude l'hotspot e ripristina il Wi-Fi normale
 const char *wifi_mgr_portal_ssid(void);
 int  wifi_mgr_portal_clients(void);
-bool wifi_mgr_portal_saved(void);          // credenziali ricevute
+bool wifi_mgr_portal_saved(void);
+void wifi_mgr_portal_poll(void);          // dal task dell'interfaccia: applica le credenziali ricevute          // credenziali ricevute
 
 // Ora
 bool wifi_mgr_time_synced(void);

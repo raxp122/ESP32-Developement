@@ -17,3 +17,4 @@ bool usbhid_mounted(void);       // un PC ci ha riconosciuti come tastiera
 // Un carattere non rappresentabile nel layout viene saltato.
 int  usbhid_type(const char *text, int len, int layout);
 void usbhid_cancel(void);        // interrompe una digitazione in corso
+void usbhid_arm(void);           // da chiamare prima di avviare usbhid_type (azzera l'interruzione)

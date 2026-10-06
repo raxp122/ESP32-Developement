@@ -18,7 +18,13 @@ static const char *onoff(bool v) { return v ? "Acceso" : "Spento"; }
 /* ---------------- Wi-Fi ---------------- */
 
 static void v_wifi_toggle(char *b, int n) { snprintf(b, n, "%s", onoff(g_set.wifi_on)); }
-static void a_wifi_toggle(void) { g_set.wifi_on = !g_set.wifi_on; settings_save(); wifi_mgr_apply(); }
+static void a_wifi_toggle(void)
+{
+    g_set.wifi_on = !g_set.wifi_on;
+    settings_save();
+    wifi_mgr_apply();
+    if (g_set.wifi_on) ota_auto_start();   // se all'avvio era spento, il controllo non era partito
+}
 
 static void v_wifi_net(char *b, int n)
 {

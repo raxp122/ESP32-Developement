@@ -36,8 +36,8 @@ static bool touch_read_raw(int *px, int *py)
     if (buf[1] == 0 || buf[1] > 4) return false;
     int rx = ((buf[2] & 0x0F) << 8) | buf[3];
     int ry = ((buf[4] & 0x0F) << 8) | buf[5];
-    if (rx > LCD_H) rx = LCD_H;
-    if (ry > LCD_W) ry = LCD_W;
+    if (rx > LCD_H - 1) rx = LCD_H - 1;
+    if (ry > LCD_W - 1) ry = LCD_W - 1;
     // coordinate verticali native (172×640), stessa mappatura del firmware di fabbrica
     *px = ry;
     *py = LCD_H - rx;
