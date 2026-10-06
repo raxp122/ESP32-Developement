@@ -1,4 +1,5 @@
-// app_wifiscan.c — reti Wi-Fi vicine con banda (2.4/5 GHz); swipe a destra = connetti
+// app_wifiscan.c — reti Wi-Fi vicine con banda (2.4/5 GHz); swipe a destra = connetti.
+// La stessa schermata si apre anche da Impostazioni › Wi-Fi (arg = titolo da mostrare).
 #include "apps.h"
 #include "keyboard.h"
 #include "wifi_mgr.h"
@@ -123,7 +124,7 @@ static void start_connect(const char *pass);
 static bool result_nav(nav_t ev)
 {
     if (ev == NAV_SELECT) {
-        if (wifi_mgr_state() == WIFI_CONNECTED) { ui_home(); return true; }
+        if (wifi_mgr_state() == WIFI_CONNECTED) { ui_pop(); return true; }   // torna all'elenco
         // riprova: se protetta richiede di nuovo la password
         ui_pop();
         return true;
@@ -181,19 +182,23 @@ static bool nav(nav_t ev)
     switch (ev) {
     case NAV_NEXT: if (sel + 1 < n) { sel++; render(+1); } return true;
     case NAV_PREV: if (sel > 0) { sel--; render(-1); } return true;
-    case NAV_SELECT: connect_sel(); return true;
-    case NAV_HOLD: pending = true; render(0); return true;  // tocco prolungato = nuova scansione
+    case NAV_SELECT:
+        if (n) connect_sel();
+        else { pending = true; render(0); }   // elenco vuoto: nuova scansione
+        return true;
+    case NAV_QUICK: pending = true; render(0); return true;  // tocco prolungato (o BOOT tenuto) = nuova scansione
     default: return false;
     }
 }
 
 static const char *title(void *arg)
 {
-    snprintf(title_buf, sizeof(title_buf), "Scanner Wi-Fi · %d reti", n);
+    snprintf(title_buf, sizeof(title_buf), "%s · %d reti", arg ? (const char *)arg : "Scanner Wi-Fi", n);
     return title_buf;
 }
 
 const app_t app_wifiscan = {
     .name = "Scanner Wi-Fi", .icon = LV_SYMBOL_WIFI,
     .enter = enter, .leave = leave, .nav = nav, .tick = tick, .title = title,
+    .flags = APP_OWN_QUICK,   // il tocco prolungato rifà la scansione
 };

@@ -27,6 +27,9 @@ extern const app_t app_restore;
 extern menu_t backup_menu;
 extern const app_t app_level;
 extern menu_t pet_settings_menu;
+extern const app_t app_ble_device;   // arg = ble_dev_t* da collegare
+extern const app_t app_ble_pair;
+extern const app_t app_ble_conns;
 
 // App all'avvio (Impostazioni): elenco con indici stabili, salvati in g_set.boot_app
 int  boot_app_count(void);

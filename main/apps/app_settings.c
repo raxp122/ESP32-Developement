@@ -46,7 +46,8 @@ static void a_wifi_forget(void) { wifi_mgr_forget(); ui_toast("Rete dimenticata"
 
 static const menu_item_t wifi_items[] = {
     {.icon = LV_SYMBOL_WIFI, .label = "Wi-Fi", .value = v_wifi_toggle, .on_select = a_wifi_toggle},
-    {.icon = ICON_MOBILE, .label = "Configura dal telefono", .value = v_wifi_net, .app = &app_portal},
+    {.icon = ICON_SEARCH, .label = "Cerca reti e collegati", .value = v_wifi_net, .app = &app_wifiscan, .arg = "Wi-Fi › Reti"},
+    {.icon = ICON_MOBILE, .label = "Configura dal telefono", .hint = "Hotspot con pagina web", .app = &app_portal},
     {.icon = ICON_INFO, .label = "Stato", .value = v_wifi_state},
     {.icon = ICON_TOWER, .label = "Segnale", .value = v_wifi_rssi},
     {.icon = LV_SYMBOL_TRASH, .label = "Dimentica rete", .on_select = a_wifi_forget, .confirm = true},
@@ -68,11 +69,26 @@ static void a_ble_vis(void)
 static void v_ble_name(char *b, int n) { snprintf(b, n, "%s", ble_mgr_name()); }
 static void v_ble_addr(char *b, int n) { ble_mgr_addr(b, n); }
 
+static void v_ble_conns(char *b, int n)
+{
+    ble_conn_t c[BLE_MAX_CONN];
+    ble_bond_t bd[8];
+    int nc = ble_mgr_conns(c, BLE_MAX_CONN), nb = ble_mgr_bonds(bd, 8);
+    if (nc) snprintf(b, n, "%d collegat%s · %d associat%s", nc, nc == 1 ? "o" : "i", nb, nb == 1 ? "o" : "i");
+    else if (nb) snprintf(b, n, "%d associat%s", nb, nb == 1 ? "o" : "i");
+    else snprintf(b, n, "Nessuno");
+}
+static void a_ble_forget_all(void) { ble_mgr_forget_all(); ui_toast("Associazioni cancellate"); }
+
 static const menu_item_t ble_items[] = {
     {.icon = LV_SYMBOL_BLUETOOTH, .label = "Bluetooth", .value = v_ble, .on_select = a_ble},
+    {.icon = ICON_MOBILE, .label = "Collega a telefono o computer", .hint = "Il Gadget si fa trovare per 2 minuti", .app = &app_ble_pair},
+    {.icon = ICON_SEARCH, .label = "Collega un dispositivo", .hint = "Cerca sensori, tastiere, telecomandi…", .app = &app_blescan, .arg = "Bluetooth › Cerca"},
+    {.icon = LV_SYMBOL_LIST, .label = "Dispositivi", .value = v_ble_conns, .app = &app_ble_conns},
     {.icon = ICON_EYE, .label = "Visibile agli altri", .value = v_ble_vis, .on_select = a_ble_vis},
     {.icon = LV_SYMBOL_EDIT, .label = "Nome", .value = v_ble_name},
     {.icon = ICON_CHIP, .label = "Indirizzo", .value = v_ble_addr},
+    {.icon = LV_SYMBOL_TRASH, .label = "Dimentica tutti i dispositivi", .on_select = a_ble_forget_all, .confirm = true},
 };
 static menu_t ble_menu = {"Impostazioni › Bluetooth", ble_items, sizeof(ble_items) / sizeof(ble_items[0]), 0};
 
