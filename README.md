@@ -52,6 +52,28 @@ Impostazioni › Polipetto: scorrere del tempo, orari di nanna e sveglia, versi,
 
 Dai 25 giorni non invecchia più: vive per sempre, oppure da Impostazioni puoi lasciarlo tornare nell'oceano e ricominciare da un uovo.
 
+## Livella
+Dal launcher: Livella. La prima volta chiede una calibrazione in due passi (appoggiata, poi in piedi sul lato lungo): così sa come è montato l'accelerometro. Poi riconosce da sola il modo:
+- **appoggiata**: bolla circolare con inclinazione X e Y;
+- **sul lato lungo**: tubo orizzontale;
+- **sul lato corto**: filo a piombo.
+
+| Comando | Azione |
+|---|---|
+| Swipe a destra | azzera sulla superficie attuale |
+| Swipe su / giù | unità: gradi, percentuale, mm/m |
+| BOOT | blocca / sblocca la lettura |
+| Dito tenuto premuto | rifà la calibrazione |
+| Swipe a sinistra | esce |
+
+## Backup e ripristino
+Impostazioni › Backup e ripristino:
+- **Crea un backup ora**: salva tutto (impostazioni, Wi-Fi, polipetto, Radar e Pokédex, livella) in un file della cartella `backup` sulla microSD.
+- **Ripristina un backup**: elenca i backup; si possono usare solo quelli fatti con questa versione del firmware o con una più vecchia. Da un backup vecchio le impostazioni nuove prendono il valore predefinito e quelle che non esistono più si ignorano. Dopo il ripristino la scheda si riavvia.
+- **Backup prima degli aggiornamenti**: prima di ogni aggiornamento OTA ne crea uno da solo.
+
+Il file è di testo con un controllo CRC: un backup rovinato o incompleto viene rifiutato senza toccare niente. Contiene anche la password del Wi-Fi in chiaro, quindi tienilo al sicuro.
+
 ## App all'avvio
 Impostazioni › App all'avvio: se scegli un'app, all'accensione si apre quella; swipe indietro torna al menu. "Nessuna" lascia tutto com'era.
 
@@ -84,8 +106,8 @@ Dalla 0.14 le impostazioni (NVS) stanno in fondo alla flash (`0xFF0000`): né l'
 - `main/wifi_mgr.*` Wi-Fi, scansione, portale captive per configurare la rete dal telefono, NTP
 - `main/ble_mgr.*` NimBLE: visibilità e scansione
 - `main/pet_core.*` regole del Polipetto (pure, senza hardware) · `main/pet.*` tempo reale, salvataggio, contapassi, versi
-- `main/ota.*` aggiornamenti via internet · `main/settings.*` impostazioni (con migrazione dalla vecchia tabella)
-- `main/apps/` le app (`app_pet.c` + `pet_art.c` per il Polipetto, `app_ota.c` per gli aggiornamenti)
+- `main/backup.*` backup e ripristino su microSD · `main/ota.*` aggiornamenti via internet · `main/settings.*` impostazioni (con migrazione dalla vecchia tabella)
+- `main/apps/` le app (`app_pet.c` + `pet_art.c` per il Polipetto, `app_ota.c` per gli aggiornamenti, `app_backup.c`, `app_level.c` per la livella)
 - `components/axs15231b` driver Waveshare inclusi nel progetto
 
 ## Aggiungere un'app
