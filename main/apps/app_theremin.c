@@ -26,10 +26,54 @@ static void touch_cfg(void) { dirty = true; }
 
 static void v_wave(char *b, int n) { snprintf(b, n, "%s", th_wave_name(th_cfg.wave)); }
 static void j_wave(int d) { th_cfg.wave = (th_cfg.wave + d + TH_WAVE_COUNT) % TH_WAVE_COUNT; touch_cfg(); }
-static void v_oct(char *b, int n) { snprintf(b, n, "Zero su La%d", 4 + th_cfg.octave); }
-static void j_oct(int d) { int v = th_cfg.octave + d; th_cfg.octave = v < -2 ? -2 : v > 2 ? 2 : v; touch_cfg(); }
-static void v_span(char *b, int n) { snprintf(b, n, "%d ottav%s", th_cfg.span, th_cfg.span == 1 ? "a" : "e"); }
-static void j_span(int d) { int v = th_cfg.span + d; th_cfg.span = v < 1 ? 1 : v > 3 ? 3 : v; touch_cfg(); }
+// "La4" (ottava come nella nota sullo schermo: La4 = 440 Hz)
+static const char *note_str(int midi, char *b, int n)
+{
+    snprintf(b, n, "%s%d", th_note_name(midi), midi / 12 - 1);
+    return b;
+}
+static void v_low(char *b, int n)
+{
+    char t[8];
+    snprintf(b, n, "%s%s", note_str(th_cfg.low, t, sizeof(t)), th_cfg.low == TH_NOTE_MIN ? " (la più grave del pianoforte)" : "");
+}
+static void j_low(int d)
+{
+    int v = th_cfg.low + d;
+    if (v < TH_NOTE_MIN || v > th_cfg.high - TH_RANGE_MIN) return;
+    th_cfg.low = v;
+    touch_cfg();
+}
+static void v_high(char *b, int n)
+{
+    char t[8];
+    snprintf(b, n, "%s%s", note_str(th_cfg.high, t, sizeof(t)), th_cfg.high == TH_NOTE_MAX ? " (la più acuta del pianoforte)" : "");
+}
+static void j_high(int d)
+{
+    int v = th_cfg.high + d;
+    if (v > TH_NOTE_MAX || v < th_cfg.low + TH_RANGE_MIN) return;
+    th_cfg.high = v;
+    touch_cfg();
+}
+// sposta tutta l'estensione di un'ottava (più veloce che spostare le due note)
+static void v_shift(char *b, int n)
+{
+    char lo[8], hi[8], mid[8];
+    int span = th_cfg.high - th_cfg.low;
+    snprintf(b, n, "%s – %s · zero su %s · %d ottav%s%s", note_str(th_cfg.low, lo, sizeof(lo)),
+             note_str(th_cfg.high, hi, sizeof(hi)), note_str((th_cfg.low + th_cfg.high) / 2, mid, sizeof(mid)),
+             span / 12, span / 12 == 1 ? "a" : "e", span % 12 ? " e più" : "");
+}
+static void j_shift(int d)
+{
+    int lo = th_cfg.low + 12 * d, hi = th_cfg.high + 12 * d;
+    if (lo < TH_NOTE_MIN || hi > TH_NOTE_MAX) return;
+    th_cfg.low = lo;
+    th_cfg.high = hi;
+    touch_cfg();
+}
+static void a_range_def(void) { th_range_default(); touch_cfg(); ui_toast("Estensione predefinita: La3 – La5"); }
 static void v_glide(char *b, int n)
 {
     if (th_cfg.glide) snprintf(b, n, "%d ms", th_glide_ms(th_cfg.glide));
@@ -49,8 +93,10 @@ static void j_level(int d) { int v = th_cfg.level + d * 10; th_cfg.level = v < 1
 
 static const menu_item_t sound_items[] = {
     {.icon = ICON_TUNER, .label = "Forma d'onda", .value = v_wave, .on_adjust = j_wave},
-    {.icon = LV_SYMBOL_UP, .label = "Ottava", .value = v_oct, .on_adjust = j_oct},
-    {.icon = ICON_SLIDERS, .label = "Estensione", .value = v_span, .on_adjust = j_span},
+    {.icon = LV_SYMBOL_DOWN, .label = "Nota più bassa", .value = v_low, .on_adjust = j_low},
+    {.icon = LV_SYMBOL_UP, .label = "Nota più alta", .value = v_high, .on_adjust = j_high},
+    {.icon = ICON_SLIDERS, .label = "Sposta di un'ottava", .value = v_shift, .on_adjust = j_shift},
+    {.icon = LV_SYMBOL_REFRESH, .label = "Estensione predefinita", .hint = "La3 – La5, zero sul La4", .on_select = a_range_def, .confirm = true},
     {.icon = LV_SYMBOL_LOOP, .label = "Glide (scivolata)", .value = v_glide, .on_adjust = j_glide},
     {.icon = LV_SYMBOL_SHUFFLE, .label = "Vibrato", .value = v_vib, .on_adjust = j_vib},
     {.icon = ICON_CLOCK, .label = "Velocità del vibrato", .value = v_vrate, .on_adjust = j_vrate},
@@ -100,14 +146,32 @@ static const menu_item_t fx_items[] = {
 };
 static menu_t fx_menu = {"Theremin » Effetti", fx_items, sizeof(fx_items) / sizeof(fx_items[0]), 0, NULL};
 
+static const char *axis_name(bool note_axis) { return note_axis == !th_cfg.swap ? "Inclinazione" : "Rotazione"; }
+static void v_swap(char *b, int n) { snprintf(b, n, "%s", axis_name(true)); }
+static void a_swap(void) { th_cfg.swap = !th_cfg.swap; touch_cfg(); }
 static void v_roll(char *b, int n) { snprintf(b, n, "%s", th_roll_name(th_cfg.roll_fn)); }
 static void j_roll(int d) { th_cfg.roll_fn = (th_cfg.roll_fn + d + TH_ROLL_COUNT) % TH_ROLL_COUNT; touch_cfg(); }
-static void v_sens(char *b, int n)
+// gradi per tutta la corsa: da 20 a 180 (180 = da rivolta verso l'alto a verso il basso)
+static void v_angle(char *b, int n)
 {
-    static const char *const s[] = {"Bassa", "Media", "Alta"};
-    snprintf(b, n, "%s (%d° per tutta l'estensione)", s[th_cfg.sens], th_sens_deg(th_cfg.sens));
+    snprintf(b, n, "%d° per tutta l'estensione%s", th_cfg.angle, th_cfg.angle >= 180 ? " (da su a giù)" : "");
 }
-static void j_sens(int d) { int v = th_cfg.sens + d; th_cfg.sens = v < 0 ? 0 : v > 2 ? 2 : v; touch_cfg(); }
+static void j_angle(int d)
+{
+    int v = th_cfg.angle + d * 10;
+    th_cfg.angle = v < TH_ANGLE_MIN ? TH_ANGLE_MIN : v > TH_ANGLE_MAX ? TH_ANGLE_MAX : v;
+    touch_cfg();
+}
+static void v_angle2(char *b, int n)
+{
+    snprintf(b, n, "%d° per tutta la corsa%s", th_cfg.angle2, th_cfg.roll_fn == TH_ROLL_NONE ? " (non usato)" : "");
+}
+static void j_angle2(int d)
+{
+    int v = th_cfg.angle2 + d * 10;
+    th_cfg.angle2 = v < TH_ANGLE_MIN ? TH_ANGLE_MIN : v > TH_ANGLE_MAX ? TH_ANGLE_MAX : v;
+    touch_cfg();
+}
 static void v_invp(char *b, int n) { snprintf(b, n, "%s", th_cfg.inv_pitch ? "Sì" : "No"); }
 static void a_invp(void) { th_cfg.inv_pitch = !th_cfg.inv_pitch; touch_cfg(); }
 static void v_invr(char *b, int n) { snprintf(b, n, "%s", th_cfg.inv_roll ? "Sì" : "No"); }
@@ -118,10 +182,12 @@ static void v_micg(char *b, int n) { snprintf(b, n, "%d di 4", th_cfg.mic_gain);
 static void j_micg(int d) { int v = th_cfg.mic_gain + d; th_cfg.mic_gain = v < 1 ? 1 : v > 4 ? 4 : v; touch_cfg(); }
 
 static const menu_item_t ctl_items[] = {
-    {.icon = LV_SYMBOL_REFRESH, .label = "La rotazione controlla", .value = v_roll, .on_adjust = j_roll},
-    {.icon = ICON_SLIDERS, .label = "Sensibilità", .value = v_sens, .on_adjust = j_sens},
+    {.icon = LV_SYMBOL_SHUFFLE, .label = "La nota segue", .value = v_swap, .on_select = a_swap},
+    {.icon = LV_SYMBOL_REFRESH, .label = "L'altro movimento controlla", .value = v_roll, .on_adjust = j_roll},
+    {.icon = ICON_SLIDERS, .label = "Inclinazione per le note", .value = v_angle, .on_adjust = j_angle},
+    {.icon = ICON_SLIDERS, .label = "Inclinazione per l'altro movimento", .value = v_angle2, .on_adjust = j_angle2},
     {.icon = LV_SYMBOL_UP, .label = "Inverti la nota", .value = v_invp, .on_select = a_invp},
-    {.icon = LV_SYMBOL_SHUFFLE, .label = "Inverti la rotazione", .value = v_invr, .on_select = a_invr},
+    {.icon = LV_SYMBOL_SHUFFLE, .label = "Inverti l'altro movimento", .value = v_invr, .on_select = a_invr},
     {.icon = LV_SYMBOL_PLAY, .label = "Suona", .value = v_always, .on_select = a_always},
     {.icon = ICON_MIC, .label = "Volume del microfono", .value = v_micg, .on_adjust = j_micg},
 };
@@ -304,6 +370,7 @@ static void angles(float *pitch, float *roll)
     if (pt > 180) pt -= 360;
     if (pt < -180) pt += 360;
     if (g_set.flipped) { ro = -ro; pt = -pt; }
+    if (th_cfg.swap) { float t = pt; pt = ro; ro = t; }   // la nota sull'altro asse
     if (th_cfg.inv_pitch) pt = -pt;
     if (th_cfg.inv_roll) ro = -ro;
     *pitch = pt;
@@ -333,7 +400,7 @@ static void render(float p, float r, bool gate)
     // rotazione
     int w = (int)lroundf((r + 1) * 0.5f * (PAD_W - 32));
     if (lv_obj_get_width(rfill) != w) lv_obj_set_width(rfill, w < 1 ? 1 : w);
-    snprintf(t, sizeof(t), "Rotazione: %s", th_roll_name(th_cfg.roll_fn));
+    snprintf(t, sizeof(t), "%s: %s", axis_name(false), th_roll_name(th_cfg.roll_fn));
     ui_set_text(l_roll, t);
     ui_set_bg_color(pad, gate ? lv_color_hex(0x10161C) : C_BG);
     btn_labels();
@@ -350,8 +417,7 @@ static void sample_cb(lv_timer_t *tm)
     }
     float pitch = 0, roll = 0;
     if (have_g) angles(&pitch, &roll);
-    float half = th_sens_deg(th_cfg.sens) / 2.0f;
-    float p = clampf(pitch / half, -1, 1), r = clampf(roll / half, -1, 1);
+    float p = clampf(pitch / (th_cfg.angle * 0.5f), -1, 1), r = clampf(roll / (th_cfg.angle2 * 0.5f), -1, 1);
     bool gate = th_cfg.always || (t_down && t_pad);
     th_control(p, r, gate);
     if (gate) input_mark_activity();
@@ -361,12 +427,14 @@ static void sample_cb(lv_timer_t *tm)
 static void on_button(int i)
 {
     if (i != B_REC && i != B_MIC && th_recording()) { ui_toast("Ferma prima la registrazione"); return; }
+    // i menu sostituiscono la schermata (gli oggetti di questa vengono cancellati): return,
+    // non break, perché btn_labels() qui sotto li toccherebbe dopo la cancellazione
     switch (i) {
-    case B_SOUND: ui_push(&app_menu, &sound_menu); break;
-    case B_SCALE: ui_push(&app_menu, &scale_menu); break;
-    case B_FX:    ui_push(&app_menu, &fx_menu); break;
-    case B_CTL:   ui_push(&app_menu, &ctl_menu); break;
-    case B_LIST:  ui_push(&app_th_recs, NULL); break;
+    case B_SOUND: ui_push(&app_menu, &sound_menu); return;
+    case B_SCALE: ui_push(&app_menu, &scale_menu); return;
+    case B_FX:    ui_push(&app_menu, &fx_menu); return;
+    case B_CTL:   ui_push(&app_menu, &ctl_menu); return;
+    case B_LIST:  ui_push(&app_th_recs, NULL); return;
     case B_MIC:
         if (th_recording()) { ui_toast("Si sceglie prima di registrare"); break; }
         th_cfg.mic = !th_cfg.mic;
