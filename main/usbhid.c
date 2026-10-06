@@ -1,0 +1,249 @@
+// usbhid.c — tastiera USB (HID) con TinyUSB. Vedi usbhid.h.
+//
+// Il codice vero è compilato solo quando c'è il componente esp_tinyusb (HAVE_USBHID,
+// definito dal CMakeLists se la cartella components/esp_tinyusb esiste). Senza, resta
+// un guscio che dice "non disponibile", così il firmware si compila lo stesso.
+#include "usbhid.h"
+#include "settings.h"
+
+#ifndef HAVE_USBHID
+
+bool usbhid_supported(void) { return false; }
+void usbhid_begin(void) {}
+void usbhid_end(void) {}
+bool usbhid_mounted(void) { return false; }
+int  usbhid_type(const char *t, int l, int layout) { (void)t; (void)l; (void)layout; return 0; }
+void usbhid_cancel(void) {}
+
+#else   /* ================= TinyUSB presente ================= */
+
+#include <string.h>
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+#include "esp_log.h"
+#include "tinyusb.h"
+#include "class/hid/hid_device.h"
+
+static const char *TAG = "usbhid";
+static bool installed;
+static volatile bool cancel;
+
+/* ---- descrittori ---- */
+
+static const uint8_t hid_report[] = { TUD_HID_REPORT_DESC_KEYBOARD() };
+
+// callback richiesti da TinyUSB
+uint8_t const *tud_hid_descriptor_report_cb(uint8_t instance) { (void)instance; return hid_report; }
+uint16_t tud_hid_get_report_cb(uint8_t i, uint8_t id, hid_report_type_t t, uint8_t *buf, uint16_t len)
+{ (void)i; (void)id; (void)t; (void)buf; (void)len; return 0; }
+void tud_hid_set_report_cb(uint8_t i, uint8_t id, hid_report_type_t t, uint8_t const *buf, uint16_t len)
+{ (void)i; (void)id; (void)t; (void)buf; (void)len; }
+
+#define EPNUM_HID 0x81
+static const uint8_t cfg_desc[] = {
+    TUD_CONFIG_DESCRIPTOR(1, 1, 0, TUD_CONFIG_DESC_LEN + TUD_HID_DESC_LEN, 0x00, 100),
+    TUD_HID_DESCRIPTOR(0, 0, HID_ITF_PROTOCOL_KEYBOARD, sizeof(hid_report), EPNUM_HID, 16, 10),
+};
+
+static const tusb_desc_device_t dev_desc = {
+    .bLength = sizeof(tusb_desc_device_t),
+    .bDescriptorType = TUSB_DESC_DEVICE,
+    .bcdUSB = 0x0200,
+    .bDeviceClass = 0x00, .bDeviceSubClass = 0x00, .bDeviceProtocol = 0x00,
+    .bMaxPacketSize0 = CFG_TUD_ENDPOINT0_SIZE,
+    .idVendor = 0x303A,          // Espressif
+    .idProduct = 0x4004,
+    .bcdDevice = 0x0100,
+    .iManufacturer = 0x01, .iProduct = 0x02, .iSerialNumber = 0x03,
+    .bNumConfigurations = 0x01,
+};
+
+static const char *str_desc[] = {
+    (const char[]){0x09, 0x04},  // lingua: inglese
+    "Gadget", "Gadget Keyboard", "0001",
+};
+
+bool usbhid_supported(void) { return true; }
+bool usbhid_mounted(void) { return installed && tud_mounted(); }
+void usbhid_cancel(void) { cancel = true; }
+
+void usbhid_begin(void)
+{
+    if (installed) return;
+    tinyusb_config_t cfg = {
+        .device_descriptor = &dev_desc,
+        .string_descriptor = str_desc,
+        .string_descriptor_count = sizeof(str_desc) / sizeof(str_desc[0]),
+        .external_phy = false,
+        .configuration_descriptor = cfg_desc,
+    };
+    if (tinyusb_driver_install(&cfg) != ESP_OK) { ESP_LOGE(TAG, "tinyusb non installato"); return; }
+    installed = true;
+}
+
+void usbhid_end(void)
+{
+    if (!installed) return;
+#if defined(CONFIG_TINYUSB_INIT_IN_DEFAULT_TASK) || 1
+    // ripristina la porta per la console (dove supportato dalla versione del componente)
+    tinyusb_driver_uninstall();
+#endif
+    installed = false;
+}
+
+/* ---- mappa caratteri → tasti ----
+ * (modificatore, usage) per i caratteri ASCII stampabili. Due layout completi (IT e US);
+ * gli altri usano US come ripiego finché non sono completati. I codici di BitLocker
+ * (cifre e trattino) coincidono in tutti questi layout, quindi si digitano sempre bene.
+ */
+#define SH 0x02    // Shift sinistro
+#define AG 0x40    // AltGr (Right Alt)
+
+typedef struct { uint8_t mod, key; } keymap_t;
+
+// US QWERTY
+static keymap_t map_us(char c)
+{
+    if (c >= 'a' && c <= 'z') return (keymap_t){0, HID_KEY_A + (c - 'a')};
+    if (c >= 'A' && c <= 'Z') return (keymap_t){SH, HID_KEY_A + (c - 'A')};
+    if (c >= '1' && c <= '9') return (keymap_t){0, HID_KEY_1 + (c - '1')};
+    switch (c) {
+    case '0': return (keymap_t){0, HID_KEY_0};
+    case ' ': return (keymap_t){0, HID_KEY_SPACE};
+    case '\n': return (keymap_t){0, HID_KEY_ENTER};
+    case '\t': return (keymap_t){0, HID_KEY_TAB};
+    case '-': return (keymap_t){0, HID_KEY_MINUS};
+    case '=': return (keymap_t){0, HID_KEY_EQUAL};
+    case '[': return (keymap_t){0, HID_KEY_BRACKET_LEFT};
+    case ']': return (keymap_t){0, HID_KEY_BRACKET_RIGHT};
+    case '\\': return (keymap_t){0, HID_KEY_BACKSLASH};
+    case ';': return (keymap_t){0, HID_KEY_SEMICOLON};
+    case '\'': return (keymap_t){0, HID_KEY_APOSTROPHE};
+    case '`': return (keymap_t){0, HID_KEY_GRAVE};
+    case ',': return (keymap_t){0, HID_KEY_COMMA};
+    case '.': return (keymap_t){0, HID_KEY_PERIOD};
+    case '/': return (keymap_t){0, HID_KEY_SLASH};
+    case '!': return (keymap_t){SH, HID_KEY_1};
+    case '@': return (keymap_t){SH, HID_KEY_2};
+    case '#': return (keymap_t){SH, HID_KEY_3};
+    case '$': return (keymap_t){SH, HID_KEY_4};
+    case '%': return (keymap_t){SH, HID_KEY_5};
+    case '^': return (keymap_t){SH, HID_KEY_6};
+    case '&': return (keymap_t){SH, HID_KEY_7};
+    case '*': return (keymap_t){SH, HID_KEY_8};
+    case '(': return (keymap_t){SH, HID_KEY_9};
+    case ')': return (keymap_t){SH, HID_KEY_0};
+    case '_': return (keymap_t){SH, HID_KEY_MINUS};
+    case '+': return (keymap_t){SH, HID_KEY_EQUAL};
+    case '{': return (keymap_t){SH, HID_KEY_BRACKET_LEFT};
+    case '}': return (keymap_t){SH, HID_KEY_BRACKET_RIGHT};
+    case '|': return (keymap_t){SH, HID_KEY_BACKSLASH};
+    case ':': return (keymap_t){SH, HID_KEY_SEMICOLON};
+    case '"': return (keymap_t){SH, HID_KEY_APOSTROPHE};
+    case '~': return (keymap_t){SH, HID_KEY_GRAVE};
+    case '<': return (keymap_t){SH, HID_KEY_COMMA};
+    case '>': return (keymap_t){SH, HID_KEY_PERIOD};
+    case '?': return (keymap_t){SH, HID_KEY_SLASH};
+    }
+    return (keymap_t){0, 0};
+}
+
+// Italiano (QWERTY IT). Lettere e cifre come US; cambiano i simboli.
+static keymap_t map_it(char c)
+{
+    if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') ||
+        c == ' ' || c == '\n' || c == '\t' || c == '-' || c == ',' || c == '.')
+        return map_us(c);
+    switch (c) {
+    case '\'': return (keymap_t){0, HID_KEY_MINUS};        // tasto a destra dello 0
+    case '?': return (keymap_t){SH, HID_KEY_MINUS};
+    case 'ì': return (keymap_t){0, HID_KEY_EQUAL};
+    case '^': return (keymap_t){SH, HID_KEY_EQUAL};
+    case 'è': return (keymap_t){0, HID_KEY_BRACKET_LEFT};
+    case 'é': return (keymap_t){SH, HID_KEY_BRACKET_LEFT};
+    case '+': return (keymap_t){0, HID_KEY_BRACKET_RIGHT};
+    case '*': return (keymap_t){SH, HID_KEY_BRACKET_RIGHT};
+    case 'ò': return (keymap_t){0, HID_KEY_SEMICOLON};
+    case 'ç': return (keymap_t){SH, HID_KEY_SEMICOLON};
+    case 'à': return (keymap_t){0, HID_KEY_APOSTROPHE};
+    case '°': return (keymap_t){SH, HID_KEY_APOSTROPHE};
+    case '\\': return (keymap_t){0, HID_KEY_GRAVE};
+    case '|': return (keymap_t){SH, HID_KEY_GRAVE};
+    case 'ù': return (keymap_t){0, HID_KEY_BACKSLASH};
+    case '§': return (keymap_t){SH, HID_KEY_BACKSLASH};
+    case ';': return (keymap_t){SH, HID_KEY_COMMA};
+    case ':': return (keymap_t){SH, HID_KEY_PERIOD};
+    case '<': return (keymap_t){0, HID_KEY_EUROPE_2};
+    case '>': return (keymap_t){SH, HID_KEY_EUROPE_2};
+    case '/': return (keymap_t){SH, HID_KEY_7};
+    case '(': return (keymap_t){SH, HID_KEY_8};
+    case ')': return (keymap_t){SH, HID_KEY_9};
+    case '=': return (keymap_t){SH, HID_KEY_0};
+    case '!': return (keymap_t){SH, HID_KEY_1};
+    case '"': return (keymap_t){SH, HID_KEY_2};
+    case '£': return (keymap_t){SH, HID_KEY_3};
+    case '$': return (keymap_t){SH, HID_KEY_4};
+    case '%': return (keymap_t){SH, HID_KEY_5};
+    case '&': return (keymap_t){SH, HID_KEY_6};
+    // AltGr
+    case '@': return (keymap_t){AG, HID_KEY_SEMICOLON};
+    case '#': return (keymap_t){AG, HID_KEY_APOSTROPHE};
+    case '[': return (keymap_t){AG, HID_KEY_BRACKET_LEFT};
+    case ']': return (keymap_t){AG, HID_KEY_BRACKET_RIGHT};
+    case '{': return (keymap_t){AG | SH, HID_KEY_BRACKET_LEFT};
+    case '}': return (keymap_t){AG | SH, HID_KEY_BRACKET_RIGHT};
+    }
+    return (keymap_t){0, 0};
+}
+
+static keymap_t map_char(char c, int layout)
+{
+    return layout == KB_LAYOUT_IT ? map_it(c) : map_us(c);
+}
+
+static bool wait_ready(void)
+{
+    for (int i = 0; i < 200 && !cancel; i++) {   // fino a ~2 s
+        if (tud_mounted() && tud_hid_ready()) return true;
+        if (!tud_mounted() && i > 10) return false;
+        vTaskDelay(pdMS_TO_TICKS(10));
+    }
+    return tud_mounted() && tud_hid_ready();
+}
+
+static bool send(uint8_t mod, uint8_t key)
+{
+    if (!wait_ready()) return false;
+    uint8_t kc[6] = {key, 0, 0, 0, 0, 0};
+    tud_hid_keyboard_report(0, mod, key ? kc : NULL);
+    if (!wait_ready()) return false;
+    tud_hid_keyboard_report(0, 0, NULL);          // rilascia
+    vTaskDelay(pdMS_TO_TICKS(6));
+    return true;
+}
+
+int usbhid_type(const char *text, int len, int layout)
+{
+    if (!installed) return 0;
+    cancel = false;
+    if (len < 0) len = strlen(text);
+    int done = 0;
+    uint8_t prev_key = 0;
+    for (int i = 0; i < len && !cancel; i++) {
+        keymap_t k = map_char(text[i], layout);
+        // UTF-8: salta i caratteri non gestiti dalla mappa (non rompe i codici ASCII)
+        if (!k.key) {
+            if ((unsigned char)text[i] >= 0x80) { while (i + 1 < len && ((unsigned char)text[i + 1] & 0xC0) == 0x80) i++; }
+            continue;
+        }
+        // due volte lo stesso tasto di fila: serve un report vuoto in mezzo (già c'è)
+        (void)prev_key;
+        if (!send(k.mod, k.key)) break;
+        prev_key = k.key;
+        done++;
+    }
+    tud_hid_keyboard_report(0, 0, NULL);
+    return done;
+}
+
+#endif

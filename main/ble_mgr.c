@@ -35,6 +35,7 @@ void ble_store_config_init(void);   // NimBLE: archivio delle associazioni (NVS)
 static bool running;
 static volatile bool synced, scanning;
 static volatile uint32_t gen, conn_gen;
+#define BUMP(x) __atomic_add_fetch(&(x), 1, __ATOMIC_RELAXED)
 static int scan_users;
 static uint8_t own_addr_type;
 static char dev_name[24];
@@ -197,7 +198,7 @@ void ble_mgr_forget(const ble_bond_t *b)
     struct ble_gap_conn_desc d;
     if (ble_gap_conn_find_by_addr(&a, &d) == 0) ble_gap_terminate(d.conn_handle, BLE_ERR_REM_USER_CONN_TERM);
     ble_store_util_delete_peer(&a);
-    conn_gen++;
+    BUMP(conn_gen);
     adv_refresh();
 }
 
@@ -207,7 +208,7 @@ void ble_mgr_forget_all(void)
     for (int i = 0; i < BLE_MAX_CONN; i++)
         if (conn_used[i]) ble_gap_terminate(conns[i].handle, BLE_ERR_REM_USER_CONN_TERM);
     ble_store_clear();
-    conn_gen++;
+    BUMP(conn_gen);
     adv_refresh();
 }
 
@@ -258,7 +259,7 @@ static void pair_timer_cb(void *arg)
 {
     pair_until_us = 0;
     passkey = 0;
-    conn_gen++;
+    BUMP(conn_gen);
     adv_refresh();
 }
 
@@ -340,7 +341,7 @@ static int on_svc(uint16_t h, const struct ble_gatt_error *e, const struct ble_g
     bool central = c && c->central, enc = c && c->encrypted;
     unlock();
     if (done) {
-        conn_gen++;
+        BUMP(conn_gen);
         // tastiere e telecomandi (HID) vogliono un collegamento cifrato e associato
         if (hid && central && !enc) ble_gap_security_initiate(h);
     }
@@ -357,7 +358,7 @@ static void start_discovery(uint16_t h)
         lock();
         if ((c = conn_get(h))) c->disc = BLE_DISC_FAILED;
         unlock();
-        conn_gen++;
+        BUMP(conn_gen);
     }
 }
 
@@ -374,7 +375,7 @@ static int on_name(uint16_t h, const struct ble_gatt_error *e, struct ble_gatt_a
             ble_conn_t *c = conn_get(h);
             if (c && nm[0]) snprintf(c->name, sizeof(c->name), "%s", nm);
             unlock();
-            conn_gen++;
+            BUMP(conn_gen);
         }
         return 0;   // arriva poi un'ultima chiamata con lo stato di fine
     }
@@ -414,7 +415,7 @@ static void on_connect(uint16_t h)
     unlock();
     if (slot < 0) { ble_gap_terminate(h, BLE_ERR_CONN_LIMIT); return; }
     ESP_LOGI(TAG, "collegato (%s)", central ? "centrale" : "periferica");
-    conn_gen++;
+    BUMP(conn_gen);
     if (ble_gattc_read_by_uuid(h, 1, 0xFFFF, BLE_UUID16_DECLARE(0x2A00), on_name, NULL) != 0 && central)
         start_discovery(h);
     notify_profiles(h, true);
@@ -429,14 +430,14 @@ static void on_disconnect(uint16_t h, int reason)
     unlock();
     passkey = 0;
     ESP_LOGI(TAG, "scollegato (motivo 0x%x)", reason);
-    conn_gen++;
+    BUMP(conn_gen);
 }
 
 static int gap_cb(struct ble_gap_event *ev, void *arg)
 {
     switch (ev->type) {
     case BLE_GAP_EVENT_DISC: add_dev(&ev->disc); break;
-    case BLE_GAP_EVENT_DISC_COMPLETE: scanning = false; gen++; break;
+    case BLE_GAP_EVENT_DISC_COMPLETE: scanning = false; BUMP(gen); break;
 
     case BLE_GAP_EVENT_CONNECT:
         if (ev->connect.status == 0) {
@@ -448,7 +449,7 @@ static int gap_cb(struct ble_gap_event *ev, void *arg)
                 snprintf(link.err, sizeof(link.err), "Non risponde (%d)", ev->connect.status);
             }
             unlock();
-            conn_gen++;
+            BUMP(conn_gen);
         }
         adv_refresh();   // un collegamento in entrata ferma gli annunci: decide di nuovo
         break;
@@ -481,7 +482,7 @@ static int gap_cb(struct ble_gap_event *ev, void *arg)
             pair_until_us = 0;
             esp_timer_stop(pair_timer);
         }
-        conn_gen++;
+        BUMP(conn_gen);
         break;
     }
 
@@ -503,7 +504,7 @@ static int gap_cb(struct ble_gap_event *ev, void *arg)
             passkey = io.passkey ? io.passkey : 1;
             io.passkey = passkey;
             ble_sm_inject_io(ev->passkey.conn_handle, &io);
-            conn_gen++;
+            BUMP(conn_gen);
         } else if (io.action == BLE_SM_IOACT_NUMCMP) {
             io.numcmp_accept = 1;
             ble_sm_inject_io(ev->passkey.conn_handle, &io);
@@ -580,7 +581,7 @@ static void stack_stop(void)
     unlock();
     pair_until_us = 0;
     passkey = 0;
-    conn_gen++;
+    BUMP(conn_gen);
 }
 
 static void update(void)
@@ -635,7 +636,7 @@ bool ble_mgr_connect(const ble_dev_t *dv)
         unlock();
         return false;
     }
-    if (scanning) { ble_gap_disc_cancel(); scanning = false; gen++; }   // la radio fa una cosa per volta
+    if (scanning) { ble_gap_disc_cancel(); scanning = false; BUMP(gen); }   // la radio fa una cosa per volta
     ble_addr_t a = {.type = dv->addr_type};
     memcpy(a.val, dv->addr, 6);
     lock();
@@ -653,10 +654,10 @@ bool ble_mgr_connect(const ble_dev_t *dv)
         link.state = BLE_LINK_FAILED;
         snprintf(link.err, sizeof(link.err), r == BLE_HS_ENOMEM ? "Troppi collegamenti" : "Errore %d", r);
         unlock();
-        conn_gen++;
+        BUMP(conn_gen);
         return false;
     }
-    conn_gen++;
+    BUMP(conn_gen);
     return true;
 }
 

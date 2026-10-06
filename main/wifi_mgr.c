@@ -50,6 +50,7 @@ static volatile bool dns_run;
 static volatile bool portal_saved;
 static volatile int portal_clients;
 static char ap_ssid[24];
+static int portal_kind;   // 0 = configura Wi-Fi, 1 = pagina Appunti
 
 static bool want_sta(void) { return g_set.wifi_on && g_set.wifi_ssid[0]; }
 
@@ -105,9 +106,14 @@ static void apply_sta_config(void)
     esp_wifi_set_config(WIFI_IF_STA, &c);
 }
 
+#define RETRY_AFTER_FAIL_MS 60000   // dopo aver "rinunciato", ritenta ogni tanto da solo
+
 static void reconnect_cb(void *arg)
 {
-    if (!started || !want_sta() || state == WIFI_CONNECTED || conn_fail) return;
+    if (!started || !want_sta() || state == WIFI_CONNECTED) return;
+    // dopo un fallimento latchato (password/AP) si riprova comunque ogni tanto: se la
+    // rete torna a portata o il router si riavvia, il Wi-Fi si riprende da solo
+    if (conn_fail) { conn_fail = false; conn_try = 0; retry_ms = 1000; state = WIFI_CONNECTING; }
     // una scansione in corso verrebbe interrotta: riprova appena finisce
     if (scanning) { esp_timer_start_once(reconnect_timer, 1500 * 1000); return; }
     sta_connect();
@@ -136,6 +142,8 @@ static void on_event(void *arg, esp_event_base_t base, int32_t id, void *data)
                 if (auth_err && ++conn_try >= 3) {
                     conn_fail = true;
                     state = WIFI_NO_NETWORK;
+                    esp_timer_stop(reconnect_timer);
+                    esp_timer_start_once(reconnect_timer, (uint64_t)RETRY_AFTER_FAIL_MS * 1000);
                     break;
                 }
                 state = WIFI_CONNECTING;
@@ -296,6 +304,8 @@ void wifi_mgr_apply(void)
         esp_wifi_disconnect();
         state = WIFI_NO_NETWORK;
         retry_ms = 1000;
+        conn_fail = false;
+        conn_try = 0;
     }
     update_mode();
 }
@@ -460,6 +470,48 @@ static const char PAGE_HEAD[] =
     "button.s{margin-top:18px;width:100%;padding:14px;border:0;border-radius:10px;background:#ffb020;color:#111;font:600 1rem system-ui}"
     "</style>";
 
+
+static const char PAGE_CLIPS[] =
+    "<!doctype html><html lang=it><meta charset=utf-8>"
+    "<meta name=viewport content='width=device-width,initial-scale=1'><title>Gadget Appunti</title>"
+    "<style>body{font-family:system-ui,sans-serif;background:#0b0d10;color:#ededed;margin:0;padding:24px;max-width:560px}"
+    "h1{font-size:1.4rem;margin:0 0 4px}p{color:#9aa3ad;margin:0 0 14px;line-height:1.4}"
+    "button{font:600 1rem system-ui;border:0;border-radius:10px;padding:13px 16px;margin:4px 0;cursor:pointer}"
+    ".p{background:#ffb020;color:#111;width:100%}.s{background:#16191d;color:#ededed;border:1px solid #2a2f35;width:100%}"
+    "textarea{width:100%;box-sizing:border-box;min-height:90px;padding:12px;border-radius:10px;border:1px solid #2a2f35;background:#16191d;color:#ededed;font:inherit;margin:6px 0}"
+    "#log{color:#9aa3ad;font-size:.9rem;margin-top:10px;white-space:pre-wrap}.ok{color:#5cff8a}.err{color:#ff6b57}"
+    "</style>"
+    "<h1>Appunti del Gadget</h1>"
+    "<p>Collega il Gadget via Bluetooth, poi incolla qui i testi: finiscono nella lista sul Gadget, "
+    "pronti per essere ridigitati via USB. Serve Chrome o Edge.</p>"
+    "<button class=p id=conn>Collega il Gadget (Bluetooth)</button>"
+    "<textarea id=txt placeholder='Incolla qui (si invia da solo) oppure scrivi e premi Invia'></textarea>"
+    "<button class=s id=send>Invia al Gadget</button>"
+    "<button class=s id=dl>Scarica questa pagina per usarla offline</button>"
+    "<div id=log>Non collegato.</div>"
+    "<script>"
+    "var SVC='6e6c0001-b5a3-f393-e0a9-e50e24dcca9e',IN='6e6c0002-b5a3-f393-e0a9-e50e24dcca9e',ST='6e6c0003-b5a3-f393-e0a9-e50e24dcca9e';"
+    "var inc,dev,log=document.getElementById('log');"
+    "function L(m,c){log.textContent=m;log.className=c||'';}"
+    "async function conn(){try{if(!navigator.bluetooth){L('Questo browser non supporta il Bluetooth. Usa Chrome o Edge.','err');return;}"
+    "dev=await navigator.bluetooth.requestDevice({filters:[{namePrefix:'Gadget-'}],optionalServices:[SVC]});"
+    "dev.addEventListener('gattserverdisconnected',function(){L('Gadget scollegato.','err');inc=null;});"
+    "var g=await dev.gatt.connect();var s=await g.getPrimaryService(SVC);inc=await s.getCharacteristic(IN);"
+    "try{var st=await s.getCharacteristic(ST);await st.startNotifications();"
+    "st.addEventListener('characteristicvaluechanged',function(e){var n=e.target.value.getUint16(0,true);L('Collegato a '+dev.name+' · '+n+' in memoria','ok');});}catch(e){}"
+    "L('Collegato a '+dev.name,'ok');}catch(e){L('Collegamento annullato: '+e,'err');}}"
+    "async function send(t){if(!inc){L('Prima collega il Gadget.','err');return;}"
+    "if(!t)return;var enc=new TextEncoder().encode(t);var buf=new Uint8Array(enc.length+1);buf.set(enc);buf[enc.length]=0;"
+    "try{for(var i=0;i<buf.length;i+=180){var c=buf.slice(i,i+180);"
+    "if(inc.writeValueWithoutResponse)await inc.writeValueWithoutResponse(c);else await inc.writeValue(c);}"
+    "L('Inviato ('+enc.length+' caratteri)','ok');}catch(e){L('Invio non riuscito: '+e,'err');}}"
+    "document.getElementById('conn').onclick=conn;"
+    "document.getElementById('send').onclick=function(){send(document.getElementById('txt').value);};"
+    "document.getElementById('txt').addEventListener('paste',function(e){var t=(e.clipboardData||window.clipboardData).getData('text');if(t){e.preventDefault();document.getElementById('txt').value=t;send(t);}});"
+    "document.getElementById('dl').onclick=function(){var b=new Blob(['<!doctype html>'+document.documentElement.outerHTML],{type:'text/html'});"
+    "var a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='gadget-appunti.html';a.click();};"
+    "</script></html>";
+
 static esp_err_t page_get(httpd_req_t *r)
 {
     if (strcmp(r->uri, "/") != 0) {
@@ -467,6 +519,11 @@ static esp_err_t page_get(httpd_req_t *r)
         httpd_resp_set_status(r, "302 Found");
         httpd_resp_set_hdr(r, "Location", "http://192.168.4.1/");
         return httpd_resp_send(r, NULL, 0);
+    }
+    if (portal_kind == 1) {
+        httpd_resp_set_type(r, "text/html; charset=utf-8");
+        httpd_resp_sendstr_chunk(r, PAGE_CLIPS);
+        return httpd_resp_sendstr_chunk(r, NULL);
     }
     httpd_resp_set_type(r, "text/html; charset=utf-8");
     httpd_resp_sendstr_chunk(r, PAGE_HEAD);
@@ -497,7 +554,7 @@ static void url_decode(char *s)
     char *o = s;
     for (; *s; s++) {
         if (*s == '+') *o++ = ' ';
-        else if (*s == '%' && isxdigit((int)s[1]) && isxdigit((int)s[2])) {
+        else if (*s == '%' && isxdigit((unsigned char)s[1]) && isxdigit((unsigned char)s[2])) {
             char h[3] = {s[1], s[2], 0};
             *o++ = (char)strtol(h, NULL, 16);
             s += 2;
@@ -540,14 +597,17 @@ static esp_err_t save_post(httpd_req_t *r)
     return ESP_OK;
 }
 
-void wifi_mgr_portal_start(void)
+void wifi_mgr_portal_start(void)      { portal_kind = 0; wifi_mgr_portal_open(); }
+void wifi_mgr_portal_start_clips(void) { portal_kind = 1; wifi_mgr_portal_open(); }
+
+void wifi_mgr_portal_open(void)
 {
     if (portal_on) return;
     portal_on = true;
     portal_saved = false;
     portal_clients = 0;
     update_mode();
-    wifi_mgr_scan_start();
+    if (portal_kind == 0) wifi_mgr_scan_start();
 
     httpd_config_t c = HTTPD_DEFAULT_CONFIG();
     c.uri_match_fn = httpd_uri_match_wildcard;

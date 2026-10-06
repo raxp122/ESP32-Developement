@@ -314,8 +314,8 @@ bool keyboard_nav(nav_t ev)
     case NAV_SELECT: finish(text); return true;
     case NAV_BACK:
         if (text[0]) { backspace(); show_text(); return true; }
-        finish(NULL);
-        return false;
+        finish(NULL);   // il callback chiude già la tastiera (ui_pop): non farne un secondo
+        return true;
     default:
         return false;
     }

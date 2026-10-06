@@ -20,6 +20,7 @@ static menu_item_t items[] = {
     {.icon = ICON_GHOST,    .label = "Doom",              .app = &app_menu, .arg = &doom_menu},
     {.icon = ICON_GAMEPAD,  .label = "Polipetto",         .app = &app_pet},
     {.icon = ICON_SLIDERS,  .label = "Livella",           .app = &app_level},
+    {.icon = LV_SYMBOL_COPY, .label = "Appunti",           .app = &app_menu, .arg = &clips_menu},
     {.icon = LV_SYMBOL_SETTINGS, .label = "Impostazioni", .app = &app_menu, .arg = &settings_menu},
 };
 
@@ -63,6 +64,7 @@ static const boot_app_t boot_apps[] = {
     {"Spada laser", &app_menu, &saber_menu},
     {"Cerca", &app_search, NULL},
     {"Livella", &app_level, NULL},
+    {"Appunti", &app_menu, &clips_menu},
 };
 #define N_BOOT (int)(sizeof(boot_apps) / sizeof(boot_apps[0]))
 
