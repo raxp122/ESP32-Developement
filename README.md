@@ -80,6 +80,14 @@ Limite dell'hardware: l'ESP32-S3 ha solo il Bluetooth Low Energy. Casse e cuffie
 ## 8-Ball veggente
 Dal launcher: **8-Ball veggente**. Pensa a una domanda (da sì o no), scuoti la scheda o fai swipe a destra: la sfera ondeggia e dalla finestrella affiora il triangolo con una delle 20 risposte classiche (10 sì, 5 vaghe, 5 no; verde, colore d'accento, rosso). Mai la stessa due volte di fila.
 
+## Q-20
+Dal launcher: **Q-20**. Pensa a qualcosa (animale, oggetto, cibo, luogo, persona…) e rispondi alle domande toccando *Sì*, *Forse sì*, *Non so*, *Forse no*, *No*. Dopo una ventina di domande (prima, se è sicuro) prova a indovinare; se sbaglia continua, fino a 30. Se vince lui, ricorda ancora meglio quella cosa; se perde ti chiede cosa pensavi e la impara. BOOT annulla l'ultima risposta.
+
+- Conosce all'inizio 250 cose e 100 domande (tabella generata da `tools/q20_gen.py`).
+- Una risposta sbagliata non lo manda fuori strada: ogni risposta pesa, nessuna elimina.
+- Quello che impara sta in `q20/kb.txt` sulla microSD ed entra nei backup. Senza microSD si gioca, ma non impara.
+- Ampliare la conoscenza iniziale: modifica `tools/q20_gen.py` (le domande nuove solo in fondo), lancia `python3 tools/q20_gen.py` e aumenta `SEED_VERSION`: il Gadget aggiunge le cose nuove al suo file senza toccare quello che ha imparato.
+
 ## Appunti (testo dal PC → tastiera USB)
 Serve per ridigitare codici e stringhe su un PC facendo da tastiera USB. Dal launcher: **Appunti**.
 
@@ -92,7 +100,7 @@ Solo il PC collegato da *Ricevi dal PC* (o un dispositivo associato) può mandar
 
 ## Backup e ripristino
 Impostazioni › Backup e ripristino:
-- **Crea un backup ora**: salva tutto (impostazioni, Wi-Fi, polipetto, Radar e Pokédex, livella) in un file della cartella `backup` sulla microSD.
+- **Crea un backup ora**: salva tutto (impostazioni, Wi-Fi, polipetto, Radar e Pokédex, livella, quello che il Q-20 ha imparato) in un file della cartella `backup` sulla microSD.
 - **Ripristina un backup**: elenca i backup; si possono usare solo quelli fatti con questa versione del firmware o con una più vecchia. Da un backup vecchio le impostazioni nuove prendono il valore predefinito e quelle che non esistono più si ignorano. Dopo il ripristino la scheda si riavvia.
 - **Backup prima degli aggiornamenti**: prima di ogni aggiornamento OTA ne crea uno da solo.
 
