@@ -123,7 +123,7 @@ Immagine unica per il flasher web (indirizzo 0x0), come fa la build su GitHub:
 `esptool.py --chip esp32s3 merge_bin -o gadget.bin --flash_mode dio --flash_size 16MB 0x0 build/bootloader/bootloader.bin 0x8000 build/partition_table/partition-table.bin 0xf000 build/ota_data_initial.bin 0x20000 build/gadget.bin`
 
 ## Aggiornamenti
-- **Dalla scheda (OTA):** Impostazioni › Sistema › Aggiornamento firmware. Ogni merge su `main` pubblica una release su GitHub con il firmware; la scheda la scarica via Wi-Fi e si riavvia. Se il nuovo firmware non riesce ad avviarsi, al riavvio torna da solo quello precedente. Con "Cerca aggiornamenti da solo" avvisa quando ne esce uno nuovo.
+- **Dalla scheda (OTA):** Impostazioni › Sistema › Aggiornamento firmware. Ogni merge su `main` pubblica una release su GitHub con il firmware; la scheda la scarica via Wi-Fi e si riavvia. Se il nuovo firmware non riesce ad avviarsi, al riavvio torna da solo quello precedente. Mentre sei nella schermata di aggiornamento il Bluetooth va in pausa (la radio è condivisa col Wi-Fi) e si riaccende uscendo. Con "Cerca aggiornamenti da solo" avvisa quando ne esce uno nuovo.
 - **Via USB:** `gadget.bin` a `0x0` (immagine unica) oppure solo `gadget-app.bin` a `0x20000`.
 
 Dalla 0.14 le impostazioni (NVS) stanno in fondo alla flash (`0xFF0000`): né l'OTA né i file qui sopra le toccano più.

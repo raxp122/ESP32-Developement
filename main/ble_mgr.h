@@ -25,6 +25,7 @@ typedef struct {
 } ble_dev_t;
 
 void ble_mgr_apply(void);          // applica g_set.ble_on / ble_visible
+void ble_mgr_suspend(bool on);     // spegne lo stack per un po' (es. aggiornamento) senza toccare le impostazioni
 bool ble_mgr_on(void);             // l'utente ha attivato il Bluetooth
 bool ble_mgr_ready(void);          // stack avviato e sincronizzato
 const char *ble_mgr_name(void);

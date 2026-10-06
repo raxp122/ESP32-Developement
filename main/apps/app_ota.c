@@ -4,9 +4,11 @@
 #include "apps.h"
 #include "ota.h"
 #include "wifi_mgr.h"
+#include "ble_mgr.h"
 #include <stdio.h>
 
 static lv_obj_t *l_ver, *l_state, *l_hint, *bar;
+static bool ble_paused;   // il Bluetooth era acceso ed è in pausa finché si resta qui
 static uint32_t confirm_until;
 
 static lv_obj_t *mk(lv_obj_t *root, const lv_font_t *f, lv_color_t c, int y)
@@ -23,10 +25,11 @@ static lv_obj_t *mk(lv_obj_t *root, const lv_font_t *f, lv_color_t c, int y)
 
 static void render(void)
 {
-    char t[96];
+    char t[128];
     ota_state_t s = ota_state();
     const char *latest = ota_latest();
-    snprintf(t, sizeof(t), "In uso: %s%s%s", ota_current(), latest[0] ? " · ultima: " : "", latest);
+    snprintf(t, sizeof(t), "In uso: %s%s%s%s", ota_current(), latest[0] ? " · ultima: " : "", latest,
+             ble_paused ? " · Bluetooth in pausa" : "");
     ui_set_text(l_ver, t);   // gira a ogni tick: solo i cambiamenti ridisegnano lo schermo
 
     bool confirming = lv_tick_get() < confirm_until && s == OTA_AVAILABLE;
@@ -75,6 +78,9 @@ static void enter(lv_obj_t *root, void *arg)
     lv_bar_set_range(bar, 0, 100);
     l_hint = mk(root, &font_s, C_DIM, 118);
     confirm_until = 0;
+    // Wi-Fi e Bluetooth condividono la radio: durante controllo e download tutta al Wi-Fi
+    ble_paused = ble_mgr_on();
+    ble_mgr_suspend(true);
     ota_state_t s = ota_state();
     if (s == OTA_IDLE || s == OTA_UP_TO_DATE || s == OTA_ERROR) ota_check();
     render();
@@ -100,10 +106,12 @@ static bool nav(nav_t ev)
     return true;
 }
 
+static void leave(void) { ble_mgr_suspend(false); ble_paused = false; }   // torna com'era
+
 static const char *title(void *arg) { return "Impostazioni » Aggiornamento firmware"; }
 
 const app_t app_ota = {
     .name = "Aggiornamento", .icon = LV_SYMBOL_DOWNLOAD,
-    .enter = enter, .nav = nav, .tick = render, .title = title,
+    .enter = enter, .leave = leave, .nav = nav, .tick = render, .title = title,
     .flags = APP_NO_SLEEP,
 };

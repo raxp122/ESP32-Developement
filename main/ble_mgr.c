@@ -628,9 +628,19 @@ static void stack_stop(void)
     BUMP(conn_gen);
 }
 
+// in pausa (es. durante un aggiornamento): radio tutta al Wi-Fi, impostazioni intatte
+static bool suspended;
+
+void ble_mgr_suspend(bool on)
+{
+    if (suspended == on) return;
+    suspended = on;
+    ble_mgr_apply();
+}
+
 static void update(void)
 {
-    bool need = g_set.ble_on || scan_users > 0;
+    bool need = (g_set.ble_on || scan_users > 0) && !suspended;
     if (!need) { stack_stop(); return; }
     stack_start();
     adv_refresh();   // se non è ancora sincronizzato, ci pensa on_sync
