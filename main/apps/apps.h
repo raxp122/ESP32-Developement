@@ -32,6 +32,8 @@ extern const app_t app_ble_pair;
 extern const app_t app_ble_conns;
 extern menu_t clips_menu;             // Appunti: testi dal PC → tastiera USB
 extern const app_t app_clip_list;
+extern const app_t app_8ball;
+extern const app_t app_q20;
 
 // App all'avvio (Impostazioni): elenco con indici stabili, salvati in g_set.boot_app
 int  boot_app_count(void);

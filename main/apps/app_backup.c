@@ -1,4 +1,4 @@
-// app_backup.c — Impostazioni › Backup: crea un backup sulla microSD e ripristina quelli
+// app_backup.c — Impostazioni » Backup: crea un backup sulla microSD e ripristina quelli
 // salvati. Il ripristino chiede conferma (secondo swipe) e poi riavvia la scheda.
 #include "apps.h"
 #include "backup.h"
@@ -30,7 +30,7 @@ static void render(int dir)
 {
     if (n <= 0) {
         list_view_set(&lv, LV_SYMBOL_SD_CARD, NULL, n < 0 ? "microSD assente" : "Nessun backup",
-                      n < 0 ? "Inserisci la microSD" : "Crealo da Impostazioni › Backup", NULL, 0, 0, dir);
+                      n < 0 ? "Inserisci la microSD" : "Crealo da Impostazioni » Backup", NULL, 0, 0, dir);
         return;
     }
     const backup_info_t *b = &list[sel];
@@ -87,14 +87,14 @@ static void tick(void)
     if (confirm_until && lv_tick_get() >= confirm_until) { confirm_until = 0; render(0); }
 }
 
-static const char *title(void *arg) { return "Impostazioni › Ripristina un backup"; }
+static const char *title(void *arg) { return "Impostazioni » Ripristina un backup"; }
 
 const app_t app_restore = {
     .name = "Ripristino", .icon = LV_SYMBOL_SD_CARD,
     .enter = enter, .nav = nav, .tick = tick, .title = title,
 };
 
-/* ---------------- Impostazioni › Backup ---------------- */
+/* ---------------- Impostazioni » Backup ---------------- */
 
 static void v_where(char *b, int len)
 {
@@ -125,4 +125,4 @@ static const menu_item_t items[] = {
     {.icon = ICON_INFO, .label = "Cosa contiene",
      .hint = "Impostazioni, Wi-Fi, polipetto, Radar, livella. Il file è in chiaro: tienilo al sicuro"},
 };
-menu_t backup_menu = {"Impostazioni › Backup", items, sizeof(items) / sizeof(items[0]), 0, NULL};
+menu_t backup_menu = {"Impostazioni » Backup", items, sizeof(items) / sizeof(items[0]), 0, NULL};

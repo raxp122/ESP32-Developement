@@ -1,5 +1,5 @@
 // app_wifiscan.c — reti Wi-Fi vicine con banda (2.4/5 GHz); swipe a destra = connetti.
-// La stessa schermata si apre anche da Impostazioni › Wi-Fi (arg = titolo da mostrare).
+// La stessa schermata si apre anche da Impostazioni » Wi-Fi (arg = titolo da mostrare).
 #include "apps.h"
 #include "keyboard.h"
 #include "wifi_mgr.h"
