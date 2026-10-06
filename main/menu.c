@@ -1,5 +1,6 @@
 // menu.c — schermata menu generica usata da home e impostazioni
 #include "ui.h"
+#include "apps/apps.h"
 #include <stdio.h>
 #include <string.h>
 
@@ -76,6 +77,13 @@ static bool nav(nav_t ev)
         case NAV_BACK: editing = false; render(0); return true;
         default: return false;
         }
+    }
+    // nel menu principale BOOT riporta in cima (a "Cerca") senza dover scorrere
+    if (ev == NAV_BTN && m == &home_menu && m->sel != 0) {
+        m->sel = 0;
+        confirm_idx = -1;
+        render(-1);
+        return true;
     }
     switch (ev) {
     case NAV_NEXT: move(+1); return true;
