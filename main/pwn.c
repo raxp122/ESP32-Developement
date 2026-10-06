@@ -393,12 +393,15 @@ int pwn_recent_channel(void) { return cur_ch; }
 
 int pwn_aps_near(void)
 {
-    int64_t now = esp_timer_get_time();
+    // last_seen è nella stessa scala di now_s() (data reale se l'ora è impostata,
+    // altrimenti secondi dall'accensione): prima si confrontava sempre con l'uptime e,
+    // con l'ora impostata, tutte le reti del Pokédex risultavano "vicine"
+    uint32_t now = now_s();
     int c = 0;
     pwn_ensure();
     xSemaphoreTake(mtx, portMAX_DELAY);
     for (int i = 0; i < n_nets; i++)
-        if (now - (int64_t)nets[i].last_seen * 0 >= 0 && esp_timer_get_time() / 1000000 - nets[i].last_seen < 30) c++;
+        if (now >= nets[i].last_seen && now - nets[i].last_seen < 30) c++;
     xSemaphoreGive(mtx);
     return c;
 }

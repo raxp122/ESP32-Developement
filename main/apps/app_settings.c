@@ -10,8 +10,8 @@
 #include "esp_heap_caps.h"
 #include "esp_timer.h"
 #include "esp_idf_version.h"
+#include "ota.h"
 
-#define FW_VERSION "0.13.1"
 
 static const char *onoff(bool v) { return v ? "Acceso" : "Spento"; }
 
@@ -190,7 +190,18 @@ static void v_mem(char *b, int n)
              (unsigned)(heap_caps_get_free_size(MALLOC_CAP_INTERNAL) / 1024),
              heap_caps_get_free_size(MALLOC_CAP_SPIRAM) / 1048576.0);
 }
-static void v_fw(char *b, int n) { snprintf(b, n, "Gadget %s · ESP-IDF %s", FW_VERSION, esp_get_idf_version()); }
+static void v_fw(char *b, int n) { snprintf(b, n, "Gadget %s · ESP-IDF %s", ota_current(), esp_get_idf_version()); }
+static void v_ota(char *b, int n)
+{
+    switch (ota_state()) {
+    case OTA_AVAILABLE:   snprintf(b, n, "Disponibile la %s", ota_latest()); break;
+    case OTA_UP_TO_DATE:  snprintf(b, n, "Aggiornato (%s)", ota_current()); break;
+    case OTA_DOWNLOADING: snprintf(b, n, "Download %d%%", ota_progress()); break;
+    default:              snprintf(b, n, "Controlla su internet"); break;
+    }
+}
+static void v_ota_auto(char *b, int n) { snprintf(b, n, "%s", g_set.ota_auto ? "Sì, quando c'è internet" : "No"); }
+static void a_ota_auto(void) { g_set.ota_auto = !g_set.ota_auto; settings_save(); }
 static void v_up(char *b, int n)
 {
     int s = (int)(esp_timer_get_time() / 1000000);
@@ -212,6 +223,8 @@ static const menu_item_t sys_items[] = {
     {.icon = LV_SYMBOL_BATTERY_FULL, .label = "Batteria", .value = v_batt},
     {.icon = ICON_CHIP, .label = "Memoria libera", .value = v_mem},
     {.icon = ICON_INFO, .label = "Firmware", .value = v_fw},
+    {.icon = LV_SYMBOL_DOWNLOAD, .label = "Aggiornamento firmware", .value = v_ota, .app = &app_ota},
+    {.icon = ICON_SYNC, .label = "Cerca aggiornamenti da solo", .value = v_ota_auto, .on_select = a_ota_auto},
     {.icon = ICON_CLOCK, .label = "Acceso da", .value = v_up},
     {.icon = LV_SYMBOL_REFRESH, .label = "Riavvia", .on_select = a_restart, .confirm = true},
     {.icon = LV_SYMBOL_POWER, .label = "Spegni", .on_select = a_off, .confirm = true},

@@ -1,5 +1,11 @@
-# Name,   Type, SubType, Offset,  Size
-nvs,      data, nvs,     0x9000,  0x6000
-phy_init, data, phy,     0xf000,  0x1000
-factory,  app,  factory, 0x10000, 6M
-storage,  data, spiffs,  ,        4M
+# Name,   Type, SubType, Offset,   Size
+# Dalla 0.14: due slot per gli aggiornamenti OTA e le impostazioni (NVS) in fondo alla
+# flash, dove nessun file di aggiornamento arriva mai. "nvs_v1" è la vecchia posizione:
+# si legge una volta sola per trasferire le impostazioni dei firmware precedenti.
+nvs_v1,   data, nvs,     0x9000,   0x6000
+otadata,  data, ota,     0xf000,   0x2000
+phy_init, data, phy,     0x11000,  0x1000
+ota_0,    app,  ota_0,   0x20000,  0x5F0000
+ota_1,    app,  ota_1,   0x610000, 0x5F0000
+storage,  data, spiffs,  0xC00000, 0x3F0000
+nvs,      data, nvs,     0xFF0000, 0x10000

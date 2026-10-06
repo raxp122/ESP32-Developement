@@ -25,6 +25,7 @@ static uint16_t *dma_buf;
 static uint8_t *rot_buf;
 static lv_display_t *disp;
 static bool is_flipped;
+static volatile bool dark;            // retroilluminazione spenta: niente invii al pannello
 static int keep_y0 = -1, keep_y1 = -1; // righe fisiche che LVGL non deve sovrascrivere
 static uint8_t *lv_tmp;                // frame ruotato di LVGL quando ci sono righe protette
 
@@ -55,23 +56,29 @@ static void push_frame(const uint16_t *src)
 
 static void flush_cb(lv_display_t *d, const lv_area_t *area, uint8_t *px)
 {
+    // Modalità DIRECT: px è l'intero frame logico (640×172) e area è solo la zona
+    // ridisegnata. Si ruota quella zona nel frame fisico (172×640), che resta in memoria:
+    // il resto è già giusto. Il frame di LVGL non si tocca (la conversione dei byte si fa
+    // sulla copia ruotata), perché LVGL ci disegna sopra al giro successivo.
     int32_t w = lv_area_get_width(area), h = lv_area_get_height(area);
-    lv_draw_sw_rgb565_swap(px, w * h);
-
-    // Ruota il frame orizzontale (640×172) nel formato fisico verticale (172×640)
     lv_area_t ra = *area;
     lv_display_rotate_area(d, &ra);
-    uint32_t src_stride = lv_draw_buf_width_to_stride(w, LV_COLOR_FORMAT_RGB565);
-    uint32_t dst_stride = lv_draw_buf_width_to_stride(lv_area_get_width(&ra), LV_COLOR_FORMAT_RGB565);
-    uint8_t *dst = keep_y0 >= 0 ? lv_tmp : rot_buf;
-    lv_draw_sw_rotate(px, dst, w, h, src_stride, dst_stride, lv_display_get_rotation(d), LV_COLOR_FORMAT_RGB565);
-    if (keep_y0 >= 0) {
-        // copia solo le righe fuori dalla zona protetta (es. l'area di gioco di Doom)
-        const size_t row = LCD_W * 2;
-        if (keep_y0 > 0) memcpy(rot_buf, lv_tmp, keep_y0 * row);
-        if (keep_y1 < LCD_H - 1) memcpy(rot_buf + (keep_y1 + 1) * row, lv_tmp + (keep_y1 + 1) * row, (LCD_H - 1 - keep_y1) * row);
+    const uint32_t src_stride = lv_draw_buf_width_to_stride(lv_display_get_horizontal_resolution(d), LV_COLOR_FORMAT_RGB565);
+    const uint32_t dst_stride = LCD_W * 2;
+    const uint8_t *src = px + area->y1 * src_stride + area->x1 * 2;
+    uint8_t *base = keep_y0 >= 0 ? lv_tmp : rot_buf;
+    lv_draw_sw_rotate(src, base + ra.y1 * dst_stride + ra.x1 * 2, w, h, src_stride, dst_stride,
+                      lv_display_get_rotation(d), LV_COLOR_FORMAT_RGB565);
+    int32_t rw = lv_area_get_width(&ra);
+    for (int32_t y = ra.y1; y <= ra.y2; y++) {
+        if (keep_y0 >= 0 && y >= keep_y0 && y <= keep_y1) continue;   // righe protette (es. Doom)
+        uint8_t *row = rot_buf + y * dst_stride + ra.x1 * 2;
+        if (keep_y0 >= 0) memcpy(row, lv_tmp + y * dst_stride + ra.x1 * 2, rw * 2);
+        lv_draw_sw_rgb565_swap(row, rw);
     }
-    push_frame((uint16_t *)rot_buf);
+    // il pannello vuole sempre il frame intero: si invia una volta sola, all'ultima zona,
+    // e mai a schermo spento (lo si manda alla riaccensione)
+    if (lv_display_flush_is_last(d) && !dark) push_frame((uint16_t *)rot_buf);
     lv_display_flush_ready(d);
 }
 
@@ -111,6 +118,14 @@ void display_set_brightness(int pct)
 {
     if (pct < 0) pct = 0;
     if (pct > 100) pct = 100;
+    if (dark && pct > 0 && rot_buf) {
+        // a schermo spento i frame non sono stati inviati: manda l'ultimo prima di riaccendere
+        display_lock();
+        dark = false;
+        push_frame((uint16_t *)rot_buf);
+        display_unlock();
+    }
+    dark = pct == 0;
     uint32_t duty = 255 - (pct * 255) / 100;
     ledc_set_duty(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_1, duty);
     ledc_update_duty(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_1);
@@ -175,12 +190,13 @@ void display_init(bool flipped)
     // dei buffer dalla risoluzione già ruotata (640×172). Il passaggio 90°↔270°
     // non cambia la risoluzione, quindi dopo si può ruotare liberamente.
     display_set_flipped(flipped);
+    // Un solo buffer in modalità DIRECT: LVGL ridisegna solo le zone cambiate e l'invio
+    // al pannello è sincrono, quindi non serve un secondo buffer.
     uint8_t *b1 = heap_caps_malloc(FRAME_BYTES, MALLOC_CAP_SPIRAM);
-    uint8_t *b2 = heap_caps_malloc(FRAME_BYTES, MALLOC_CAP_SPIRAM);
-    rot_buf = heap_caps_malloc(FRAME_BYTES, MALLOC_CAP_SPIRAM);
+    rot_buf = heap_caps_calloc(1, FRAME_BYTES, MALLOC_CAP_SPIRAM);
     dma_buf = heap_caps_malloc(CHUNK_BYTES, MALLOC_CAP_DMA | MALLOC_CAP_INTERNAL);
-    assert(b1 && b2 && rot_buf && dma_buf);
-    lv_display_set_buffers(disp, b1, b2, FRAME_BYTES, LV_DISPLAY_RENDER_MODE_FULL);
+    assert(b1 && rot_buf && dma_buf);
+    lv_display_set_buffers(disp, b1, NULL, FRAME_BYTES, LV_DISPLAY_RENDER_MODE_DIRECT);
 
     const esp_timer_create_args_t ta = {.callback = tick_cb, .name = "lv_tick"};
     esp_timer_handle_t th;
@@ -195,6 +211,7 @@ void display_set_flipped(bool flipped)
 }
 
 bool display_is_flipped(void) { return is_flipped; }
+bool display_is_dark(void) { return dark; }
 
 void display_lock(void) { xSemaphoreTakeRecursive(lv_mux, portMAX_DELAY); }
 void display_unlock(void) { xSemaphoreGiveRecursive(lv_mux); }

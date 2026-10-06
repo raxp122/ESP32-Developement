@@ -15,6 +15,7 @@
 #include "sd.h"
 #include "doom_app.h"
 #include "pet.h"
+#include "ota.h"
 #include "apps/apps.h"
 
 static const char *TAG = "main";
@@ -47,6 +48,7 @@ void app_main(void)
         // modalità Doom: niente Wi-Fi/Bluetooth, tutta la memoria al gioco
         display_init(g_set.flipped);
         logcon_start();
+        ota_mark_valid();
         doom_run();
         return;
     }
@@ -71,5 +73,7 @@ void app_main(void)
     display_unlock();
 
     logcon_start();
+    ota_mark_valid();   // arrivati fin qui il firmware funziona: niente ritorno al precedente
+    ota_auto_start();
     ESP_LOGI(TAG, "pronto · comandi dal monitor seriale: L log, I info, R riavvia");
 }

@@ -54,9 +54,14 @@ typedef struct {
     uint8_t  pet_sound;       // versi del polipetto
     uint8_t  pet_steps;       // contapassi
     uint8_t  pet_tilt_inv;    // inverte l'inclinazione nel minigioco
+    // v11
+    uint8_t  pet_sleep_h;     // modalità ibrida: ora della nanna (0–23)
+    uint8_t  pet_wake_h;      // modalità ibrida: ora della sveglia (0–23)
+    uint8_t  ota_auto;        // controlla gli aggiornamenti quando c'è internet
 } settings_t;
 
-enum { PET_TIME_REAL = 0, PET_TIME_DEVICE, PET_TIME_APP, PET_TIME_COUNT };
+// i valori sono salvati: quelli nuovi vanno in fondo
+enum { PET_TIME_REAL = 0, PET_TIME_DEVICE, PET_TIME_APP, PET_TIME_HYBRID, PET_TIME_COUNT };
 
 const char *g_set_pwn_name(void);
 

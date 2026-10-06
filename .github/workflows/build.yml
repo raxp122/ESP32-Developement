@@ -1,11 +1,15 @@
 name: Build firmware
 
-# Compila il firmware e allega il .bin pronto da flashare come artifact.
+# Compila il firmware su ogni push e PR. Sui push a main pubblica anche una release:
+# è da lì che la scheda scarica gli aggiornamenti OTA (version.json + gadget-app.bin).
 on:
   push:
     branches: ["**"]
   pull_request:
   workflow_dispatch:   # permette di avviarlo a mano dalla tab Actions
+
+permissions:
+  contents: write      # serve solo per pubblicare la release da main
 
 jobs:
   build:
@@ -13,6 +17,13 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Numero di versione
+        id: ver
+        run: |
+          v="0.14.${{ github.run_number }}"
+          echo "$v" > version.txt          # ESP-IDF lo usa come versione del firmware
+          echo "v=$v" >> "$GITHUB_OUTPUT"
 
       - name: Scarica LVGL
         run: git clone -b v9.2.2 --depth 1 https://github.com/lvgl/lvgl components/lvgl
@@ -29,7 +40,13 @@ jobs:
             --flash_mode dio --flash_size 16MB
             0x0 build/bootloader/bootloader.bin
             0x8000 build/partition_table/partition-table.bin
-            0x10000 build/gadget.bin
+            0xf000 build/ota_data_initial.bin
+            0x20000 build/gadget.bin
+
+      - name: Prepara i file
+        run: |
+          cp build/gadget.bin gadget-app.bin
+          echo "{\"version\":\"${{ steps.ver.outputs.v }}\"}" > version.json
 
       - name: Allega il firmware
         uses: actions/upload-artifact@v4
@@ -38,6 +55,29 @@ jobs:
           if-no-files-found: error
           path: |
             gadget.bin
-            build/gadget.bin
+            gadget-app.bin
+            version.json
             build/bootloader/bootloader.bin
             build/partition_table/partition-table.bin
+            build/ota_data_initial.bin
+
+      - name: Pubblica la release (solo main)
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.ver.outputs.v }}
+          name: Gadget ${{ steps.ver.outputs.v }}
+          target_commitish: ${{ github.sha }}
+          make_latest: "true"
+          body: |
+            Firmware ${{ steps.ver.outputs.v }}.
+
+            - **Dalla scheda (OTA):** Impostazioni › Sistema › Aggiornamento firmware.
+            - **Via USB, immagine unica:** `gadget.bin` all'indirizzo `0x0`.
+            - **Via USB, solo l'app:** `gadget-app.bin` all'indirizzo `0x20000`.
+
+            Le impostazioni stanno in fondo alla flash: nessuno di questi file le cancella.
+          files: |
+            gadget.bin
+            gadget-app.bin
+            version.json

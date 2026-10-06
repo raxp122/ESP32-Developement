@@ -46,7 +46,11 @@ Un Tamagotchi originale con un polpetto arancione in pixel art. Dal launcher: Po
 
 Cresce da neonato a bimbo, ragazzo e adulto; la forma adulta (saggio, esploratore, normale, goloso, pasticcione) dipende dalle cure. Fame, sete, felicità, disciplina, peso, inchiostro da pulire, malattie, nanna con la luce: se lo trascuri può morire e si ricomincia da un nuovo uovo.
 Giochi: *Da che parte?*, *Pesca* (inclinando la scheda) e *Passeggiata* (contapassi: i passi lo rendono felice e sbloccano l'esploratore).
-Impostazioni › Polipetto: scorrere del tempo (reale, anche a scheda spenta / solo a scheda accesa / solo con l'app aperta), versi, contapassi, verso dell'inclinazione, nuovo uovo.
+Impostazioni › Polipetto: scorrere del tempo, orari di nanna e sveglia, versi, contapassi, verso dell'inclinazione, nuovo uovo.
+- *Ibrida* (consigliata): tempo reale, anche a scheda spenta, ma negli orari di nanna scelti dorme protetto: nessuna chiamata, nessun errore, nessun pericolo. Senza ora impostata avanza solo a scheda accesa.
+- *Tempo reale*, *Solo a scheda accesa*, *Solo con l'app aperta*.
+
+Dai 25 giorni non invecchia più: vive per sempre, oppure da Impostazioni puoi lasciarlo tornare nell'oceano e ricominciare da un uovo.
 
 ## App all'avvio
 Impostazioni › App all'avvio: se scegli un'app, all'accensione si apre quella; swipe indietro torna al menu. "Nessuna" lascia tutto com'era.
@@ -61,8 +65,15 @@ Il firmware conserva in RAM gli ultimi 16 KB di log dall'accensione. Dal monitor
    `git clone -b v9.2.2 --depth 1 https://github.com/lvgl/lvgl components/lvgl`
 3. `idf.py set-target esp32s3` e poi `idf.py build flash monitor`.
 
-Immagine unica per il flasher web (indirizzo 0x0):
-`esptool.py --chip esp32s3 merge_bin -o gadget.bin --flash_mode dio --flash_size 16MB 0x0 build/bootloader/bootloader.bin 0x8000 build/partition_table/partition-table.bin 0x10000 build/gadget.bin`
+Immagine unica per il flasher web (indirizzo 0x0), come fa la build su GitHub:
+`esptool.py --chip esp32s3 merge_bin -o gadget.bin --flash_mode dio --flash_size 16MB 0x0 build/bootloader/bootloader.bin 0x8000 build/partition_table/partition-table.bin 0xf000 build/ota_data_initial.bin 0x20000 build/gadget.bin`
+
+## Aggiornamenti
+- **Dalla scheda (OTA):** Impostazioni › Sistema › Aggiornamento firmware. Ogni merge su `main` pubblica una release su GitHub con il firmware; la scheda la scarica via Wi-Fi e si riavvia. Se il nuovo firmware non riesce ad avviarsi, al riavvio torna da solo quello precedente. Con "Cerca aggiornamenti da solo" avvisa quando ne esce uno nuovo.
+- **Via USB:** `gadget.bin` a `0x0` (immagine unica) oppure solo `gadget-app.bin` a `0x20000`.
+
+Dalla 0.14 le impostazioni (NVS) stanno in fondo alla flash (`0xFF0000`): né l'OTA né i file qui sopra le toccano più.
+**Passaggio dalla 0.13 (una volta sola):** la tabella delle partizioni cambia, quindi serve un flash via USB. Con l'immagine unica le impostazioni vecchie si perdono (stavano proprio nella zona che l'immagine riempie). Per conservarle, flasha invece i file separati della release/artifact: `bootloader.bin` a `0x0`, `partition-table.bin` a `0x8000`, `ota_data_initial.bin` a `0xf000`, `gadget-app.bin` a `0x20000`. Al primo avvio vengono copiate nella nuova posizione.
 
 ## Struttura
 - `main/board.*` pin, latch di alimentazione (TCA9554 EXIO6), batteria, RTC PCF85063, IMU QMI8658, pulsanti
@@ -73,7 +84,8 @@ Immagine unica per il flasher web (indirizzo 0x0):
 - `main/wifi_mgr.*` Wi-Fi, scansione, portale captive per configurare la rete dal telefono, NTP
 - `main/ble_mgr.*` NimBLE: visibilità e scansione
 - `main/pet_core.*` regole del Polipetto (pure, senza hardware) · `main/pet.*` tempo reale, salvataggio, contapassi, versi
-- `main/apps/` le app (`app_pet.c` + `pet_art.c` per il Polipetto)
+- `main/ota.*` aggiornamenti via internet · `main/settings.*` impostazioni (con migrazione dalla vecchia tabella)
+- `main/apps/` le app (`app_pet.c` + `pet_art.c` per il Polipetto, `app_ota.c` per gli aggiornamenti)
 - `components/axs15231b` driver Waveshare inclusi nel progetto
 
 ## Aggiungere un'app

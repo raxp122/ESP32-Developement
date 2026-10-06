@@ -35,6 +35,8 @@ uint8_t pet_core_base_weight(int stage)
 
 bool pet_core_alive(const pet_t *p) { return p->stage >= PET_BABY && p->stage <= PET_ADULT; }
 
+bool pet_core_can_release(const pet_t *p) { return pet_core_alive(p) && p->age_s >= PET_RELEASE_S; }
+
 uint32_t pet_core_egg_left(const pet_t *p)
 {
     if (p->stage != PET_EGG) return 0;
@@ -80,17 +82,23 @@ void pet_core_new_egg(pet_t *p, uint32_t seed)
     p->hunger = p->thirst = p->happy = 2;
 }
 
-static bool sleep_hours(int stage, int hour)
+static bool sleep_now(int stage, const pet_clock_t *c)
 {
-    if (hour < 0) return false;
+    if (c->hour < 0) return false;
     int s, e;
-    switch (stage) {
-    case PET_CHILD: s = 20; e = 8; break;
-    case PET_TEEN:  s = 21; e = 9; break;
-    case PET_ADULT: s = 22; e = 9; break;
-    default: return false;   // il neonato non ha orari
+    if (c->sleep_h >= 0 && c->wake_h >= 0) {
+        s = c->sleep_h;   // orari scelti dal giocatore: valgono a ogni età
+        e = c->wake_h;
+    } else {
+        switch (stage) {
+        case PET_CHILD: s = 20; e = 8; break;
+        case PET_TEEN:  s = 21; e = 9; break;
+        case PET_ADULT: s = 22; e = 9; break;
+        default: return false;   // il neonato non ha orari
+        }
     }
-    return hour >= s || hour < e;
+    if (s == e) return false;
+    return s < e ? (c->hour >= s && c->hour < e) : (c->hour >= s || c->hour < e);
 }
 
 // fa scorrere un conto alla rovescia: a ogni scadenza toglie una tacca
@@ -147,9 +155,7 @@ static uint32_t evolve(pet_t *p)
         pet_form_t f = adult_form(p);
         set_stage(p, PET_ADULT);
         p->form = f;
-        uint32_t m = p->mistakes > 8 ? 8 : p->mistakes;
-        uint32_t days = 10 + (8 - m) + p->discipline + (f == FORM_EXPLORER ? 3 : 0);
-        p->lifespan_s = days * 86400u;
+        p->lifespan_s = 0;
         return EV_EVOLVE;
     }
     default:
@@ -157,7 +163,7 @@ static uint32_t evolve(pet_t *p)
     }
 }
 
-uint32_t pet_core_step(pet_t *p, uint32_t dt, int hour)
+uint32_t pet_core_step(pet_t *p, uint32_t dt, const pet_clock_t *c)
 {
     uint32_t ev = 0;
     if (!dt || p->stage == PET_NONE || p->stage == PET_DEAD) return 0;
@@ -170,12 +176,13 @@ uint32_t pet_core_step(pet_t *p, uint32_t dt, int hour)
         }
         return ev;
     }
+    if (p->age_s < PET_RELEASE_S && p->age_s + dt >= PET_RELEASE_S) ev |= EV_ELDER;
     p->age_s += dt;
     p->t_pet_cd = p->t_pet_cd > dt ? p->t_pet_cd - dt : 0;
     p->t_shake_cd = p->t_shake_cd > dt ? p->t_shake_cd - dt : 0;
 
     // nanna: a orari fissi; al risveglio la luce si riaccende da sola
-    bool night = sleep_hours(p->stage, hour);
+    bool night = sleep_now(p->stage, c);
     if (night && !p->asleep) {
         p->asleep = 1;
         p->tantrum = 0;
@@ -246,20 +253,22 @@ uint32_t pet_core_step(pet_t *p, uint32_t dt, int hour)
         }
 
         ev |= evolve(p);
-        if (p->stage == PET_ADULT && p->stage_s >= p->lifespan_s) {
-            die(p, DEATH_OLD);
-            return ev | EV_DEATH;
-        }
     }
+    // notte protetta (ibrida): la luce si spegne da sola
+    if (p->asleep && c->safe_night) p->light_off = 1;
 
     // chiamate e errori di cura
+    // mentre dorme non chiama (e non conta errori), tranne per la luce rimasta accesa
     uint8_t needs = 0;
-    if (!p->hunger) needs |= NEED_HUNGER;
-    if (!p->thirst) needs |= NEED_THIRST;
-    if (!p->happy) needs |= NEED_HAPPY;
-    if (p->sick) needs |= NEED_SICK;
-    if (p->asleep && !p->light_off) needs |= NEED_LIGHT;
-    if (p->tantrum) needs |= NEED_TANTRUM;
+    if (p->asleep) {
+        if (!p->light_off) needs |= NEED_LIGHT;
+    } else {
+        if (!p->hunger) needs |= NEED_HUNGER;
+        if (!p->thirst) needs |= NEED_THIRST;
+        if (!p->happy) needs |= NEED_HAPPY;
+        if (p->sick) needs |= NEED_SICK;
+        if (p->tantrum) needs |= NEED_TANTRUM;
+    }
     if (needs & ~p->needs) {
         ev |= EV_CALL;
         if (!(p->needs & ~NEED_TANTRUM)) p->t_needs = 0;
@@ -391,4 +400,11 @@ uint32_t pet_core_steps(pet_t *p, uint32_t n, bool walking)
     }
     if (p->happy) { p->needs &= ~NEED_HAPPY; p->mistake_done &= ~NEED_HAPPY; }
     return ev;
+}
+
+uint32_t pet_core_release(pet_t *p)
+{
+    if (!pet_core_can_release(p)) return 0;
+    die(p, DEATH_OLD);
+    return EV_DEATH;
 }

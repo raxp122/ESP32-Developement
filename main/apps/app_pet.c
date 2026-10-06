@@ -482,7 +482,7 @@ static void draw_panel(const pet_t *p)
         fmt_age(p->best_age_s, b, sizeof(b));
         snprintf(t, sizeof(t), "generazione %u · record %s", p->generation, b);
         set_text(l_info, t);
-        static const char *const why[] = {"", "Di fame…", "Di sete…", "Di malattia…", "Negli abissi"};
+        static const char *const why[] = {"", "Di fame…", "Di sete…", "Di malattia…", "Buon viaggio!"};
         set_text(l_main, why[p->death <= DEATH_OLD ? p->death : 0]);
         fmt_age(p->age_s, a, sizeof(a));
         snprintf(t, sizeof(t), "%s · visse %s · swipe a destra: nuovo uovo",
@@ -756,7 +756,8 @@ static void handle_events(pet_t *p)
         start(A_HEARTS, 0);
         if (mode == M_WALK) say("Che bella passeggiata!", false);
     }
-    if (ev & EV_SICK) say("Si è ammalato!", true);
+    if (ev & EV_ELDER) say("Ha 25 giorni! Ora vive per sempre, o puoi lasciarlo partire (Impostazioni)", false);
+    else if (ev & EV_SICK) say("Si è ammalato!", true);
     else if (ev & EV_SLEEP) say("Si è addormentato", false);
     else if (ev & EV_WAKE) say("Buongiorno!", false);
     else if (ev & EV_POOP) say("Ha fatto un po' d'inchiostro", false);
@@ -786,6 +787,9 @@ static void frame_cb(lv_timer_t *t)
         walk_seen = p->steps_total;
         walk_last_ms = now_ms;
     }
+
+    // a schermo spento si fa avanzare il gioco ma non si disegna (si riprende alla riaccensione)
+    if (display_is_dark()) return;
 
     art_begin(scene_buf, LW, LH, SC, scene_stride);
     if (p->stage == PET_DEAD) draw_dead(p);
@@ -945,17 +949,48 @@ const app_t app_pet = {
 
 /* ---------------- Impostazioni › Polipetto ---------------- */
 
+// ordine in cui le modalità compaiono scorrendo (i valori salvati restano quelli dell'enum)
+static const uint8_t time_order[PET_TIME_COUNT] = {PET_TIME_HYBRID, PET_TIME_REAL, PET_TIME_DEVICE, PET_TIME_APP};
+static const char *const time_names[PET_TIME_COUNT] = {
+    [PET_TIME_REAL] = "Tempo reale", [PET_TIME_DEVICE] = "Solo a scheda accesa",
+    [PET_TIME_APP] = "Solo con l'app aperta", [PET_TIME_HYBRID] = "Ibrida: reale, ma la notte è protetta",
+};
+
 static void v_time(char *b, int n)
 {
-    static const char *const names[PET_TIME_COUNT] = {"Tempo reale", "Solo a scheda accesa", "Solo con l'app aperta"};
     int m = g_set.pet_time % PET_TIME_COUNT;
-    if (m == PET_TIME_REAL && !pet_time_known()) snprintf(b, n, "Tempo reale (ora non impostata)");
-    else snprintf(b, n, "%s", names[m]);
+    bool real = m == PET_TIME_REAL || m == PET_TIME_HYBRID;
+    if (real && !pet_time_known()) snprintf(b, n, "%s (ora non impostata: avanza solo a scheda accesa)", time_names[m]);
+    else snprintf(b, n, "%s", time_names[m]);
 }
 static void j_time(int d)
 {
-    g_set.pet_time = (g_set.pet_time + d + PET_TIME_COUNT) % PET_TIME_COUNT;
+    int i = 0;
+    while (i < PET_TIME_COUNT && time_order[i] != g_set.pet_time) i++;
+    i = ((i < PET_TIME_COUNT ? i : 0) + d + PET_TIME_COUNT) % PET_TIME_COUNT;
+    g_set.pet_time = time_order[i];
     settings_save();
+}
+static void v_hours(char *b, int n, int h)
+{
+    if (g_set.pet_time == PET_TIME_HYBRID) snprintf(b, n, "%02d:00", h);
+    else snprintf(b, n, "%02d:00 · vale nella modalità ibrida", h);
+}
+static void v_sleep_h(char *b, int n) { v_hours(b, n, g_set.pet_sleep_h); }
+static void v_wake_h(char *b, int n) { v_hours(b, n, g_set.pet_wake_h); }
+static void j_sleep_h(int d) { g_set.pet_sleep_h = (g_set.pet_sleep_h + d + 24) % 24; settings_save(); }
+static void j_wake_h(int d) { g_set.pet_wake_h = (g_set.pet_wake_h + d + 24) % 24; settings_save(); }
+static void v_release(char *b, int n)
+{
+    const pet_t *p = pet_get();
+    if (!pet_core_alive(p)) snprintf(b, n, "Quando avrà 25 giorni");
+    else if (pet_core_can_release(p)) snprintf(b, n, "Ha 25 giorni: se vuoi, può partire");
+    else snprintf(b, n, "Dai 25 giorni · mancano %lu giorni", (unsigned long)((PET_RELEASE_S - p->age_s + 86399) / 86400));
+}
+static void a_release(void)
+{
+    if (pet_release()) ui_toast("Buon viaggio, polipetto!");
+    else ui_toast("Potrà partire quando avrà 25 giorni");
 }
 static void v_sound(char *b, int n) { snprintf(b, n, "%s", g_set.pet_sound ? "Acceso" : "Spento"); }
 static void a_sound(void)
@@ -990,10 +1025,13 @@ static void a_egg(void) { pet_new_egg(); ui_toast("Nuovo uovo pronto"); }
 static const menu_item_t pet_items[] = {
     {.icon = ICON_GAMEPAD, .label = "Gioca con il polipetto", .value = v_state, .app = &app_pet},
     {.icon = ICON_CLOCK, .label = "Scorrere del tempo", .value = v_time, .on_adjust = j_time},
+    {.icon = ICON_MOON, .label = "Ora della nanna", .value = v_sleep_h, .on_adjust = j_sleep_h},
+    {.icon = ICON_SUN, .label = "Ora della sveglia", .value = v_wake_h, .on_adjust = j_wake_h},
     {.icon = LV_SYMBOL_VOLUME_MAX, .label = "Versi", .value = v_sound, .on_select = a_sound},
     {.icon = LV_SYMBOL_PLAY, .label = "Ascolta il verso", .hint = "Blub-blub-pii!", .on_select = a_listen},
     {.icon = LV_SYMBOL_GPS, .label = "Contapassi", .value = v_steps, .on_select = a_steps},
     {.icon = ICON_SLIDERS, .label = "Inclinazione nel gioco", .value = v_tilt, .on_select = a_tilt},
+    {.icon = LV_SYMBOL_UPLOAD, .label = "Lascialo tornare nell'oceano", .value = v_release, .on_select = a_release, .confirm = true},
     {.icon = LV_SYMBOL_REFRESH, .label = "Ricomincia da un uovo", .hint = "Il polipetto attuale se ne va", .on_select = a_egg, .confirm = true},
 };
 menu_t pet_settings_menu = {"Impostazioni › Polipetto", pet_items, sizeof(pet_items) / sizeof(pet_items[0]), 0};
