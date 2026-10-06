@@ -34,7 +34,7 @@ static const char *TAG = "q20";
 #define KB_PATH KB_DIR "/kb.txt"
 #define KB_TMP  KB_DIR "/kb.tmp"
 
-typedef struct { char name[NAMELEN]; int8_t w[MAXQ]; } obj_t;
+typedef struct { char name[NAMELEN]; int8_t w[MAXQ]; bool learned; } obj_t;   // learned: non era nel seme
 
 static obj_t *objs;
 static float *logp, *pbuf;   // punteggi e probabilità normalizzate (PSRAM)
@@ -117,7 +117,8 @@ static bool load_file(const char *path)
                 o->w[q] = (int8_t)(uint8_t)(hi * 16 + lo);
             }
             // domande arrivate con un firmware più nuovo: dal seme, se la cosa c'è
-            const q20_seed_t *s = q < q20_nq ? seed_of(o->name) : NULL;
+            const q20_seed_t *s = seed_of(o->name);
+            o->learned = !s;
             for (; q < q20_nq && q < MAXQ; q++) o->w[q] = s ? seed_w(s->ans[q]) : 0;
             n_obj++;
         }
@@ -320,6 +321,24 @@ void q20_win(int i)
     save();
 }
 
+int q20_learned(int *out, int max)   // out NULL: le conta soltanto
+{
+    int n = 0;
+    for (int i = 0; i < n_obj && n < max; i++)
+        if (objs[i].learned) { if (out) out[n] = i; n++; }
+    return n;
+}
+
+bool q20_forget(int i)
+{
+    if (i < 0 || i >= n_obj) return false;
+    memmove(&objs[i], &objs[i + 1], (n_obj - i - 1) * sizeof(obj_t));
+    n_obj--;
+    q20_new_game();   // gli indici della partita non valgono più
+    save();
+    return true;
+}
+
 int q20_teach(const char *name)
 {
     char clean[NAMELEN];
@@ -340,6 +359,7 @@ int q20_teach(const char *name)
         i = n_obj++;
         memset(&objs[i], 0, sizeof(obj_t));
         snprintf(objs[i].name, sizeof(objs[i].name), "%s", clean);
+        objs[i].learned = !seed_of(clean);
         learn(i, 0.8f);   // cosa nuova: le risposte di questa partita sono tutto ciò che sa
     }
     save();

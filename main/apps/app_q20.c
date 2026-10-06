@@ -7,13 +7,16 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "esp_heap_caps.h"
 
 #define BTN_Y   112
 #define BTN_H   56
-#define NBTN    5
+#define NANS    5               // risposte
+#define NBTN    6               // pulsanti al massimo: le risposte + "indietro"
+#define BACK_W  64              // il pulsante "indietro" è più stretto
 
 // pulsanti delle risposte (in partita) o delle scelte (tentativo, fine)
-static const struct { const char *txt; int a; } answers[NBTN] = {
+static const struct { const char *txt; int a; } answers[NANS] = {
     {"Sì", Q20_YES}, {"Forse sì", Q20_PROB_YES}, {"Non so", Q20_DUNNO}, {"Forse no", Q20_PROB_NO}, {"No", Q20_NO},
 };
 
@@ -23,6 +26,7 @@ static int cur_q = -1, cur_guess = -1;
 static lv_obj_t *l_top, *l_main, *l_hint;
 static lv_obj_t *btn[NBTN], *btn_l[NBTN];
 static int btn_n;                       // pulsanti visibili
+static bool has_back;                   // il primo pulsante è "indietro"
 static int btn_x[NBTN], btn_w[NBTN];
 static lv_timer_t *touch_tmr;
 
@@ -41,14 +45,19 @@ static void cap(const char *in, char *out, int n)
 static void set_buttons(const char *const *labels, int n)
 {
     btn_n = n;
-    int gap = 6, w = (SCR_W - 24 - gap * (n - 1)) / n;
+    // con "indietro" in testa: lui stretto, gli altri si dividono il resto
+    int gap = 6, first = has_back && n > 1 ? BACK_W : 0;
+    int rest = n - (first ? 1 : 0);
+    int w = (SCR_W - 24 - first - gap * (n - 1)) / (rest ? rest : 1);
+    int x = 12;
     for (int i = 0; i < NBTN; i++) {
         if (i >= n) { lv_obj_add_flag(btn[i], LV_OBJ_FLAG_HIDDEN); continue; }
-        btn_x[i] = 12 + i * (w + gap);
-        btn_w[i] = w;
+        btn_x[i] = x;
+        btn_w[i] = (i == 0 && first) ? first : w;
+        x += btn_w[i] + gap;
         lv_obj_clear_flag(btn[i], LV_OBJ_FLAG_HIDDEN);
         lv_obj_set_pos(btn[i], btn_x[i], BTN_Y);
-        lv_obj_set_size(btn[i], w, BTN_H);
+        lv_obj_set_size(btn[i], btn_w[i], BTN_H);
         lv_label_set_text(btn_l[i], labels[i]);
         lv_obj_center(btn_l[i]);
     }
@@ -64,6 +73,7 @@ static void press_style(int i, bool down)
 
 static void show_intro(void)
 {
+    has_back = false;
     st = S_INTRO;
     char t[160];
     int g, w;
@@ -75,8 +85,11 @@ static void show_intro(void)
     else snprintf(t, sizeof(t), "Conosco %d cose e imparo giocando%s", q20_count(),
                   q20_can_learn() ? "" : " (serve la microSD)");
     ui_set_text(l_hint, t);
-    static const char *const b[] = {"Ho pensato, inizia!"};
-    set_buttons(b, 1);
+    static char learned[32];
+    int nl = q20_learned(NULL, 0x7fffffff);
+    snprintf(learned, sizeof(learned), "Imparate (%d)", nl);
+    const char *b[] = {"Ho pensato, inizia!", learned};
+    set_buttons(b, 2);
 }
 
 static void next(void);
@@ -88,10 +101,14 @@ static void show_question(void)
     snprintf(t, sizeof(t), "Domanda %d", q20_asked() + 1);
     ui_set_text(l_top, t);
     ui_set_text(l_main, q20_question(cur_q));
-    ui_set_text(l_hint, q20_asked() ? "BOOT: annulla l'ultima risposta" : "");
+    ui_set_text(l_hint, "");
+    // dalla seconda domanda: "indietro" (←) per cambiare l'ultima risposta
+    has_back = q20_asked() > 0;
     static const char *b[NBTN];
-    for (int i = 0; i < NBTN; i++) b[i] = answers[i].txt;
-    set_buttons(b, NBTN);
+    int n = 0;
+    if (has_back) b[n++] = LV_SYMBOL_LEFT;
+    for (int i = 0; i < NANS; i++) b[n++] = answers[i].txt;
+    set_buttons(b, n);
 }
 
 static void show_guess(void)
@@ -105,12 +122,14 @@ static void show_guess(void)
     ui_set_text(l_top, top);
     ui_set_text(l_main, t);
     ui_set_text(l_hint, "");
-    static const char *const b[] = {"Sì, indovinato!", "No"};
-    set_buttons(b, 2);
+    has_back = true;   // si torna all'ultima domanda
+    static const char *const b[] = {LV_SYMBOL_LEFT, "Sì, indovinato!", "No"};
+    set_buttons(b, 3);
 }
 
 static void show_win(void)
 {
+    has_back = false;
     st = S_WIN;
     char name[48], t[96];
     cap(q20_name(cur_guess), name, sizeof(name));
@@ -124,6 +143,7 @@ static void show_win(void)
 
 static void show_lose(void)
 {
+    has_back = false;
     st = S_LOSE;
     ui_set_text(l_top, "Q-20");
     ui_set_text(l_main, "Mi hai battuto! A cosa pensavi?");
@@ -167,22 +187,116 @@ static const app_t app_q20_name = {
     .flags = APP_FULLSCREEN | APP_OWN_QUICK,
 };
 
+/* ---------------- registro delle cose imparate ---------------- */
+
+#define MAX_LEARNED 900
+static int *learned_idx;   // indici in q20 (PSRAM)
+static int n_learned, l_sel;
+static uint32_t l_confirm_until;
+static list_view_t l_lv;
+static char l_names[3][48], l_title[48];
+
+static const char *l_name(int k, char *b)
+{
+    if (k < 0 || k >= n_learned) return NULL;
+    cap(q20_name(learned_idx[k]), b, 48);
+    return b;
+}
+
+static void l_reload(void)
+{
+    if (!learned_idx) learned_idx = heap_caps_malloc(sizeof(int) * MAX_LEARNED, MALLOC_CAP_SPIRAM);
+    n_learned = learned_idx ? q20_learned(learned_idx, MAX_LEARNED) : 0;
+    if (l_sel >= n_learned) l_sel = n_learned ? n_learned - 1 : 0;
+}
+
+static void l_render(int dir)
+{
+    if (!n_learned) {
+        list_view_set(&l_lv, ICON_GAMEPAD, NULL, "Non ho ancora imparato niente",
+                      "Quando perdi, dimmi cosa pensavi: finisce qui", NULL, 0, 0, dir);
+        return;
+    }
+    bool confirming = l_confirm_until && (int32_t)(lv_tick_get() - l_confirm_until) < 0;
+    list_view_set(&l_lv, ICON_GAMEPAD, l_name(l_sel - 1, l_names[0]), l_name(l_sel, l_names[1]),
+                  confirming ? "Swipe a destra di nuovo per dimenticarla" : "Swipe a destra: dimentica",
+                  l_name(l_sel + 1, l_names[2]), l_sel, n_learned, dir);
+    ui_set_text_color(l_lv.sub, confirming ? C_WARN : C_DIM);
+}
+
+static void l_enter(lv_obj_t *root, void *arg)
+{
+    list_view_create(&l_lv, root);
+    l_confirm_until = 0;
+    l_reload();
+    l_render(0);
+}
+
+static void l_tick(void)
+{
+    if (l_confirm_until && (int32_t)(lv_tick_get() - l_confirm_until) >= 0) { l_confirm_until = 0; l_render(0); }
+}
+
+static bool l_nav(nav_t ev)
+{
+    switch (ev) {
+    case NAV_NEXT: if (l_sel + 1 < n_learned) { l_sel++; l_confirm_until = 0; l_render(+1); } return true;
+    case NAV_PREV: if (l_sel > 0) { l_sel--; l_confirm_until = 0; l_render(-1); } return true;
+    case NAV_SELECT:
+        if (!n_learned) return true;
+        if (!l_confirm_until) { l_confirm_until = lv_tick_get() + 4000; l_render(0); return true; }
+        l_confirm_until = 0;
+        {
+            char name[48], msg[80];
+            cap(q20_name(learned_idx[l_sel]), name, sizeof(name));
+            q20_forget(learned_idx[l_sel]);
+            snprintf(msg, sizeof(msg), "Dimenticata: %s", name);
+            ui_toast(msg);
+        }
+        l_reload();
+        l_render(0);
+        return true;
+    default:
+        return false;
+    }
+}
+
+static const char *l_titlef(void *arg)
+{
+    snprintf(l_title, sizeof(l_title), "Q-20 » Imparate · %d", n_learned);
+    return l_title;
+}
+
+static const app_t app_q20_learned = {
+    .name = "Imparate", .icon = ICON_GAMEPAD,
+    .enter = l_enter, .nav = l_nav, .tick = l_tick, .title = l_titlef,
+};
+
 /* ---------------- azioni ---------------- */
 
 static void on_button(int i)
 {
     switch (st) {
     case S_INTRO:
+        if (i == 1) { ui_push(&app_q20_learned, NULL); break; }
+        q20_new_game();
+        next();
+        break;
     case S_WIN:
         q20_new_game();
         next();
         break;
     case S_ASK:
+        if (has_back) {
+            if (i == 0) { q20_undo(); next(); break; }   // cambia idea sull'ultima risposta
+            i--;
+        }
         q20_answer(cur_q, answers[i].a);
         next();
         break;
     case S_GUESS:
-        if (i == 0) { q20_win(cur_guess); show_win(); break; }
+        if (i == 0) { q20_undo(); next(); break; }        // indietro: di nuovo l'ultima domanda
+        if (i == 1) { q20_win(cur_guess); show_win(); break; }
         q20_wrong(cur_guess);
         if (q20_over()) show_lose();
         else next();
@@ -196,12 +310,14 @@ static void on_button(int i)
     }
 }
 
-// tocchi: stesso schema della tastiera (il touch perde il dito per qualche lettura)
+// Tocchi: il dito conta come sollevato dopo RELEASE_MS senza letture (il touch lo perde per
+// qualche lettura e un tocco varrebbe doppio). Nessuna durata minima: mentre lo schermo si
+// ridisegna dopo una risposta le letture si diradano e un tocco rapido può vedersi una
+// volta sola: scartarlo faceva "non registrare" il pulsante.
 #define RELEASE_MS   70
-#define PRESS_MIN_MS 25
 static bool t_down, t_moved;
 static int t_sx, t_sy, t_key = -1;
-static uint32_t t0, t_seen;
+static uint32_t t_seen;
 
 static int hit(int x, int y)
 {
@@ -217,7 +333,7 @@ static void touch_cb(lv_timer_t *t)
     if (input_touch(&x, &y)) {
         t_seen = now;
         if (!t_down) {
-            t_down = true; t_moved = false; t_sx = x; t_sy = y; t0 = now;
+            t_down = true; t_moved = false; t_sx = x; t_sy = y;
             t_key = hit(x, y);
             if (t_key >= 0) press_style(t_key, true);
             return;
@@ -234,7 +350,7 @@ static void touch_cb(lv_timer_t *t)
         int k = t_key;
         t_key = -1;
         press_style(k, false);
-        if (!t_moved && t_seen - t0 >= PRESS_MIN_MS) on_button(k);   // può cambiare schermata
+        if (!t_moved) on_button(k);   // può cambiare schermata
     }
 }
 

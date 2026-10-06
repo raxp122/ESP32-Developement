@@ -1,6 +1,7 @@
 // wifi_mgr.c — Wi-Fi STA, scansione, portale captive (hotspot + DNS + pagina web), NTP
 #include "wifi_mgr.h"
 #include "settings.h"
+#include "radio.h"
 #include "board.h"
 #include <string.h>
 #include <stdio.h>
@@ -395,6 +396,7 @@ const char *wifi_mgr_band(int ch)
 bool wifi_mgr_connect(const char *ssid, const char *pass)
 {
     if (!ssid || !ssid[0] || strlen(ssid) > 32 || strlen(pass) > 64) return false;
+    radio_only_wifi();
     strlcpy(g_set.wifi_ssid, ssid, sizeof(g_set.wifi_ssid));
     strlcpy(g_set.wifi_pass, pass, sizeof(g_set.wifi_pass));
     g_set.wifi_on = true;
@@ -635,6 +637,7 @@ static esp_err_t save_post(httpd_req_t *r)
 void wifi_mgr_portal_poll(void)
 {
     if (!__atomic_exchange_n(&pend_creds, false, __ATOMIC_ACQ_REL)) return;
+    radio_only_wifi();
     strlcpy(g_set.wifi_ssid, pend_ssid, sizeof(g_set.wifi_ssid));
     strlcpy(g_set.wifi_pass, pend_pass, sizeof(g_set.wifi_pass));
     g_set.wifi_on = true;

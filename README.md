@@ -70,6 +70,8 @@ Dal launcher: Livella. La prima volta chiede una calibrazione in due passi (appo
 Impostazioni › Wi-Fi › **Cerca reti e collegati**: elenco delle reti vicine, swipe a destra per collegarti (con la tastiera per la password). È la stessa schermata dello Scanner Wi-Fi, che funziona anche mentre sei connesso. Tocco prolungato: nuova scansione. In alternativa "Configura dal telefono" apre un hotspot con una pagina web.
 
 ## Bluetooth
+**Wi-Fi e Bluetooth non sono mai accesi insieme**: l'ESP32-S3 ha una sola radio e con tutti e due attivi il Wi-Fi diventa lento e instabile. Di predefinito è acceso il Wi-Fi; accendere il Bluetooth (anche da Appunti › Ricevi dal PC o collegando un dispositivo) spegne il Wi-Fi, e viceversa. La schermata di aggiornamento riaccende da sola il Wi-Fi. Gli scanner funzionano comunque, finché sono aperti.
+
 Il Bluetooth è predisposto per collegarsi nei due sensi (le funzioni vere arriveranno sopra):
 - **Collega a telefono o computer** (il Gadget è l'accessorio): per 2 minuti il Gadget si fa trovare col suo nome; sceglilo nelle impostazioni Bluetooth dell'altro dispositivo. Se l'altro ha una tastiera, sul Gadget compare un codice da digitare. Dopo l'associazione si ricollega da solo; nessun altro può associarsi a finestra chiusa. Base per la futura tastiera Bluetooth. Nota: iPhone elenca nelle impostazioni solo accessori di tipo noto (tastiera, cuffie…), quindi il Gadget comparirà lì quando avrà il profilo tastiera.
 - **Collega un dispositivo** (il Gadget comanda): scansione, swipe a destra su un dispositivo collegabile per collegarti e vedere i servizi che offre (batteria, battito cardiaco, tastiera…).
@@ -80,11 +82,23 @@ Limite dell'hardware: l'ESP32-S3 ha solo il Bluetooth Low Energy. Casse e cuffie
 ## 8-Ball veggente
 Dal launcher: **8-Ball veggente**. Pensa a una domanda (da sì o no), scuoti la scheda o fai swipe a destra: la sfera ondeggia e dalla finestrella affiora il triangolo con una delle 20 risposte classiche (10 sì, 5 vaghe, 5 no; verde, colore d'accento, rosso). Mai la stessa due volte di fila.
 
+## Theremin
+Dal launcher: **Theremin**. Inclina la scheda avanti/indietro per cambiare la nota, ruotala a destra/sinistra per il volume (a sinistra fino al silenzio). Suona finché tieni il dito sulla zona grande a sinistra; **BOOT** imposta la posizione zero (la nota di partenza è il La della tua ottava).
+
+Pulsanti a destra:
+- **Suono**: forma d'onda (Theremin, Sinusoide, Triangolo, Dente di sega, Quadra), ottava, estensione (1–3 ottave), glide, vibrato e sua velocità, volume.
+- **Scala**: libera (glissando, come il theremin vero) oppure agganciata a cromatica, maggiore, minore, pentatonica o blues, con la tonica a scelta. Il LA di riferimento è quello dell'Accordatore.
+- **Effetti**: eco (corta, media, lunga) e ripetizioni, timbro (da scuro a brillante).
+- **Comandi**: cosa fa la rotazione (volume, vibrato, timbro o niente), sensibilità, inversione di nota e rotazione, "suona sempre", volume del microfono.
+- **Registra**: registra quello che suoni in un file WAV nella cartella `theremin` della microSD. Con **Mic: sì** mixa anche il microfono, per cantare mentre suoni (il microfono sente anche l'altoparlante).
+- **Registrazioni**: elenco per riascoltarle (swipe a destra) o cancellarle (BOOT due volte).
+
 ## Q-20
-Dal launcher: **Q-20**. Pensa a qualcosa (animale, oggetto, cibo, luogo, persona…) e rispondi alle domande toccando *Sì*, *Forse sì*, *Non so*, *Forse no*, *No*. Dopo una ventina di domande (prima, se è sicuro) prova a indovinare; se sbaglia continua, fino a 30. Se vince lui, ricorda ancora meglio quella cosa; se perde ti chiede cosa pensavi e la impara. BOOT annulla l'ultima risposta.
+Dal launcher: **Q-20**. Pensa a qualcosa (animale, oggetto, cibo, luogo, persona…) e rispondi alle domande toccando *Sì*, *Forse sì*, *Non so*, *Forse no*, *No*. Dopo una ventina di domande (prima, se è sicuro) prova a indovinare; se sbaglia continua, fino a 30. Se vince lui, ricorda ancora meglio quella cosa; se perde ti chiede cosa pensavi e la impara. Il pulsante ← (o BOOT) torna indietro all'ultima domanda se cambi idea, anche quando sta già provando a indovinare.
 
 - Conosce all'inizio 250 cose e 100 domande (tabella generata da `tools/q20_gen.py`).
 - Una risposta sbagliata non lo manda fuori strada: ogni risposta pesa, nessuna elimina.
+- **Imparate**: dalla schermata iniziale, l'elenco delle cose che ha imparato da te; swipe a destra (due volte) per fargliene dimenticare una.
 - Quello che impara sta in `q20/kb.txt` sulla microSD ed entra nei backup. Senza microSD si gioca, ma non impara.
 - Ampliare la conoscenza iniziale: modifica `tools/q20_gen.py` (le domande nuove solo in fondo), lancia `python3 tools/q20_gen.py` e aumenta `SEED_VERSION`: il Gadget aggiunge le cose nuove al suo file senza toccare quello che ha imparato.
 
@@ -123,7 +137,7 @@ Immagine unica per il flasher web (indirizzo 0x0), come fa la build su GitHub:
 `esptool.py --chip esp32s3 merge_bin -o gadget.bin --flash_mode dio --flash_size 16MB 0x0 build/bootloader/bootloader.bin 0x8000 build/partition_table/partition-table.bin 0xf000 build/ota_data_initial.bin 0x20000 build/gadget.bin`
 
 ## Aggiornamenti
-- **Dalla scheda (OTA):** Impostazioni › Sistema › Aggiornamento firmware. Ogni merge su `main` pubblica una release su GitHub con il firmware; la scheda la scarica via Wi-Fi e si riavvia. Se il nuovo firmware non riesce ad avviarsi, al riavvio torna da solo quello precedente. Con "Cerca aggiornamenti da solo" avvisa quando ne esce uno nuovo.
+- **Dalla scheda (OTA):** Impostazioni › Sistema › Aggiornamento firmware. Ogni merge su `main` pubblica una release su GitHub con il firmware; la scheda la scarica via Wi-Fi e si riavvia. Se il nuovo firmware non riesce ad avviarsi, al riavvio torna da solo quello precedente. Mentre sei nella schermata di aggiornamento il Bluetooth va in pausa (la radio è condivisa col Wi-Fi) e si riaccende uscendo. Con "Cerca aggiornamenti da solo" avvisa quando ne esce uno nuovo.
 - **Via USB:** `gadget.bin` a `0x0` (immagine unica) oppure solo `gadget-app.bin` a `0x20000`.
 
 Dalla 0.14 le impostazioni (NVS) stanno in fondo alla flash (`0xFF0000`): né l'OTA né i file qui sopra le toccano più.

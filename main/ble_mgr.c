@@ -3,6 +3,7 @@
 // aggiornano tabelle protette da mutex che l'interfaccia legge quando vuole.
 #include "ble_mgr.h"
 #include "settings.h"
+#include "radio.h"
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -267,7 +268,7 @@ static void pair_timer_cb(void *arg)
 
 void ble_mgr_pair_start(int seconds)
 {
-    if (!g_set.ble_on) { g_set.ble_on = true; settings_save(); }
+    if (!g_set.ble_on) { radio_only_ble(); g_set.ble_on = true; settings_save(); }
     pair_until_us = esp_timer_get_time() + (int64_t)seconds * 1000000;
     esp_timer_stop(pair_timer);
     esp_timer_start_once(pair_timer, (uint64_t)seconds * 1000000);
@@ -628,9 +629,19 @@ static void stack_stop(void)
     BUMP(conn_gen);
 }
 
+// in pausa (es. durante un aggiornamento): radio tutta al Wi-Fi, impostazioni intatte
+static bool suspended;
+
+void ble_mgr_suspend(bool on)
+{
+    if (suspended == on) return;
+    suspended = on;
+    ble_mgr_apply();
+}
+
 static void update(void)
 {
-    bool need = g_set.ble_on || scan_users > 0;
+    bool need = (g_set.ble_on || scan_users > 0) && !suspended;
     if (!need) { stack_stop(); return; }
     stack_start();
     adv_refresh();   // se non è ancora sincronizzato, ci pensa on_sync
@@ -668,7 +679,7 @@ void ble_mgr_addr(char *buf, int n)
 
 bool ble_mgr_connect(const ble_dev_t *dv)
 {
-    if (!g_set.ble_on) { g_set.ble_on = true; settings_save(); ble_mgr_apply(); }
+    if (!g_set.ble_on) { radio_only_ble(); g_set.ble_on = true; settings_save(); ble_mgr_apply(); }
     lock();
     memcpy(link.addr, dv->addr, 6);
     snprintf(link.name, sizeof(link.name), "%s", dv->name);
