@@ -28,13 +28,14 @@ typedef struct {
     uint8_t echo_fb;    // 0..3 ripetizioni
     uint8_t tone;       // 0..4 timbro (scuro → brillante)
     uint8_t roll_fn;    // TH_ROLL_*
-    uint8_t sens;       // 0..2: angolo per tutta l'estensione 90 / 60 / 40 gradi
+    uint8_t angle;      // gradi d'inclinazione per tutta l'estensione delle note (20..180)
     uint8_t inv_pitch, inv_roll;
     uint8_t always;     // suona sempre (non solo col dito sullo schermo)
     uint8_t mic;        // registrazione con il microfono
     uint8_t mic_gain;   // 1..4
     uint8_t level;      // 10..100 volume del sintetizzatore
     uint8_t swap;       // la nota segue la rotazione (e l'altro parametro l'inclinazione)
+    uint8_t angle2;     // gradi per tutta la corsa dell'altro movimento (20..180)
 } th_cfg_t;
 
 extern th_cfg_t th_cfg;
@@ -49,7 +50,8 @@ const char *th_scale_name(int s);
 const char *th_note_name(int n);     // 0..11, nomi italiani (Do, Do#, Re…)
 const char *th_roll_name(int r);
 int  th_glide_ms(int i);
-int  th_sens_deg(int i);
+#define TH_ANGLE_MIN 20
+#define TH_ANGLE_MAX 180
 
 // suono
 bool th_start(void);                 // avvia il sintetizzatore (false se l'audio non c'è)

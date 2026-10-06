@@ -36,7 +36,7 @@ static void cfg_defaults(void)
     th_cfg = (th_cfg_t){
         .magic = CFG_MAGIC, .wave = TH_WAVE_THEREMIN, .low = 57, .high = 81, .glide = 2,
         .vib_depth = 2, .vib_rate = 5, .scale = TH_SCALE_FREE, .root = 0, .echo = 0, .echo_fb = 1,
-        .tone = 3, .roll_fn = TH_ROLL_VOLUME, .sens = 1, .always = 0, .mic = 0, .mic_gain = 2, .level = 80,
+        .tone = 3, .roll_fn = TH_ROLL_VOLUME, .angle = 60, .angle2 = 60, .always = 0, .mic = 0, .mic_gain = 2, .level = 80,
     };
 }
 
@@ -64,7 +64,13 @@ void th_cfg_load(void)
         if (th_cfg.echo_fb > 3) th_cfg.echo_fb = 1;
         if (th_cfg.tone > 4) th_cfg.tone = 3;
         if (th_cfg.roll_fn >= TH_ROLL_COUNT) th_cfg.roll_fn = TH_ROLL_VOLUME;
-        if (th_cfg.sens > 2) th_cfg.sens = 1;
+        // la prima versione salvava la sensibilità come 0..2 (90 / 60 / 40 gradi, per tutti e due)
+        if (th_cfg.angle <= 2) {
+            static const uint8_t old[] = {90, 60, 40};
+            th_cfg.angle = th_cfg.angle2 = old[th_cfg.angle];
+        }
+        if (th_cfg.angle < TH_ANGLE_MIN || th_cfg.angle > TH_ANGLE_MAX) th_cfg.angle = 60;
+        if (th_cfg.angle2 < TH_ANGLE_MIN || th_cfg.angle2 > TH_ANGLE_MAX) th_cfg.angle2 = 60;
         if (th_cfg.mic_gain < 1 || th_cfg.mic_gain > 4) th_cfg.mic_gain = 2;
         if (th_cfg.level < 10 || th_cfg.level > 100) th_cfg.level = 80;
         if (th_cfg.swap > 1) th_cfg.swap = 0;
@@ -100,11 +106,10 @@ const char *th_note_name(int n)
 }
 const char *th_roll_name(int r)
 {
-    static const char *const n[] = {"Volume", "Vibrato", "Timbro", "Niente"};
+    static const char *const n[] = {"Volume", "Vibrato", "Timbro", "Niente (volume fisso)"};
     return r >= 0 && r < TH_ROLL_COUNT ? n[r] : "";
 }
 int th_glide_ms(int i) { static const int ms[] = {0, 30, 80, 150, 300}; return ms[i < 0 ? 0 : i > 4 ? 4 : i]; }
-int th_sens_deg(int i) { static const int d[] = {90, 60, 40}; return d[i < 0 ? 0 : i > 2 ? 2 : i]; }
 
 /* ---------------- sintetizzatore (task audio) ---------------- */
 
