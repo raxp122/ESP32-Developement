@@ -29,6 +29,45 @@ lv_color_t ui_accent(void) { return lv_color_hex(accents[g_set.accent % ui_accen
 int ui_accent_count(void) { return sizeof(accents) / sizeof(accents[0]); }
 const char *ui_accent_name(int i) { return accents[i % ui_accent_count()].name; }
 
+bool ui_set_text(lv_obj_t *l, const char *t)
+{
+    if (!strcmp(lv_label_get_text(l), t)) return false;
+    lv_label_set_text(l, t);
+    return true;
+}
+
+void ui_set_text_color(lv_obj_t *o, lv_color_t c)
+{
+    if (!lv_color_eq(lv_obj_get_style_text_color(o, 0), c)) lv_obj_set_style_text_color(o, c, 0);
+}
+
+static void set_pos(lv_obj_t *o, int32_t x, int32_t y)
+{
+    if (lv_obj_get_style_x(o, 0) != x || lv_obj_get_style_y(o, 0) != y) lv_obj_set_pos(o, x, y);
+}
+
+static void set_size(lv_obj_t *o, int32_t w, int32_t h)
+{
+    if (lv_obj_get_style_width(o, 0) != w || lv_obj_get_style_height(o, 0) != h) lv_obj_set_size(o, w, h);
+}
+
+static void set_width(lv_obj_t *o, int32_t w)
+{
+    if (lv_obj_get_style_width(o, 0) != w) lv_obj_set_width(o, w);
+}
+
+static void set_bg(lv_obj_t *o, lv_color_t c)
+{
+    if (!lv_color_eq(lv_obj_get_style_bg_color(o, 0), c)) lv_obj_set_style_bg_color(o, c, 0);
+}
+
+static void set_hidden(lv_obj_t *o, bool hide)
+{
+    if (lv_obj_has_flag(o, LV_OBJ_FLAG_HIDDEN) == hide) return;
+    if (hide) lv_obj_add_flag(o, LV_OBJ_FLAG_HIDDEN);
+    else lv_obj_clear_flag(o, LV_OBJ_FLAG_HIDDEN);
+}
+
 static void anim_tx(void *o, int32_t v) { lv_obj_set_style_translate_x(o, v, 0); }
 static void anim_ty(void *o, int32_t v) { lv_obj_set_style_translate_y(o, v, 0); }
 
@@ -48,44 +87,49 @@ static lv_obj_t *mk_label(lv_obj_t *p, const lv_font_t *f, lv_color_t c)
 
 static void bar_update(void)
 {
+    // chiamata ogni secondo: si tocca un'etichetta solo se cambia davvero, altrimenti
+    // ogni secondo si ridisegnerebbe (e invierebbe al pannello) tutto lo schermo
     const frame_t *f = &stack[depth - 1];
     const char *title = f->app->title ? f->app->title(f->arg) : f->app->name;
-    lv_label_set_text(bar_title, title ? title : "");
+    ui_set_text(bar_title, title ? title : "");
 
+    char t[24];
     time_t now = time(NULL);
     struct tm lt;
     localtime_r(&now, &lt);
-    if (lt.tm_year >= 124) lv_label_set_text_fmt(bar_time, "%02d:%02d", lt.tm_hour, lt.tm_min);
-    else lv_label_set_text(bar_time, "");
+    if (lt.tm_year >= 124) snprintf(t, sizeof(t), "%02d:%02d", lt.tm_hour, lt.tm_min);
+    else t[0] = 0;
+    ui_set_text(bar_time, t);
 
     switch (wifi_mgr_state()) {
     case WIFI_CONNECTED:
-        lv_label_set_text(bar_wifi, LV_SYMBOL_WIFI);
-        lv_obj_set_style_text_color(bar_wifi, ui_accent(), 0);
+        ui_set_text(bar_wifi, LV_SYMBOL_WIFI);
+        ui_set_text_color(bar_wifi, ui_accent());
         break;
     case WIFI_CONNECTING:
-        lv_label_set_text(bar_wifi, LV_SYMBOL_WIFI);
-        lv_obj_set_style_text_color(bar_wifi, (lv_tick_get() / 1000) % 2 ? C_TEXT : C_DIM, 0);
+        ui_set_text(bar_wifi, LV_SYMBOL_WIFI);
+        ui_set_text_color(bar_wifi, (lv_tick_get() / 1000) % 2 ? C_TEXT : C_DIM);
         break;
     case WIFI_NO_NETWORK:
-        lv_label_set_text(bar_wifi, LV_SYMBOL_WIFI);
-        lv_obj_set_style_text_color(bar_wifi, C_DIM, 0);
+        ui_set_text(bar_wifi, LV_SYMBOL_WIFI);
+        ui_set_text_color(bar_wifi, C_DIM);
         break;
     default:
-        lv_label_set_text(bar_wifi, "");
+        ui_set_text(bar_wifi, "");
     }
-    lv_label_set_text(bar_ble, ble_mgr_on() ? LV_SYMBOL_BLUETOOTH : "");
+    ui_set_text(bar_ble, ble_mgr_on() ? LV_SYMBOL_BLUETOOTH : "");
 
     float v = board_battery_volts();
     if (v > 2.5f) {
         int p = board_battery_percent(v);
         const char *ic = p > 85 ? LV_SYMBOL_BATTERY_FULL : p > 60 ? LV_SYMBOL_BATTERY_3
                        : p > 35 ? LV_SYMBOL_BATTERY_2 : p > 12 ? LV_SYMBOL_BATTERY_1 : LV_SYMBOL_BATTERY_EMPTY;
-        lv_label_set_text_fmt(bar_batt, "%s %d%%", ic, p);
-        lv_obj_set_style_text_color(bar_batt, p <= 12 ? C_WARN : C_TEXT, 0);
+        snprintf(t, sizeof(t), "%s %d%%", ic, p);
+        ui_set_text(bar_batt, t);
+        ui_set_text_color(bar_batt, p <= 12 ? C_WARN : C_TEXT);
     } else {
-        lv_label_set_text(bar_batt, LV_SYMBOL_USB);
-        lv_obj_set_style_text_color(bar_batt, C_TEXT, 0);
+        ui_set_text(bar_batt, LV_SYMBOL_USB);
+        ui_set_text_color(bar_batt, C_TEXT);
     }
 }
 
@@ -336,39 +380,40 @@ static void anim_in(lv_obj_t *o, int dy)
 void list_view_set(list_view_t *v, const char *icon, const char *prev, const char *main,
                    const char *sub, const char *next, int index, int count, int dir)
 {
+    // i menu si ridisegnano ogni secondo per i valori dinamici: si cambia solo il necessario
     lv_color_t acc = ui_accent();
-    lv_obj_set_style_bg_color(v->marker, acc, 0);
-    lv_obj_set_style_bg_color(v->thumb, acc, 0);
-    lv_obj_set_style_text_color(v->icon, acc, 0);
-    lv_obj_set_style_text_color(v->sub, acc, 0);
-    lv_label_set_text(v->icon, icon ? icon : "");
-    lv_label_set_text(v->prev, prev ? prev : "");
-    lv_label_set_text(v->next, next ? next : "");
-    lv_label_set_text(v->main, main ? main : "");
+    set_bg(v->marker, acc);
+    set_bg(v->thumb, acc);
+    ui_set_text_color(v->icon, acc);
+    ui_set_text_color(v->sub, acc);
+    ui_set_text(v->icon, icon ? icon : "");
+    ui_set_text(v->prev, prev ? prev : "");
+    ui_set_text(v->next, next ? next : "");
+    ui_set_text(v->main, main ? main : "");
     bool has_sub = sub && *sub;
-    lv_label_set_text(v->sub, has_sub ? sub : "");
+    ui_set_text(v->sub, has_sub ? sub : "");
     int x = icon ? 76 : 22;
-    lv_obj_set_width(v->main, SCR_W - x - 24);
-    lv_obj_set_width(v->sub, SCR_W - x - 24);
+    set_width(v->main, SCR_W - x - 24);
+    set_width(v->sub, SCR_W - x - 24);
     if (has_sub) {
-        lv_obj_set_pos(v->main, x, CONTENT_H / 2 - 36);
-        lv_obj_set_pos(v->sub, x, CONTENT_H / 2 + 6);
+        set_pos(v->main, x, CONTENT_H / 2 - 36);
+        set_pos(v->sub, x, CONTENT_H / 2 + 6);
     } else {
-        lv_obj_set_pos(v->main, x, CONTENT_H / 2 - 20);
-        lv_obj_set_pos(v->sub, x, CONTENT_H / 2 + 6);
+        set_pos(v->main, x, CONTENT_H / 2 - 20);
+        set_pos(v->sub, x, CONTENT_H / 2 + 6);
     }
 
     int track_h = CONTENT_H - 20;
     if (count > 1) {
         int th = track_h / count;
         if (th < 10) th = 10;
-        lv_obj_set_size(v->thumb, 3, th);
-        lv_obj_set_pos(v->thumb, SCR_W - 10, 10 + (track_h - th) * index / (count - 1));
-        lv_obj_clear_flag(v->thumb, LV_OBJ_FLAG_HIDDEN);
-        lv_obj_clear_flag(v->track, LV_OBJ_FLAG_HIDDEN);
+        set_size(v->thumb, 3, th);
+        set_pos(v->thumb, SCR_W - 10, 10 + (track_h - th) * index / (count - 1));
+        set_hidden(v->thumb, false);
+        set_hidden(v->track, false);
     } else {
-        lv_obj_add_flag(v->thumb, LV_OBJ_FLAG_HIDDEN);
-        lv_obj_add_flag(v->track, LV_OBJ_FLAG_HIDDEN);
+        set_hidden(v->thumb, true);
+        set_hidden(v->track, true);
     }
     if (dir) {
         int dy = dir > 0 ? 16 : -16;

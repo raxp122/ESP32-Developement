@@ -7,6 +7,8 @@
 // Con il rollback del bootloader attivo: se il nuovo firmware non arriva a chiamare
 // ota_mark_valid() (si blocca o si riavvia prima), al riavvio torna il precedente.
 #include "ota.h"
+#include "backup.h"
+#include "sd.h"
 #include "display.h"
 #include "pet.h"
 #include "settings.h"
@@ -73,15 +75,17 @@ static void parse_ver(const char *s, int v[3])
     }
 }
 
-static bool newer(const char *a, const char *b)   // a più nuova di b?
+int ota_compare(const char *a, const char *b)
 {
     int x[3], y[3];
     parse_ver(a, x);
     parse_ver(b, y);
     for (int i = 0; i < 3; i++)
-        if (x[i] != y[i]) return x[i] > y[i];
-    return false;
+        if (x[i] != y[i]) return x[i] > y[i] ? 1 : -1;
+    return 0;
 }
+
+static bool newer(const char *a, const char *b) { return ota_compare(a, b) > 0; }   // a più nuova di b?
 
 /* ---------------- version.json ---------------- */
 
@@ -146,6 +150,15 @@ static void do_check(void)
 static void do_install(void)
 {
     if (wifi_mgr_state() != WIFI_CONNECTED) { fail("Collega il Wi-Fi a internet"); return; }
+    // prima di tutto un backup sulla microSD: se qualcosa va storto i dati ci sono
+    if (g_set.backup_before_ota && sd_ok()) {
+        char name[40];
+        display_lock();
+        pet_save();
+        bool ok = backup_create(name, sizeof(name));
+        display_unlock();
+        ESP_LOGI(TAG, "backup prima dell'aggiornamento: %s", ok ? name : backup_error());
+    }
     state = OTA_DOWNLOADING;
     progress = 0;
     esp_http_client_config_t http = {

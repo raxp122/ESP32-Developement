@@ -47,15 +47,20 @@ static void face_tick(void)
     else if (s.nets_total != last_net_total) { last_net_total = s.nets_total; mood = M_HAPPY; mood_until = lv_tick_get() + 1500; }
     else mood = pick_mood(&s);
 
-    lv_label_set_text(f_eyes, eyes[mood]);
-    lv_label_set_text(f_mouth, mouth[mood]);
-    lv_label_set_text(f_quip, pwn_running() ? pwn_last_event() : quip[M_SLEEP]);
+    // ogni mezzo secondo: le etichette si toccano solo se cambiano (meno ridisegni)
+    char b[64];
+    ui_set_text(f_eyes, eyes[mood]);
+    ui_set_text(f_mouth, mouth[mood]);
+    ui_set_text(f_quip, pwn_running() ? pwn_last_event() : quip[M_SLEEP]);
 
-    lv_label_set_text_fmt(f_name, "%s  Lv%d", s.name, s.level);
-    lv_label_set_text_fmt(f_stat, "reti %lu · pasti %lu · pkt %lu", (unsigned long)s.nets_total,
-                          (unsigned long)s.handshakes, (unsigned long)s.pkts);
-    if (pwn_running()) lv_label_set_text_fmt(f_ch, "ch %d · vicine %d", pwn_recent_channel(), pwn_aps_near());
-    else lv_label_set_text(f_ch, "fermo");
+    snprintf(b, sizeof(b), "%s  Lv%d", s.name, s.level);
+    ui_set_text(f_name, b);
+    snprintf(b, sizeof(b), "reti %lu · pasti %lu · pkt %lu", (unsigned long)s.nets_total,
+             (unsigned long)s.handshakes, (unsigned long)s.pkts);
+    ui_set_text(f_stat, b);
+    if (pwn_running()) snprintf(b, sizeof(b), "ch %d · vicine %d", pwn_recent_channel(), pwn_aps_near());
+    else snprintf(b, sizeof(b), "fermo");
+    ui_set_text(f_ch, b);
 
     // barra XP verso il livello successivo (stessa curva del motore)
     uint32_t lv = s.level > 9999 ? 0 : s.level;

@@ -76,6 +76,10 @@ void ui_toast(const char *msg);
 void ui_screen_off(void);
 void ui_power_off(void);
 lv_color_t ui_accent(void);
+// Come lv_label_set_text / lv_obj_set_style_text_color, ma non fanno nulla se il valore
+// è già quello: ogni modifica fa ridisegnare e inviare al pannello l'intero schermo.
+bool ui_set_text(lv_obj_t *label, const char *text);   // true se è cambiato
+void ui_set_text_color(lv_obj_t *obj, lv_color_t c);
 int  ui_accent_count(void);
 const char *ui_accent_name(int i);
 

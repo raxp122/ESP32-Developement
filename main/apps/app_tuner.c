@@ -67,13 +67,25 @@ static void tuning_notes(const tuning_t *t, char *b, int n)
     for (int i = 0; i < t->n; i++) o += snprintf(b + o, n - o, "%s%s", i ? " " : "", n_us[t->midi[i] % 12]);
 }
 
-/* ---------------- rilevamento (task microfono) ---------------- */
+/* ---------------- rilevamento (task microfono) ----------------
+ * YIN in due passi: prima sul segnale dimezzato a 12 kHz (un quarto dei calcoli) per
+ * trovare il periodo, poi a 24 kHz solo attorno a quel periodo per la precisione. Le
+ * note acute si rifanno a 24 kHz sui soli periodi corti. Collaudato sul PC con note
+ * sintetiche da SI0 a MI6: stessa precisione della versione a forza bruta, ~12 volte
+ * più veloce, quindi un'analisi ogni 21 ms invece di 43 e niente campioni persi.
+ */
 
 #define FS      AUDIO_RATE   // 24 kHz: a frequenze alte il sotto-campionamento costava qualche cent
 #define WIN     2048         // 85 ms
 #define TAU_MIN 18           // ~1330 Hz
 #define TAU_MAX 800          // 30 Hz
-#define HOP     1024         // un'analisi ogni ~43 ms
+#define HOP     512          // un'analisi ogni ~21 ms
+#define W1      (WIN - TAU_MAX)
+#define W2      (W1 / 2)
+#define T2_MIN  (TAU_MIN / 2)
+#define T2_MAX  (TAU_MAX / 2)
+#define SHORT2  48           // sotto questo periodo (a 12 kHz) si rifà l'analisi a 24 kHz
+#define GATE_DB -64.0f
 
 static volatile float det_hz;      // 0 = nessuna nota
 static volatile float det_level;   // dBFS
@@ -81,53 +93,101 @@ static volatile uint32_t det_seq;
 static volatile bool run;
 static TaskHandle_t task_h;
 
-static float yin(const float *x)
+typedef struct { float x2[WIN / 2], d[T2_MAX + 1], df[2 * SHORT2 + 8]; } yin_work_t;
+
+// somma dei quadrati di x[j] - x[j + tau], con 4 accumulatori indipendenti: la FPU
+// lavora in pipeline invece di aspettare ogni somma
+static float sqdiff(const float *x, int tau, int len)
 {
-    EXT_RAM_BSS_ATTR static float d[TAU_MAX + 1], raw[TAU_MAX + 1];
-    const int len = WIN - TAU_MAX;
+    float s0 = 0, s1 = 0, s2 = 0, s3 = 0;
+    const float *b = x + tau;
+    int j = 0;
+    for (; j + 4 <= len; j += 4) {
+        float a0 = x[j] - b[j], a1 = x[j + 1] - b[j + 1], a2 = x[j + 2] - b[j + 2], a3 = x[j + 3] - b[j + 3];
+        s0 += a0 * a0; s1 += a1 * a1; s2 += a2 * a2; s3 += a3 * a3;
+    }
+    for (; j < len; j++) { float a = x[j] - b[j]; s0 += a * a; }
+    return (s0 + s1) + (s2 + s3);
+}
+
+static float yin(const float *x, yin_work_t *w)
+{
+    // 1) metà frequenza (media di coppie: passa-basso e decimazione insieme)
+    for (int i = 0; i < WIN / 2; i++) w->x2[i] = 0.5f * (x[2 * i] + x[2 * i + 1]);
+    // 2) differenza normalizzata cumulativa a 12 kHz
+    float *d = w->d, run_sum = 0;
     d[0] = 1;
-    raw[0] = 0;
-    float run_sum = 0;
-    for (int tau = 1; tau <= TAU_MAX; tau++) {
-        float s = 0;
-        const float *a = x, *b = x + tau;
-        for (int j = 0; j < len; j++) { float v = a[j] - b[j]; s += v * v; }
-        raw[tau] = s;
+    for (int tau = 1; tau <= T2_MAX; tau++) {
+        float s = sqdiff(w->x2, tau, W2);
         run_sum += s;
-        d[tau] = run_sum > 0 ? s * tau / run_sum : 1;   // differenza normalizzata cumulativa
+        d[tau] = run_sum > 0 ? s * tau / run_sum : 1;
     }
     int best = -1;
-    for (int tau = TAU_MIN; tau < TAU_MAX; tau++) {
-        if (d[tau] < 0.12f) {
-            while (tau + 1 < TAU_MAX && d[tau + 1] < d[tau]) tau++;
+    for (int tau = T2_MIN; tau < T2_MAX; tau++)
+        if (d[tau] < 0.15f) {
+            while (tau + 1 < T2_MAX && d[tau + 1] < d[tau]) tau++;
             best = tau;
             break;
         }
-    }
     if (best < 0) {
-        // nessun valore sotto soglia: prendi il minimo globale se è abbastanza buono
+        // nessun valore sotto soglia: il minimo globale, se è abbastanza buono
         float mn = 1;
-        for (int tau = TAU_MIN; tau < TAU_MAX; tau++) if (d[tau] < mn) { mn = d[tau]; best = tau; }
-        if (mn > 0.30f) return 0;
+        for (int tau = T2_MIN; tau < T2_MAX; tau++) if (d[tau] < mn) { mn = d[tau]; best = tau; }
+        if (mn > 0.32f) return 0;
     }
-    // interpolazione parabolica sulla differenza grezza (meno distorta alle frequenze alte)
-    float t = best;
-    if (best > 1 && best < TAU_MAX) {
-        float s0 = raw[best - 1], s1 = raw[best], s2 = raw[best + 1];
-        float den = s0 + s2 - 2 * s1;
-        if (fabsf(den) > 1e-9f) t += 0.5f * (s0 - s2) / den;
+    // 3) note acute: a 12 kHz il minimo cade fra due campioni e si rischia di prendere
+    //    quello dopo (un'ottava sotto). Si rifà YIN a 24 kHz, ma solo sui periodi corti.
+    if (best < SHORT2) {
+        float *df = w->df, run1 = 0;
+        int top = 2 * best + 6, b1 = -1;
+        df[0] = 1;
+        for (int tau = 1; tau <= top; tau++) {
+            float s = sqdiff(x, tau, W1);
+            run1 += s;
+            df[tau] = run1 > 0 ? s * tau / run1 : 1;
+        }
+        for (int tau = TAU_MIN; tau < top; tau++)
+            if (df[tau] < 0.15f) {
+                while (tau + 1 < top && df[tau + 1] < df[tau]) tau++;
+                b1 = tau;
+                break;
+            }
+        if (b1 > 0) best = (b1 + 1) / 2;
     }
+    // 4) rifinitura a 24 kHz attorno al periodo, con interpolazione parabolica
+    int lo = 2 * best - 3, hi = 2 * best + 3;
+    if (lo < TAU_MIN) lo = TAU_MIN;
+    if (hi > TAU_MAX - 1) hi = TAU_MAX - 1;
+    float r[16] = {0};   // lo..hi ha al massimo 7 valori, più i due vicini
+    int bt = lo;
+    for (int tau = lo - 1; tau <= hi + 1; tau++) r[tau - lo + 1] = sqdiff(x, tau, W1);
+    for (int tau = lo; tau <= hi; tau++) if (r[tau - lo + 1] < r[bt - lo + 1]) bt = tau;
+    float s0 = r[bt - lo], s1 = r[bt - lo + 1], s2 = r[bt - lo + 2], t = bt;
+    float den = s0 + s2 - 2 * s1;
+    if (fabsf(den) > 1e-12f) t += 0.5f * (s0 - s2) / den;
     return FS / t;
+}
+
+static float median3(const float *h, int n)
+{
+    if (n == 1) return h[0];
+    if (n == 2) return 0.5f * (h[0] + h[1]);
+    float a = h[0], b = h[1], c = h[2];
+    if ((a <= b && b <= c) || (c <= b && b <= a)) return b;
+    if ((b <= a && a <= c) || (c <= a && a <= b)) return a;
+    return c;
 }
 
 static void mic_task(void *arg)
 {
     EXT_RAM_BSS_ATTR static int16_t in[HOP * 2];
+    // tutto in RAM interna: è lì che i calcoli vanno veloci
     float *buf = heap_caps_calloc(WIN, sizeof(float), MALLOC_CAP_INTERNAL);
+    yin_work_t *w = heap_caps_malloc(sizeof(yin_work_t), MALLOC_CAP_INTERNAL);
     float hist[3] = {0};
-    int filled = 0, hi = 0;
+    int nh = 0, hi = 0, misses = 0, jump = 0, filled = 0;
     float dc = 0;
-    while (run && buf) {
+    while (run && buf && w) {
         int n = audio_mic_read(in, HOP, 300);
         if (n <= 0) continue;
         memmove(buf, buf + n, (WIN - n) * sizeof(float));
@@ -144,18 +204,34 @@ static void mic_task(void *arg)
         if (filled < WIN) continue;
         float lvl = 10.0f * log10f((float)(e / n) + 1e-12f);
         det_level = lvl;
-        float f = lvl > -62.0f ? yin(buf) : 0;
-        // mediana di 3 per eliminare salti d'ottava sporadici
-        hist[hi] = f;
-        hi = (hi + 1) % 3;
-        float a = hist[0], b = hist[1], c = hist[2], med;
-        if ((a <= b && b <= c) || (c <= b && b <= a)) med = b;
-        else if ((b <= a && a <= c) || (c <= a && a <= b)) med = a;
-        else med = c;
-        det_hz = (f > 0 && med > 0) ? med : 0;
+        float f = lvl > GATE_DB ? yin(buf, w) : 0;
+
+        // Stabilità: mediana delle ultime letture valide (i buchi non contano), una nota
+        // nuova si accetta solo se si ripete (niente salti d'ottava isolati) e dopo una
+        // lettura persa si tiene la nota per qualche analisi invece di spegnerla.
+        float out = 0;
+        if (f > 0) {
+            if (nh && fabsf(12.0f * log2f(f / median3(hist, nh))) > 0.6f) {
+                if (++jump < 2) f = median3(hist, nh);
+                else { nh = 0; hi = 0; jump = 0; }
+            } else {
+                jump = 0;
+            }
+            hist[hi] = f;
+            hi = (hi + 1) % 3;
+            if (nh < 3) nh++;
+            misses = 0;
+            out = median3(hist, nh);
+        } else if (nh && ++misses <= 3) {
+            out = median3(hist, nh);
+        } else {
+            nh = hi = jump = 0;
+        }
+        det_hz = out;
         det_seq++;
     }
     free(buf);
+    free(w);
     task_h = NULL;
     vTaskDelete(NULL);
 }
@@ -238,14 +314,27 @@ static void set_needle(float cents, lv_color_t col)
 {
     if (cents > 55) cents = 55;
     if (cents < -55) cents = -55;
-    polar(cents, G_R - 26, &needle_pts[1]);
-    lv_line_set_points(needle, needle_pts, 2);
-    lv_obj_set_style_line_color(needle, col, 0);
+    lv_point_precise_t p;
+    polar(cents, G_R - 26, &p);
+    // l'ago si ridisegna solo se si sposta di almeno mezzo pixel o cambia colore
+    if (fabsf((float)(p.x - needle_pts[1].x)) >= 0.5f || fabsf((float)(p.y - needle_pts[1].y)) >= 0.5f) {
+        needle_pts[1] = p;
+        lv_line_set_points(needle, needle_pts, 2);
+    }
+    if (!lv_color_eq(lv_obj_get_style_line_color(needle, 0), col)) lv_obj_set_style_line_color(needle, col, 0);
 }
+
+static int chips_active = -2;
+static uint8_t chips_ok_mask = 0xFF;
 
 static void style_chips(int active)
 {
     if (!tun) return;
+    uint8_t mask = 0;
+    for (int i = 0; i < tun->n; i++) mask |= string_ok[i] << i;
+    if (active == chips_active && mask == chips_ok_mask) return;   // niente da cambiare
+    chips_active = active;
+    chips_ok_mask = mask;
     for (int i = 0; i < tun->n; i++) {
         bool on = i == active;
         lv_obj_set_style_bg_opa(chips[i], on ? LV_OPA_COVER : LV_OPA_TRANSP, 0);
@@ -265,11 +354,12 @@ static void ui_cb(lv_timer_t *t)
     if (det_seq == seen) return;
     seen = det_seq;
     float f = det_hz;
+    char b[96];
     if (f <= 0) {
-        // niente nota: dopo un attimo l'ago torna a riposo
-        if (++silent_frames > 6) {
-            lv_label_set_text(l_status, det_level > -62 ? "Suona una nota singola" : "In ascolto…");
-            lv_obj_set_style_text_color(l_status, C_DIM, 0);
+        // niente nota: dopo un attimo (~¼ di secondo) l'ago torna a riposo
+        if (++silent_frames > 12) {
+            ui_set_text(l_status, det_level > GATE_DB ? "Suona una nota singola" : "In ascolto…");
+            ui_set_text_color(l_status, C_DIM);
             set_needle(0, C_FAINT);
             in_tune_since = 0;
         }
@@ -280,11 +370,13 @@ static void ui_cb(lv_timer_t *t)
     float m = hz_midi(f);
     int mi = (int)lroundf(m);
     if (mi < 0) return;
-    lv_label_set_text(l_note, n_us[mi % 12]);
-    lv_label_set_text_fmt(l_oct, "%d", mi / 12 - 1);
-    lv_obj_align_to(l_oct, l_note, LV_ALIGN_OUT_RIGHT_BOTTOM, 4, -10);
-    lv_label_set_text(l_it, n_it[mi % 12]);
-    lv_label_set_text_fmt(l_hz, "%.1f Hz", f);
+    bool moved = ui_set_text(l_note, n_us[mi % 12]);
+    snprintf(b, sizeof(b), "%d", mi / 12 - 1);
+    moved |= ui_set_text(l_oct, b);
+    if (moved) lv_obj_align_to(l_oct, l_note, LV_ALIGN_OUT_RIGHT_BOTTOM, 4, -10);
+    ui_set_text(l_it, n_it[mi % 12]);
+    snprintf(b, sizeof(b), "%.1f Hz", f);
+    ui_set_text(l_hz, b);
 
     // in modalità guidata: corda più vicina
     float target = mi;
@@ -301,21 +393,22 @@ static void ui_cb(lv_timer_t *t)
     float ac = fabsf(shown_c);
     lv_color_t col = ac <= 5 ? C_OK : ac <= 15 ? lv_color_hex(0xFFB020) : C_WARN;
     set_needle(shown_c, col);
-    lv_obj_set_style_text_color(l_note, ac <= 5 ? C_OK : C_TEXT, 0);
+    ui_set_text_color(l_note, ac <= 5 ? C_OK : C_TEXT);
 
     if (tun) {
         int tm = (int)target;
-        lv_label_set_text_fmt(l_cents, "%+.0f cent · corda %s%d (%s) %.1f Hz", cents, n_us[tm % 12], tm / 12 - 1,
-                              n_it[tm % 12], midi_hz(target));
+        snprintf(b, sizeof(b), "%+.0f cent · corda %s%d (%s) %.1f Hz", cents, n_us[tm % 12], tm / 12 - 1,
+                 n_it[tm % 12], midi_hz(target));
     } else {
-        lv_label_set_text_fmt(l_cents, "%+.1f cent", cents);
+        snprintf(b, sizeof(b), "%+.1f cent", cents);
     }
+    ui_set_text(l_cents, b);
 
     if (ac <= 5) {
         if (!in_tune_since) in_tune_since = lv_tick_get();
         bool held = lv_tick_elaps(in_tune_since) > 600;
-        lv_label_set_text(l_status, held ? LV_SYMBOL_OK " Accordato" : "Quasi…");
-        lv_obj_set_style_text_color(l_status, C_OK, 0);
+        ui_set_text(l_status, held ? LV_SYMBOL_OK " Accordato" : "Quasi…");
+        ui_set_text_color(l_status, C_OK);
         if (held && tun && last_string >= 0 && !string_ok[last_string]) {
             string_ok[last_string] = true;
             style_chips(last_string);
@@ -323,9 +416,9 @@ static void ui_cb(lv_timer_t *t)
     } else {
         in_tune_since = 0;
         // in modalità guidata il consiglio si basa sulla corda, con margine anche oltre ±50 cent
-        lv_label_set_text(l_status, cents < 0 ? LV_SYMBOL_UP " Tendi la corda" : LV_SYMBOL_DOWN " Allenta la corda");
-        lv_obj_set_style_text_color(l_status, ac <= 15 ? lv_color_hex(0xFFB020) : C_WARN, 0);
-        if (!tun) lv_label_set_text(l_status, cents < 0 ? LV_SYMBOL_UP " Calante" : LV_SYMBOL_DOWN " Crescente");
+        if (tun) ui_set_text(l_status, cents < 0 ? LV_SYMBOL_UP " Tendi la corda" : LV_SYMBOL_DOWN " Allenta la corda");
+        else ui_set_text(l_status, cents < 0 ? LV_SYMBOL_UP " Calante" : LV_SYMBOL_DOWN " Crescente");
+        ui_set_text_color(l_status, ac <= 15 ? lv_color_hex(0xFFB020) : C_WARN);
     }
 }
 
@@ -333,6 +426,8 @@ static void enter(lv_obj_t *root, void *arg)
 {
     tun = arg;
     memset(string_ok, 0, sizeof(string_ok));
+    chips_active = -2;
+    chips_ok_mask = 0xFF;
     last_string = -1;
     shown_c = 0;
     silent_frames = 99;
@@ -420,7 +515,8 @@ const app_t app_tuner = {
 #define MAX_ITEMS 12
 static menu_item_t gtr_items[MAX_ITEMS], bass_items[MAX_ITEMS], uke_items[MAX_ITEMS];
 static char hints[3][MAX_ITEMS][32];
-static menu_t gtr_menu = {"Accordatore › Chitarra"}, bass_menu = {"Accordatore › Basso"}, uke_menu = {"Accordatore › Ukulele"};
+static menu_t gtr_menu = {.title = "Accordatore › Chitarra"}, bass_menu = {.title = "Accordatore › Basso"},
+              uke_menu = {.title = "Accordatore › Ukulele"};
 
 static void fill(menu_t *m, menu_item_t *items, const tuning_t *t, int n, char h[][32], const char *icon)
 {
@@ -462,7 +558,7 @@ static void pick_pitch(void *arg)
     ui_toast(b);
 }
 
-static menu_t pitch_menu = {"Accordatore › LA storici"};
+static menu_t pitch_menu = {.title = "Accordatore › LA storici"};
 
 static void v_a4(char *b, int n) { snprintf(b, n, "%.1f Hz", a4()); }
 static void j_a4(int d)

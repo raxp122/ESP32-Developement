@@ -11,6 +11,7 @@
 #include "board.h"
 #include "lvgl.h"
 #include <math.h>
+#include <stddef.h>
 #include <string.h>
 #include <time.h>
 #include "esp_log.h"
@@ -57,11 +58,16 @@ static void load(void)
     memset(&P, 0, sizeof(P));
     nvs_handle_t h;
     if (nvs_open("pet", NVS_READONLY, &h) != ESP_OK) return;
+    // un salvataggio di una versione precedente (anche più corto: i campi nuovi stanno
+    // in fondo) si accetta, e quello che manca resta a zero; uno più nuovo no
     pet_t tmp;
+    memset(&tmp, 0, sizeof(tmp));
     size_t len = sizeof(tmp);
-    if (nvs_get_blob(h, "st", &tmp, &len) == ESP_OK && len == sizeof(tmp) &&
-        tmp.magic == PET_MAGIC && tmp.version == PET_VERSION)
+    if (nvs_get_blob(h, "st", &tmp, &len) == ESP_OK && len >= offsetof(pet_t, last_epoch) &&
+        tmp.magic == PET_MAGIC && tmp.version <= PET_VERSION) {
+        tmp.version = PET_VERSION;
         P = tmp;
+    }
     nvs_close(h);
 }
 

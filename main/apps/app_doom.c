@@ -121,4 +121,4 @@ static const menu_item_t doom_items[] = {
     {.icon = LV_SYMBOL_LOOP, .label = "Inverti avanti/indietro", .value = v_inv_pt, .on_select = a_inv_pt},
     {.icon = ICON_INFO, .label = "Comandi", .value = v_help},
 };
-menu_t doom_menu = {"Doom", doom_items, sizeof(doom_items) / sizeof(doom_items[0])};
+menu_t doom_menu = {"Doom", doom_items, sizeof(doom_items) / sizeof(doom_items[0]), 0};

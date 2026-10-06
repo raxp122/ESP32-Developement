@@ -23,6 +23,9 @@ void tuner_menu_init(void);
 extern menu_t radar_menu;
 extern const app_t app_pet;
 extern const app_t app_ota;
+extern const app_t app_restore;
+extern menu_t backup_menu;
+extern const app_t app_level;
 extern menu_t pet_settings_menu;
 
 // App all'avvio (Impostazioni): elenco con indici stabili, salvati in g_set.boot_app
