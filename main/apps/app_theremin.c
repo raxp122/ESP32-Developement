@@ -361,12 +361,14 @@ static void sample_cb(lv_timer_t *tm)
 static void on_button(int i)
 {
     if (i != B_REC && i != B_MIC && th_recording()) { ui_toast("Ferma prima la registrazione"); return; }
+    // i menu sostituiscono la schermata (gli oggetti di questa vengono cancellati): return,
+    // non break, perché btn_labels() qui sotto li toccherebbe dopo la cancellazione
     switch (i) {
-    case B_SOUND: ui_push(&app_menu, &sound_menu); break;
-    case B_SCALE: ui_push(&app_menu, &scale_menu); break;
-    case B_FX:    ui_push(&app_menu, &fx_menu); break;
-    case B_CTL:   ui_push(&app_menu, &ctl_menu); break;
-    case B_LIST:  ui_push(&app_th_recs, NULL); break;
+    case B_SOUND: ui_push(&app_menu, &sound_menu); return;
+    case B_SCALE: ui_push(&app_menu, &scale_menu); return;
+    case B_FX:    ui_push(&app_menu, &fx_menu); return;
+    case B_CTL:   ui_push(&app_menu, &ctl_menu); return;
+    case B_LIST:  ui_push(&app_th_recs, NULL); return;
     case B_MIC:
         if (th_recording()) { ui_toast("Si sceglie prima di registrare"); break; }
         th_cfg.mic = !th_cfg.mic;
