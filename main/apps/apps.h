@@ -30,6 +30,8 @@ extern menu_t pet_settings_menu;
 extern const app_t app_ble_device;   // arg = ble_dev_t* da collegare
 extern const app_t app_ble_pair;
 extern const app_t app_ble_conns;
+extern menu_t clips_menu;             // Appunti: testi dal PC → tastiera USB
+extern const app_t app_clip_list;
 
 // App all'avvio (Impostazioni): elenco con indici stabili, salvati in g_set.boot_app
 int  boot_app_count(void);

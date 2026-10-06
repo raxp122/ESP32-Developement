@@ -60,7 +60,14 @@ typedef struct {
     uint8_t  ota_auto;        // controlla gli aggiornamenti quando c'è internet
     // v12
     uint8_t  backup_before_ota;   // backup automatico sulla microSD prima di ogni aggiornamento
+    // v13 - Appunti (testo dal PC → tastiera USB)
+    uint8_t  kb_layout;           // layout della tastiera USB (kb_layout_t)
 } settings_t;
+
+// layout della tastiera USB. L'ordine è salvato: le voci nuove vanno in fondo.
+enum { KB_LAYOUT_IT = 0, KB_LAYOUT_US, KB_LAYOUT_US_INTL, KB_LAYOUT_UK,
+       KB_LAYOUT_DE, KB_LAYOUT_FR, KB_LAYOUT_ES, KB_LAYOUT_COUNT };
+const char *settings_layout_name(int i);
 
 // i valori sono salvati: quelli nuovi vanno in fondo
 enum { PET_TIME_REAL = 0, PET_TIME_DEVICE, PET_TIME_APP, PET_TIME_HYBRID, PET_TIME_COUNT };

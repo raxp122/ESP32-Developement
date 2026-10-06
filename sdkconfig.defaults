@@ -40,3 +40,5 @@ CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE=y
 CONFIG_MBEDTLS_EXTERNAL_MEM_ALLOC=y
 # associazioni Bluetooth salvate nell'NVS (ricollegamento automatico)
 CONFIG_BT_NIMBLE_NVS_PERSIST=y
+# Appunti: tastiera USB (una istanza HID). Ignorato se esp_tinyusb non c'è (build locale).
+CONFIG_TINYUSB_HID_COUNT=1

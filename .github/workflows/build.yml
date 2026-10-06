@@ -28,6 +28,15 @@ jobs:
       - name: Scarica LVGL
         run: git clone -b v9.2.2 --depth 1 https://github.com/lvgl/lvgl components/lvgl
 
+      - name: Abilita la tastiera USB (TinyUSB)
+        # Dichiarato solo qui (non nel repo) così la build locale, senza accesso al
+        # registro dei componenti, resta compilabile con lo stub di usbhid.c.
+        run: |
+          cat > main/idf_component.yml <<'YML'
+          dependencies:
+            espressif/esp_tinyusb: ">=1.4.0,<2.0.0"
+          YML
+
       - name: Compila (ESP-IDF 5.4.2) e crea l'immagine unica
         uses: espressif/esp-idf-ci-action@v1
         with:

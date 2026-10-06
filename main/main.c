@@ -17,6 +17,9 @@
 #include "pet.h"
 #include "ota.h"
 #include "apps/apps.h"
+#include "clips.h"
+
+void clip_ble_register(void);
 
 static const char *TAG = "main";
 
@@ -43,6 +46,7 @@ void app_main(void)
     settings_load();
     time_from_rtc();
     sd_mount();
+    clips_init();          // Appunti: testi ricevuti dal PC
 
     if (doom_boot_requested()) {
         // modalità Doom: niente Wi-Fi/Bluetooth, tutta la memoria al gioco
@@ -63,6 +67,7 @@ void app_main(void)
     display_set_brightness(g_set.brightness);
 
     wifi_mgr_init();
+    clip_ble_register();   // servizio Bluetooth degli Appunti (prima di accendere lo stack)
     ble_mgr_apply();
 
     // il polipetto vive in sottofondo; poi l'eventuale app scelta per l'avvio

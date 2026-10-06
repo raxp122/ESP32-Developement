@@ -6,7 +6,7 @@
 #include "nvs.h"
 #include "esp_log.h"
 
-#define SETTINGS_VERSION 12
+#define SETTINGS_VERSION 13
 settings_t g_set;
 
 static void defaults(void)
@@ -40,9 +40,17 @@ static void defaults(void)
     g_set.pet_wake_h = 8;
     g_set.ota_auto = 1;
     g_set.backup_before_ota = 1;
+    g_set.kb_layout = KB_LAYOUT_IT;
 }
 
 int settings_version(void) { return SETTINGS_VERSION; }
+
+const char *settings_layout_name(int i)
+{
+    static const char *const n[] = {"Italiano", "US", "US internazionale", "Regno Unito",
+                                    "Tedesco", "Francese", "Spagnolo"};
+    return (i >= 0 && i < KB_LAYOUT_COUNT) ? n[i] : n[0];
+}
 
 /* ---------------- migrazione dalla vecchia tabella delle partizioni ----------------
  * Fino alla 0.13 l'NVS stava a 0x9000, proprio dove l'immagine unica gadget.bin (che
@@ -149,6 +157,8 @@ void settings_load(void)
         }
         if (old < 11) { g_set.pet_sleep_h = 22; g_set.pet_wake_h = 8; g_set.ota_auto = 1; }
         if (old < 12) g_set.backup_before_ota = 1;
+        if (old < 13) g_set.kb_layout = KB_LAYOUT_IT;
+        if (g_set.kb_layout >= KB_LAYOUT_COUNT) g_set.kb_layout = KB_LAYOUT_IT;
         if (g_set.pet_time >= PET_TIME_COUNT) g_set.pet_time = PET_TIME_REAL;
         if (g_set.pet_sleep_h > 23) g_set.pet_sleep_h = 22;
         if (g_set.pet_wake_h > 23) g_set.pet_wake_h = 8;

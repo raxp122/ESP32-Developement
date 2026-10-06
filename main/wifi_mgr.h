@@ -43,8 +43,10 @@ int  wifi_mgr_scan_results(wifi_ap_t *out, int max);
 const char *wifi_mgr_auth_name(int auth);
 
 // Portale: hotspot + pagina web per inserire la rete dal telefono
-void wifi_mgr_portal_start(void);
-void wifi_mgr_portal_stop(void);
+void wifi_mgr_portal_start(void);         // pagina: configura il Wi-Fi
+void wifi_mgr_portal_start_clips(void);   // pagina: Appunti (manda testi via Bluetooth)
+void wifi_mgr_portal_open(void);          // interna: avvia l'hotspot con la pagina scelta
+void wifi_mgr_portal_stop(void);          // chiude l'hotspot e ripristina il Wi-Fi normale
 const char *wifi_mgr_portal_ssid(void);
 int  wifi_mgr_portal_clients(void);
 bool wifi_mgr_portal_saved(void);          // credenziali ricevute

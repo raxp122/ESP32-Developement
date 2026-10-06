@@ -77,6 +77,16 @@ Il Bluetooth è predisposto per collegarsi nei due sensi (le funzioni vere arriv
 
 Limite dell'hardware: l'ESP32-S3 ha solo il Bluetooth Low Energy. Casse e cuffie riproducono l'audio col Bluetooth "classico" (A2DP), che questo chip non ha: per l'audio servirebbe un modulo esterno.
 
+## Appunti (testo dal PC → tastiera USB)
+Serve per ridigitare codici e stringhe su un PC facendo da tastiera USB. Dal launcher: **Appunti**.
+
+1. **Ricevi dal PC** (Bluetooth): il Gadget si fa trovare per qualche minuto. Dal PC apri la pagina Appunti in Chrome o Edge, premi *Collega il Gadget*, scegli il nome `Gadget-xxxx`. Poi ogni testo che incolli nella pagina arriva nella lista del Gadget.
+2. **Scarica la pagina** (Wi-Fi): se sul PC non hai ancora la pagina, qui il Gadget apre un hotspot Wi-Fi con una pagina da salvare (premi *Scarica*). Chiudendo questa schermata l'hotspot si spegne e il Wi-Fi torna com'era. La pagina salvata funziona poi da sola (apri il file, usa il Bluetooth).
+3. **Codici salvati**: la lista. Swipe a destra su una voce apre il dettaglio; con la USB-C collegata a un PC, un secondo swipe la digita come se la scrivessi a tastiera. BOOT cancella la voce; *Cancella tutti* svuota la lista.
+4. **Layout tastiera**: come è impostata la tastiera del PC su cui digiti (Italiano di default, US, US internazionale, e altri). Per i codici BitLocker (cifre e trattini) non cambia nulla.
+
+I testi restano salvati finché non li cancelli tu. Attenzione: mentre la tastiera USB è attiva la console seriale su USB si sospende (sull'ESP32-S3 la porta fa una cosa per volta) e torna quando esci.
+
 ## Backup e ripristino
 Impostazioni › Backup e ripristino:
 - **Crea un backup ora**: salva tutto (impostazioni, Wi-Fi, polipetto, Radar e Pokédex, livella) in un file della cartella `backup` sulla microSD.
@@ -117,6 +127,7 @@ Dalla 0.14 le impostazioni (NVS) stanno in fondo alla flash (`0xFF0000`): né l'
 - `main/wifi_mgr.*` Wi-Fi, scansione, portale captive per configurare la rete dal telefono, NTP
 - `main/ble_mgr.*` NimBLE: visibilità, scansione, collegamenti nei due sensi, associazioni, profili · `main/apps/app_bt.c` le schermate
 - `main/pet_core.*` regole del Polipetto (pure, senza hardware) · `main/pet.*` tempo reale, salvataggio, contapassi, versi
+- `main/clips.*` Appunti (testi dal PC) · `main/clip_ble.c` servizio Bluetooth di ricezione · `main/usbhid.*` tastiera USB · `main/apps/app_clips.c` le schermate
 - `main/backup.*` backup e ripristino su microSD · `main/ota.*` aggiornamenti via internet · `main/settings.*` impostazioni (con migrazione dalla vecchia tabella)
 - `main/apps/` le app (`app_pet.c` + `pet_art.c` per il Polipetto, `app_ota.c` per gli aggiornamenti, `app_backup.c`, `app_level.c` per la livella)
 - `components/axs15231b` driver Waveshare inclusi nel progetto
