@@ -41,13 +41,16 @@ static void tt_cb(lv_timer_t *t)
 {
     float st, pt;
     if (!tilt_read(&st, &pt)) {
-        lv_label_set_text(val_st, "IMU?");
+        ui_set_text(val_st, "IMU?");
         return;
     }
     lv_bar_set_value(bar_st, (int)(tilt_axis(st) * 100), LV_ANIM_OFF);
     lv_bar_set_value(bar_pt, (int)(tilt_axis(pt) * 100), LV_ANIM_OFF);
-    lv_label_set_text_fmt(val_st, "%+d°", (int)st);
-    lv_label_set_text_fmt(val_pt, "%+d°", (int)pt);
+    char b[12];
+    snprintf(b, sizeof(b), "%+d°", (int)st);
+    ui_set_text(val_st, b);   // solo se cambia: ogni modifica ridisegna l'intero schermo
+    snprintf(b, sizeof(b), "%+d°", (int)pt);
+    ui_set_text(val_pt, b);
     input_mark_activity();
 }
 
@@ -81,12 +84,19 @@ static const app_t app_tilt = {
 
 /* ---------------- menu Doom ---------------- */
 
+// il menu la ricalcola ogni secondo: si guarda sulla microSD al massimo ogni 5 s
 static void v_wad(char *b, int n)
 {
-    char p[64];
-    if (!sd_ok()) snprintf(b, n, "microSD non trovata");
-    else if (doom_find_wad(p, sizeof(p))) snprintf(b, n, "%s", p + strlen(SD_MOUNT) + 1);
-    else snprintf(b, n, "Manca: copia doom1.wad nella cartella doom della microSD");
+    static char cache[96];
+    static uint32_t at;
+    if (!cache[0] || lv_tick_get() - at > 5000) {
+        char p[64];
+        if (!sd_ok()) snprintf(cache, sizeof(cache), "microSD non trovata");
+        else if (doom_find_wad(p, sizeof(p))) snprintf(cache, sizeof(cache), "%s", p + strlen(SD_MOUNT) + 1);
+        else snprintf(cache, sizeof(cache), "Manca: copia doom1.wad nella cartella doom della microSD");
+        at = lv_tick_get();
+    }
+    snprintf(b, n, "%s", cache);
 }
 
 static void a_play(void)
@@ -121,4 +131,4 @@ static const menu_item_t doom_items[] = {
     {.icon = LV_SYMBOL_LOOP, .label = "Inverti avanti/indietro", .value = v_inv_pt, .on_select = a_inv_pt},
     {.icon = ICON_INFO, .label = "Comandi", .value = v_help},
 };
-menu_t doom_menu = {"Doom", doom_items, sizeof(doom_items) / sizeof(doom_items[0]), 0};
+menu_t doom_menu = {"Doom", doom_items, sizeof(doom_items) / sizeof(doom_items[0]), 0, NULL};

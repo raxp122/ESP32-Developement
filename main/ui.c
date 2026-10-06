@@ -1,5 +1,6 @@
 // ui.c — gestione schermate, barra di stato, risparmio schermo, azione rapida
 #include "ui.h"
+#include <stdlib.h>
 #include "apps/apps.h"
 #include "board.h"
 #include "settings.h"
@@ -34,6 +35,11 @@ bool ui_set_text(lv_obj_t *l, const char *t)
     if (!strcmp(lv_label_get_text(l), t)) return false;
     lv_label_set_text(l, t);
     return true;
+}
+
+void ui_set_bg_color(lv_obj_t *obj, lv_color_t c)
+{
+    if (!lv_color_eq(lv_obj_get_style_bg_color(obj, 0), c)) lv_obj_set_style_bg_color(obj, c, 0);
 }
 
 void ui_set_text_color(lv_obj_t *o, lv_color_t c)
@@ -119,9 +125,17 @@ static void bar_update(void)
     }
     ui_set_text(bar_ble, ble_mgr_on() ? LV_SYMBOL_BLUETOOTH : "");
 
+    // Una lettura sola dell'ADC oscilla di qualche % tra un secondo e l'altro: ogni volta
+    // si ridisegnava tutto lo schermo (e partiva una notifica Bluetooth). Media mobile e
+    // cambi di almeno 2 punti.
+    static float v_avg;
+    static int p_shown = -1;
     float v = board_battery_volts();
     if (v > 2.5f) {
-        int p = board_battery_percent(v);
+        v_avg = v_avg < 2.5f ? v : v_avg + (v - v_avg) * 0.2f;
+        int p = board_battery_percent(v_avg);
+        if (p_shown < 0 || abs(p - p_shown) >= 2 || p == 100 || p == 0) p_shown = p;
+        p = p_shown;
         ble_mgr_set_battery(p);
         const char *ic = p > 85 ? LV_SYMBOL_BATTERY_FULL : p > 60 ? LV_SYMBOL_BATTERY_3
                        : p > 35 ? LV_SYMBOL_BATTERY_2 : p > 12 ? LV_SYMBOL_BATTERY_1 : LV_SYMBOL_BATTERY_EMPTY;
@@ -129,6 +143,8 @@ static void bar_update(void)
         ui_set_text(bar_batt, t);
         ui_set_text_color(bar_batt, p <= 12 ? C_WARN : C_TEXT);
     } else {
+        v_avg = 0;
+        p_shown = -1;
         ui_set_text(bar_batt, LV_SYMBOL_USB);
         ui_set_text_color(bar_batt, C_TEXT);
     }
@@ -170,10 +186,21 @@ static void show_top(int dir)
     bar_update();
 }
 
+static bool closing;   // leave_top per un ritorno indietro (ui_pop/ui_home)
+
+bool ui_closing(void) { return closing; }
+
 static void leave_top(void)
 {
     const frame_t *f = &stack[depth - 1];
     if (f->app->leave) f->app->leave();
+}
+
+static void close_top(void)
+{
+    closing = true;
+    leave_top();
+    closing = false;
 }
 
 void ui_push(const app_t *app, void *arg)
@@ -187,14 +214,14 @@ void ui_push(const app_t *app, void *arg)
 void ui_pop(void)
 {
     if (depth <= 1) return;
-    leave_top();
+    close_top();
     depth--;
     show_top(-1);
 }
 
 void ui_home(void)
 {
-    while (depth > 1) { leave_top(); depth--; }
+    while (depth > 1) { close_top(); depth--; }
     show_top(-1);
 }
 
@@ -230,11 +257,15 @@ void ui_screen_off(void)
     display_set_brightness(0);
 }
 
+static int bright_override = -1;   // es. la torcia: al risveglio torna a questa luminosità
+
+void ui_set_brightness_override(int pct) { bright_override = pct; }
+
 static void screen_on(void)
 {
     sleeping = false;
     input_mark_activity();
-    display_set_brightness(g_set.brightness);
+    display_set_brightness(bright_override >= 0 ? bright_override : g_set.brightness);
 }
 
 static void power_off_check(lv_timer_t *t)
@@ -244,11 +275,22 @@ static void power_off_check(lv_timer_t *t)
     ui_toast("Alimentata via USB: scollega il cavo per spegnere");
 }
 
-static void rebuild_cb(lv_timer_t *t) { ui_rebuild(); }
+// Durante lo spegnimento la schermata dell'app è già stata chiusa (leave + oggetti
+// cancellati): finché non si torna (alimentazione USB) niente tick né eventi all'app.
+static bool powering_off;
+
+static void rebuild_cb(lv_timer_t *t)
+{
+    powering_off = false;
+    show_top(0);   // leave è già stato chiamato in ui_power_off
+}
 
 void ui_power_off(void)
 {
+    if (powering_off) return;
     screen_on();
+    leave_top();
+    powering_off = true;
     lv_obj_clean(content);
     lv_obj_add_flag(bar, LV_OBJ_FLAG_HIDDEN);
     lv_obj_set_pos(content, 0, 0);
@@ -284,6 +326,7 @@ static void quick_action(void)
 
 static void on_nav(nav_t ev)
 {
+    if (powering_off) return;
     if (ev == NAV_PWR_LONG) { ui_power_off(); return; }
     if (ev == NAV_PWR_CLICK) { if (sleeping) screen_on(); else ui_screen_off(); return; }
 
@@ -294,6 +337,9 @@ static void on_nav(nav_t ev)
         return;
     }
     if (ev == NAV_TOUCH_DOWN) { swallow_touch = false; return; }
+    // il tocco di risveglio va consumato, ma un pulsante no: se quel tocco non ha
+    // prodotto un gesto, il flag resterebbe e mangerebbe il BOOT successivo
+    if (ev == NAV_BTN || ev == NAV_QUICK) swallow_touch = false;
     if (swallow_touch) { swallow_touch = false; return; }
     if (ev == NAV_TAP) return; // il tocco semplice non conferma nulla
 
@@ -310,6 +356,7 @@ static void on_nav(nav_t ev)
 
 static void tick_cb(lv_timer_t *t)
 {
+    if (powering_off) return;
     const app_t *app = stack[depth - 1].app;
     if (app->tick) app->tick();
     if (!sleeping && g_set.sleep_s && !(app->flags & APP_NO_SLEEP) && input_idle_ms() > g_set.sleep_s * 1000u)

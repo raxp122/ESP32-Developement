@@ -51,6 +51,7 @@ typedef struct {
     uint8_t addr[6];
     char name[32];
     bool encrypted, bonded;
+    bool trusted;           // ammesso: voluto dal Gadget, accettato a finestra aperta o associato
     uint16_t appearance;
     uint16_t svcs[BLE_MAX_SVCS]; // servizi trovati (UUID a 16 bit; 0xFFFF = a 128 bit)
     int n_svcs;
@@ -65,6 +66,7 @@ bool ble_mgr_connect(const ble_dev_t *d);           // altri → Gadget
 ble_link_t ble_mgr_link_state(const uint8_t addr[6]); // esito dell'ultimo ble_mgr_connect
 const char *ble_mgr_link_error(void);
 void ble_mgr_disconnect(uint16_t handle);
+bool ble_mgr_conn_trusted(uint16_t handle);         // per i servizi che non vogliono sconosciuti
 
 // finestra di associazione (Gadget → altri): il Gadget si fa trovare e accetta un
 // nuovo telefono o computer per `seconds` secondi

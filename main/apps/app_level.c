@@ -412,6 +412,7 @@ static void set_zero(void)
 
 static bool nav(nav_t ev)
 {
+    if (!tmr) return false;   // niente accelerometro: nessuna misura possibile, si esce soltanto
     if (state != ST_RUN) {
         if (ev == NAV_SELECT) { if (!meas.on) meas_start(); render(); return true; }
         if (ev == NAV_BACK || ev == NAV_BTN) {

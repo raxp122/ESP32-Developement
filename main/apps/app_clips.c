@@ -24,9 +24,14 @@ static void preview(const clip_t *c, char *b, int n)
     int o = 0;
     for (int i = 0; i < c->len && o < n - 1; i++) {
         unsigned char ch = c->text[i];
-        if (ch == '\n' || ch == '\r' || ch == '\t') { if (o && b[o - 1] != ' ') b[o++] = ' '; }
-        else if (ch < 0x20) continue;
-        else b[o++] = ch;
+        if (ch == '\n' || ch == '\r' || ch == '\t') { if (o && b[o - 1] != ' ') b[o++] = ' '; continue; }
+        if (ch < 0x20) continue;
+        // un carattere UTF-8 entra intero o per niente (mezzo carattere si vedrebbe come un quadratino)
+        int l = ch >= 0xF0 ? 4 : ch >= 0xE0 ? 3 : ch >= 0xC0 ? 2 : 1;
+        if (o + l > n - 1 || i + l > c->len) break;
+        memcpy(b + o, c->text + i, l);
+        o += l;
+        i += l - 1;
     }
     b[o] = 0;
 }
@@ -45,7 +50,8 @@ static void when(const clip_t *c, char *b, int n)
 static int sel;
 static uint32_t seen_gen;
 static list_view_t lv;
-static char rows[3][CLIP_MAX_LEN];
+static char rows[3][64];
+static uint32_t sel_id;   // voce selezionata: la si ritrova anche se arrivano testi nuovi
 static char title_buf[40];
 
 static const char *row_text(int i, char *buf)
@@ -67,6 +73,7 @@ static void list_render(int dir)
     if (sel >= n) sel = n - 1;
     clip_t c;
     clips_get(sel, &c);
+    sel_id = c.id;
     char sub[80];
     when(&c, sub, sizeof(sub));
     if (c.used) snprintf(sub + strlen(sub), sizeof(sub) - strlen(sub), " · " LV_SYMBOL_OK);
@@ -86,7 +93,12 @@ static void list_enter(lv_obj_t *root, void *arg)
 
 static void list_tick(void)
 {
-    if (clips_gen() != seen_gen) { seen_gen = clips_gen(); if (sel >= clips_count()) sel = 0; list_render(0); }
+    if (clips_gen() == seen_gen) return;
+    seen_gen = clips_gen();
+    clip_t c;
+    for (int i = 0; clips_get(i, &c); i++) if (c.id == sel_id) { sel = i; break; }
+    if (sel >= clips_count()) sel = 0;
+    list_render(0);
 }
 
 static bool list_nav(nav_t ev)
@@ -115,7 +127,7 @@ const app_t app_clip_list = {
 
 static clip_t cur;
 static lv_obj_t *d_text, *d_state, *d_hint;
-static enum { D_IDLE, D_CONFIRM, D_TYPING, D_DONE } d_mode;
+static enum { D_IDLE, D_CONFIRM, D_TYPING, D_DONE, D_CONFIRM_DEL } d_mode;
 static volatile int d_typed;
 static volatile bool d_typing_done;
 static TaskHandle_t d_task;
@@ -131,6 +143,11 @@ static void detail_render(void)
         snprintf(t, sizeof(t), LV_SYMBOL_WARNING " Swipe a destra di nuovo per digitare");
         col = C_WARN;
         hint = "Metti il cursore sul PC dove vuoi scrivere · sinistra: annulla";
+        break;
+    case D_CONFIRM_DEL:
+        snprintf(t, sizeof(t), LV_SYMBOL_TRASH " BOOT di nuovo per cancellarlo");
+        col = C_WARN;
+        hint = "Qualsiasi altro gesto annulla";
         break;
     case D_TYPING:
         snprintf(t, sizeof(t), "Sto digitando…");
@@ -209,17 +226,29 @@ static void do_type(void)
     d_mode = D_TYPING;
     d_typed = 0;
     d_typing_done = false;
+    usbhid_arm();   // qui e non nel task: un "ferma" dato prima che parta non va perso
     detail_render();
     xTaskCreatePinnedToCore(type_task, "clip_type", 4096, NULL, 4, &d_task, 0);
 }
 
 static bool detail_nav(nav_t ev)
 {
-    if (ev == NAV_BTN) {   // BOOT = cancella questa voce (non mentre digita)
+    if (ev == NAV_BTN) {   // BOOT = cancella questa voce, con conferma (non mentre digita)
         if (d_mode == D_TYPING) return true;
-        clips_delete(sel);
+        if (d_mode != D_CONFIRM_DEL) {
+            d_mode = D_CONFIRM_DEL;
+            d_confirm_until = lv_tick_get() + 5000;
+            detail_render();
+            return true;
+        }
+        clips_delete_id(cur.id);   // per id: la lista può essersi spostata nel frattempo
         ui_pop();
         return true;
+    }
+    if (d_mode == D_CONFIRM_DEL) {   // qualsiasi altro gesto annulla la cancellazione
+        d_mode = D_IDLE;
+        detail_render();
+        if (ev != NAV_BACK) return true;
     }
     if (ev == NAV_SELECT) {
         if (!usbhid_supported()) { ui_toast("Serve il supporto USB"); return true; }
@@ -234,7 +263,7 @@ static bool detail_nav(nav_t ev)
 static void detail_tick(void)
 {
     if (d_mode == D_TYPING && d_typing_done) { d_mode = D_DONE; detail_render(); }
-    else if (d_mode == D_CONFIRM && lv_tick_get() > d_confirm_until) { d_mode = D_IDLE; detail_render(); }
+    else if ((d_mode == D_CONFIRM || d_mode == D_CONFIRM_DEL) && (int32_t)(lv_tick_get() - d_confirm_until) > 0) { d_mode = D_IDLE; detail_render(); }
     else if (d_mode == D_IDLE) detail_render();   // aggiorna se la USB viene collegata ora
 }
 
@@ -313,10 +342,10 @@ static lv_obj_t *w_status;
 
 static void wpage_tick(void)
 {
-    char b[96];
-    if (wifi_mgr_portal_clients() > 0) { snprintf(b, sizeof(b), "PC collegato: apri 192.168.4.1 e salva la pagina"); lv_obj_set_style_text_color(w_status, ui_accent(), 0); }
-    else { snprintf(b, sizeof(b), "In attesa del PC…"); lv_obj_set_style_text_color(w_status, C_DIM, 0); }
-    lv_label_set_text(w_status, b);
+    bool pc = wifi_mgr_portal_clients() > 0;
+    // solo se cambia: ogni modifica ridisegna l'intero schermo
+    ui_set_text(w_status, pc ? "PC collegato: apri 192.168.4.1 e salva la pagina" : "In attesa del PC…");
+    ui_set_text_color(w_status, pc ? ui_accent() : C_DIM);
 }
 
 static void wpage_enter(lv_obj_t *root, void *arg)
@@ -377,4 +406,4 @@ static const menu_item_t clip_items[] = {
     {.icon = ICON_SLIDERS, .label = "Layout tastiera", .value = v_layout, .on_adjust = j_layout},
     {.icon = LV_SYMBOL_TRASH, .label = "Cancella tutti", .on_select = a_clear, .confirm = true},
 };
-menu_t clips_menu = {"Appunti", clip_items, sizeof(clip_items) / sizeof(clip_items[0]), 0};
+menu_t clips_menu = {"Appunti", clip_items, sizeof(clip_items) / sizeof(clip_items[0]), 0, NULL};

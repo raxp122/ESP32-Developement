@@ -12,8 +12,9 @@ void usbhid_begin(void);         // prende la porta USB (fa da tastiera); consol
 void usbhid_end(void);           // libera la porta; la console torna
 bool usbhid_mounted(void);       // un PC ci ha riconosciuti come tastiera
 
-// Digita il testo come una tastiera `layout` (KB_LAYOUT_* di settings.h). Si ferma se
+// Digita il testo come una tastiera `layout` (KB_LAYOUT_* di settings.h; mappe in usb_keymap.c). Si ferma se
 // scollegano la USB. Ritorna i caratteri digitati; se < della lunghezza, interrotto.
 // Un carattere non rappresentabile nel layout viene saltato.
 int  usbhid_type(const char *text, int len, int layout);
 void usbhid_cancel(void);        // interrompe una digitazione in corso
+void usbhid_arm(void);           // da chiamare prima di avviare usbhid_type (azzera l'interruzione)

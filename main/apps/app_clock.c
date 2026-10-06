@@ -24,7 +24,8 @@ static void update(void)
         return;
     }
     snprintf(b, sizeof(b), "%02d:%02d", t.tm_hour, t.tm_min);
-    ui_set_text(l_time, b);
+    // le cifre non sono tutte larghe uguali: i secondi seguono la nuova larghezza dell'ora
+    if (ui_set_text(l_time, b)) lv_obj_align_to(l_sec, l_time, LV_ALIGN_OUT_RIGHT_BOTTOM, 10, -8);
     if (show_sec) snprintf(b, sizeof(b), "%02d", t.tm_sec);
     else b[0] = 0;
     ui_set_text(l_sec, b);

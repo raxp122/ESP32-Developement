@@ -1,5 +1,6 @@
 // menu.c — schermata menu generica usata da home e impostazioni
 #include "ui.h"
+#include "settings.h"
 #include "apps/apps.h"
 #include <stdio.h>
 #include <string.h>
@@ -74,7 +75,7 @@ static bool nav(nav_t ev)
         case NAV_NEXT: it->on_adjust(+1); render(0); return true;
         case NAV_PREV: it->on_adjust(-1); render(0); return true;
         case NAV_SELECT:
-        case NAV_BACK: editing = false; render(0); return true;
+        case NAV_BACK: editing = false; settings_defer(false); render(0); return true;
         default: return false;
         }
     }
@@ -96,7 +97,7 @@ static bool nav(nav_t ev)
             return true;
         }
         confirm_idx = -1;
-        if (it->on_adjust) { editing = true; render(0); return true; }
+        if (it->on_adjust) { editing = true; settings_defer(true); render(0); return true; }
         if (it->app) { ui_push(it->app, it->arg); return true; }
         if (it->on_pick) it->on_pick(it->arg);
         else if (it->on_select) it->on_select();
@@ -117,7 +118,12 @@ static void tick(void)
     render(0);
 }
 
-static void leave(void) { active = false; }
+static void leave(void)
+{
+    active = false;
+    if (ui_closing() && m->on_close) m->on_close();
+    if (editing) { editing = false; settings_defer(false); }   // salva quello che si stava regolando
+}
 
 static const char *title(void *arg) { return ((menu_t *)arg)->title; }
 

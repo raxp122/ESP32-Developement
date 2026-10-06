@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "esp_heap_caps.h"
+#include "esp_log.h"
 
 /* ---------------- indice ---------------- */
 
@@ -17,7 +18,7 @@ typedef struct {
     char where[40];      // es. "Impostazioni › Schermo"
 } entry_t;
 
-#define MAX_ENTRIES 120
+#define MAX_ENTRIES 256   // ~150 voci oggi: con 120 metà delle app non si trovavano
 static entry_t *entries;
 static int n_entries;
 
@@ -26,6 +27,7 @@ static void index_menu(menu_t *m, const char *where, int depth)
     for (int i = 0; i < m->count && n_entries < MAX_ENTRIES; i++) {
         const menu_item_t *it = &m->items[i];
         if (m == &home_menu && it->app == &app_search) continue;
+        if (n_entries == MAX_ENTRIES - 1) ESP_LOGW("search", "indice pieno: aumenta MAX_ENTRIES");
         entry_t *e = &entries[n_entries++];
         e->item = it;
         e->menu = m;
@@ -158,32 +160,40 @@ static int hit(int x, int y)
 
 static lv_timer_t *touch_timer;
 
+// Stesso schema di keyboard.c: il controller del touch perde il dito per qualche lettura,
+// quindi il dito conta come sollevato solo dopo RELEASE_MS senza letture (altrimenti un
+// tocco scriveva due lettere) e un tocco più corto di PRESS_MIN_MS è un rimbalzo.
+#define RELEASE_MS   70
+#define PRESS_MIN_MS 25
+static bool t_isdown, t_moved;
+static int t_sx, t_sy;
+static uint32_t t_down, t_seen;
+
 static void touch_cb(lv_timer_t *t)
 {
-    static bool down, moved;
-    static int sx, sy, rel;
     int x, y;
+    uint32_t now = lv_tick_get();
     if (input_touch(&x, &y)) {
-        rel = 0;
-        if (!down) {
-            down = true; moved = false; sx = x; sy = y;
+        t_seen = now;
+        if (!t_isdown) {
+            t_isdown = true; t_moved = false; t_sx = x; t_sy = y; t_down = now;
             key_down = hit(x, y);
             if (key_down >= 0) style_key(key_down, true);
             return;
         }
-        if (abs(x - sx) > 26 || abs(y - sy) > 26) {
-            moved = true;    // è uno swipe: annulla il tasto
+        if (abs(x - t_sx) > 26 || abs(y - t_sy) > 26) {
+            t_moved = true;    // è uno swipe: annulla il tasto
             if (key_down >= 0) { style_key(key_down, false); key_down = -1; }
         }
         return;
     }
-    if (!down || ++rel < 2) return;
-    down = false;
+    if (!t_isdown || now - t_seen < RELEASE_MS) return;
+    t_isdown = false;
     if (key_down >= 0) {
         int k = key_down;
         style_key(k, false);
         key_down = -1;
-        if (!moved) press(k);   // può chiudere la schermata: niente dopo
+        if (!t_moved && t_seen - t_down >= PRESS_MIN_MS) press(k);   // può chiudere la schermata: niente dopo
     }
 }
 
@@ -253,6 +263,7 @@ static void enter(lv_obj_t *root, void *arg)
     do_search();
     render();
     key_down = -1;
+    t_isdown = false;
     touch_timer = lv_timer_create(touch_cb, 15, NULL);
 }
 

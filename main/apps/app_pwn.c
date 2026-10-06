@@ -109,7 +109,7 @@ static void face_enter(lv_obj_t *root, void *arg)
 static void face_leave(void)
 {
     if (tmr) { lv_timer_delete(tmr); tmr = NULL; }
-    // il motore continua a girare: si ferma dal menu o uscendo dall'app radar
+    // il motore continua a girare tornando al menu del Radar: si ferma uscendo dall'app
 }
 
 static bool face_nav(nav_t ev)
@@ -180,7 +180,12 @@ static void got_name(const char *t, void *arg)
 {
     keyboard_close();
     ui_pop();
-    if (t && t[0]) { strlcpy(g_set.pwn_name, t, sizeof(g_set.pwn_name)); settings_save(); ui_toast("Nome salvato"); }
+    if (t && t[0]) {
+        strlcpy(g_set.pwn_name, t, sizeof(g_set.pwn_name));
+        settings_save();
+        pwn_set_name(g_set.pwn_name);   // si vede subito, anche col radar acceso
+        ui_toast("Nome salvato");
+    }
 }
 static void name_enter(lv_obj_t *root, void *arg)
 {
@@ -209,7 +214,7 @@ static const menu_item_t set_items[] = {
     {.icon = LV_SYMBOL_SD_CARD, .label = "Stato microSD", .value = v_sd},
     {.icon = LV_SYMBOL_WARNING, .label = "Azzera Pokédex e livelli", .on_select = a_reset, .confirm = true},
 };
-static menu_t set_menu = {"Radar › Impostazioni", set_items, sizeof(set_items) / sizeof(set_items[0]), 0};
+static menu_t set_menu = {"Radar › Impostazioni", set_items, sizeof(set_items) / sizeof(set_items[0]), 0, NULL};
 
 /* ================= menu principale del radar ================= */
 
@@ -232,4 +237,11 @@ static const menu_item_t radar_items[] = {
     {.icon = LV_SYMBOL_SETTINGS, .label = "Impostazioni", .app = &app_menu, .arg = &set_menu},
     {.icon = ICON_INFO, .label = "Cos'è", .hint = "Ascolto passivo: reti, dispositivi, handshake captati senza trasmettere nulla"},
 };
-menu_t radar_menu = {"Radar", radar_items, sizeof(radar_items) / sizeof(radar_items[0]), 0};
+// uscendo dall'app Radar (non entrando in una sua voce) il motore si ferma: il Wi-Fi
+// torna normale e la radio non resta ad ascoltare in sottofondo
+static void radar_close(void)
+{
+    if (pwn_running()) { pwn_stop(); ui_toast("Radar fermo · Wi-Fi ripristinato"); }
+}
+
+menu_t radar_menu = {"Radar", radar_items, sizeof(radar_items) / sizeof(radar_items[0]), 0, radar_close};

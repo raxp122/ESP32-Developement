@@ -51,13 +51,30 @@ static volatile bool portal_saved;
 static volatile int portal_clients;
 static char ap_ssid[24];
 static int portal_kind;   // 0 = configura Wi-Fi, 1 = pagina Appunti
+static char pend_ssid[33], pend_pass[65];   // credenziali dal portale, da applicare
+static bool pend_creds;
 
-static bool want_sta(void) { return g_set.wifi_on && g_set.wifi_ssid[0]; }
+// mentre il Radar ascolta (modalità promiscua) la connessione resta sospesa
+static bool want_sta(void) { return g_set.wifi_on && g_set.wifi_ssid[0] && !sniff_on; }
+
+// disconnessione chiesta da noi subito prima di ricollegarci: il suo evento (che arriva
+// dopo) non deve essere preso per una caduta della rete, né azzerare il tentativo nuovo
+static volatile bool self_disc;
+static void own_disconnect(void)
+{
+    self_disc = state == WIFI_CONNECTED || attempt;
+    esp_wifi_disconnect();
+}
 
 static void sta_connect(void)
 {
+    esp_timer_stop(reconnect_timer);   // un ritentativo già in coda non deve partire due volte
     attempt = true;
-    if (esp_wifi_connect() != ESP_OK) attempt = false;
+    if (esp_wifi_connect() != ESP_OK) {
+        attempt = false;
+        // non restare "in connessione" per sempre: riprova più tardi
+        esp_timer_start_once(reconnect_timer, (uint64_t)retry_ms * 1000);
+    }
 }
 
 /* ---------------- NTP ---------------- */
@@ -128,6 +145,8 @@ static void on_event(void *arg, esp_event_base_t base, int32_t id, void *data)
             break;
         case WIFI_EVENT_STA_DISCONNECTED: {
             wifi_event_sta_disconnected_t *d = data;
+            if (self_disc && d && d->reason == WIFI_REASON_ASSOC_LEAVE) { self_disc = false; break; }
+            self_disc = false;
             attempt = false;
             conn_reason = d ? d->reason : 0;
             ip_str[0] = 0;
@@ -205,9 +224,10 @@ bool wifi_mgr_sniff_start(wifi_sniff_cb_t cb)
     if (sniff_on) return true;
     // ferma tutto il resto: niente connessione, niente scansione, niente portale
     if (scanning) { esp_wifi_scan_stop(); scanning = false; }
-    if (started && (state == WIFI_CONNECTED || state == WIFI_CONNECTING)) esp_wifi_disconnect();
     sniff_cb = cb;
-    sniff_on = true;
+    sniff_on = true;   // prima della disconnessione: l'evento non deve far ripartire la connessione
+    esp_timer_stop(reconnect_timer);
+    if (started && (state == WIFI_CONNECTED || state == WIFI_CONNECTING)) esp_wifi_disconnect();
     if (cur_mode != WIFI_MODE_STA) { esp_wifi_set_mode(WIFI_MODE_STA); cur_mode = WIFI_MODE_STA; }
     if (!started) { esp_wifi_start(); started = true; }
     state = WIFI_OFF;
@@ -301,7 +321,7 @@ void wifi_mgr_apply(void)
 {
     if (started && want_sta()) {
         // credenziali cambiate o riaccensione: riparti da zero
-        esp_wifi_disconnect();
+        own_disconnect();
         state = WIFI_NO_NETWORK;
         retry_ms = 1000;
         conn_fail = false;
@@ -381,7 +401,7 @@ bool wifi_mgr_connect(const char *ssid, const char *pass)
     settings_save();
     // la radio deve smettere di scansionare prima di potersi collegare
     if (scanning) { esp_wifi_scan_stop(); scanning = false; }
-    if (started) esp_wifi_disconnect();
+    if (started) own_disconnect();
     retry_ms = 1000;
     conn_fail = false;
     conn_try = 0;
@@ -443,19 +463,27 @@ static void dns_task(void *arg)
     vTaskDelete(NULL);
 }
 
+// in un buffer e poi un solo pezzo: un pezzo HTTP per carattere era lentissimo
 static void html_escape(httpd_req_t *r, const char *s)
 {
-    char out[8];
+    char out[200];
+    int o = 0;
     for (; *s; s++) {
+        const char *e = NULL;
         switch (*s) {
-        case '<': httpd_resp_sendstr_chunk(r, "&lt;"); break;
-        case '>': httpd_resp_sendstr_chunk(r, "&gt;"); break;
-        case '&': httpd_resp_sendstr_chunk(r, "&amp;"); break;
-        case '"': httpd_resp_sendstr_chunk(r, "&quot;"); break;
-        case '\'': httpd_resp_sendstr_chunk(r, "&#39;"); break;
-        default: out[0] = *s; out[1] = 0; httpd_resp_sendstr_chunk(r, out);
+        case '<': e = "&lt;"; break;
+        case '>': e = "&gt;"; break;
+        case '&': e = "&amp;"; break;
+        case '"': e = "&quot;"; break;
+        case '\'': e = "&#39;"; break;
         }
+        int l = e ? (int)strlen(e) : 1;
+        if (o + l >= (int)sizeof(out)) { out[o] = 0; httpd_resp_sendstr_chunk(r, out); o = 0; }
+        if (e) { memcpy(out + o, e, l); o += l; }
+        else out[o++] = *s;
     }
+    out[o] = 0;
+    if (o) httpd_resp_sendstr_chunk(r, out);
 }
 
 static const char PAGE_HEAD[] =
@@ -565,8 +593,16 @@ static void url_decode(char *s)
 
 static esp_err_t save_post(httpd_req_t *r)
 {
-    char body[256] = {0};
-    int len = r->content_len < (int)sizeof(body) - 1 ? r->content_len : (int)sizeof(body) - 1;
+    // la pagina Appunti non configura il Wi-Fi: chi è sull'hotspot aperto non deve poterlo fare
+    if (portal_kind != 0) return httpd_resp_send_404(r);
+    char body[512] = {0};
+    if (r->content_len >= (int)sizeof(body)) {
+        httpd_resp_set_type(r, "text/html; charset=utf-8");
+        httpd_resp_sendstr_chunk(r, PAGE_HEAD);
+        httpd_resp_sendstr_chunk(r, "<h1>Dati troppo lunghi</h1><p><a href=/ style=color:#ffb020>Riprova</a></p>");
+        return httpd_resp_sendstr_chunk(r, NULL);
+    }
+    int len = r->content_len;
     int got = 0;
     while (got < len) {
         int k = httpd_req_recv(r, body + got, len - got);
@@ -584,17 +620,27 @@ static esp_err_t save_post(httpd_req_t *r)
         httpd_resp_sendstr_chunk(r, "<h1>Dati non validi</h1><p><a href=/ style=color:#ffb020>Riprova</a></p>");
         return httpd_resp_sendstr_chunk(r, NULL);
     }
-    strlcpy(g_set.wifi_ssid, ssid, sizeof(g_set.wifi_ssid));
-    strlcpy(g_set.wifi_pass, pass, sizeof(g_set.wifi_pass));
-    g_set.wifi_on = true;
-    settings_save();
+    // le applica il task dell'interfaccia (wifi_mgr_portal_poll): da qui, nel task del
+    // server web, si correrebbe con l'interfaccia su g_set e sul Wi-Fi
+    strlcpy(pend_ssid, ssid, sizeof(pend_ssid));
+    strlcpy(pend_pass, pass, sizeof(pend_pass));
+    __atomic_store_n(&pend_creds, true, __ATOMIC_RELEASE);
     httpd_resp_sendstr_chunk(r, "<h1>Salvato</h1><p>Il gadget si sta collegando a <b>");
     html_escape(r, ssid);
     httpd_resp_sendstr_chunk(r, "</b>. Controlla lo schermo: puoi chiudere questa pagina.</p></html>");
     httpd_resp_sendstr_chunk(r, NULL);
+    return ESP_OK;
+}
+
+void wifi_mgr_portal_poll(void)
+{
+    if (!__atomic_exchange_n(&pend_creds, false, __ATOMIC_ACQ_REL)) return;
+    strlcpy(g_set.wifi_ssid, pend_ssid, sizeof(g_set.wifi_ssid));
+    strlcpy(g_set.wifi_pass, pend_pass, sizeof(g_set.wifi_pass));
+    g_set.wifi_on = true;
+    settings_save();
     portal_saved = true;
     wifi_mgr_apply();
-    return ESP_OK;
 }
 
 void wifi_mgr_portal_start(void)      { portal_kind = 0; wifi_mgr_portal_open(); }

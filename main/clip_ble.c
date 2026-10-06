@@ -49,6 +49,9 @@ static int access(uint16_t conn, uint16_t attr, struct ble_gatt_access_ctxt *ctx
         return os_mbuf_append(ctxt->om, &c, sizeof(c)) ? BLE_ATT_ERR_INSUFFICIENT_RES : 0;
     }
     if (ctxt->op != BLE_GATT_ACCESS_OP_WRITE_CHR) return BLE_ATT_ERR_UNLIKELY;
+    // solo chi si è collegato dalla finestra "Ricevi dal PC" (o è associato) può scrivere:
+    // altrimenti chiunque nei paraggi potrebbe riempire la lista di testi da digitare
+    if (!ble_mgr_conn_trusted(conn)) return BLE_ATT_ERR_WRITE_NOT_PERMITTED;
 
     // un nuovo mittente azzera quello che era rimasto a metà
     if (conn != asm_conn) { asm_conn = conn; asm_len = 0; }

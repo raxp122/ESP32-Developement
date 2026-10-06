@@ -246,6 +246,10 @@ static void task(void *arg)
         pcap_flush_queue();
         if (now - last_save > 60000000) { pwn_save(); last_save = now; if (pcap) fflush(pcap); }
     }
+    // la chiusura la fa il task stesso: così nessuno chiude il file mentre ci sta scrivendo
+    // (un salvataggio su microSD può durare ben più di quanto pwn_stop aspetti)
+    pcap_close();
+    pwn_save();
     task_h = NULL;
     vTaskDelete(NULL);
 }
@@ -344,7 +348,7 @@ void pwn_reset_pokedex(void)
 
 void pwn_start(void)
 {
-    if (running) return;
+    if (running || task_h) return;   // il task precedente sta ancora chiudendo
     pwn_ensure();
     load();
     snprintf(last_event, sizeof(last_event), "in ascolto…");
@@ -362,10 +366,9 @@ void pwn_stop(void)
 {
     if (!running) return;
     running = false;
-    for (int i = 0; i < 40 && task_h; i++) vTaskDelay(pdMS_TO_TICKS(10));
+    // il task esce entro un giro (≤ 280 ms) più l'eventuale salvataggio finale
+    for (int i = 0; i < 300 && task_h; i++) vTaskDelay(pdMS_TO_TICKS(10));
     wifi_mgr_sniff_stop();
-    pcap_close();
-    pwn_save();
 }
 
 bool pwn_running(void) { return running; }
@@ -375,6 +378,15 @@ void pwn_get_stats(pwn_stats_t *out)
     pwn_ensure();
     xSemaphoreTake(mtx, portMAX_DELAY);
     *out = stats;
+    xSemaphoreGive(mtx);
+}
+
+void pwn_set_name(const char *name)
+{
+    // il nome si legge solo all'avvio del motore: se gira già, va aggiornato qui
+    pwn_ensure();
+    xSemaphoreTake(mtx, portMAX_DELAY);
+    strlcpy(stats.name, name && name[0] ? name : "Gadget", sizeof(stats.name));
     xSemaphoreGive(mtx);
 }
 

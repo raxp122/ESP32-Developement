@@ -14,6 +14,7 @@ void usbhid_end(void) {}
 bool usbhid_mounted(void) { return false; }
 int  usbhid_type(const char *t, int l, int layout) { (void)t; (void)l; (void)layout; return 0; }
 void usbhid_cancel(void) {}
+void usbhid_arm(void) {}
 
 #else   /* ================= TinyUSB presente ================= */
 
@@ -23,6 +24,7 @@ void usbhid_cancel(void) {}
 #include "esp_log.h"
 #include "tinyusb.h"
 #include "class/hid/hid_device.h"
+#include "usb_keymap.h"
 
 static const char *TAG = "usbhid";
 static bool installed;
@@ -66,6 +68,7 @@ static const char *str_desc[] = {
 bool usbhid_supported(void) { return true; }
 bool usbhid_mounted(void) { return installed && tud_mounted(); }
 void usbhid_cancel(void) { cancel = true; }
+void usbhid_arm(void) { cancel = false; }
 
 void usbhid_begin(void)
 {
@@ -89,116 +92,6 @@ void usbhid_end(void)
     tinyusb_driver_uninstall();
 #endif
     installed = false;
-}
-
-/* ---- mappa caratteri → tasti ----
- * (modificatore, usage) per i caratteri ASCII stampabili. Due layout completi (IT e US);
- * gli altri usano US come ripiego finché non sono completati. I codici di BitLocker
- * (cifre e trattino) coincidono in tutti questi layout, quindi si digitano sempre bene.
- */
-#define SH 0x02    // Shift sinistro
-#define AG 0x40    // AltGr (Right Alt)
-
-typedef struct { uint8_t mod, key; } keymap_t;
-
-// US QWERTY
-static keymap_t map_us(char c)
-{
-    if (c >= 'a' && c <= 'z') return (keymap_t){0, HID_KEY_A + (c - 'a')};
-    if (c >= 'A' && c <= 'Z') return (keymap_t){SH, HID_KEY_A + (c - 'A')};
-    if (c >= '1' && c <= '9') return (keymap_t){0, HID_KEY_1 + (c - '1')};
-    switch (c) {
-    case '0': return (keymap_t){0, HID_KEY_0};
-    case ' ': return (keymap_t){0, HID_KEY_SPACE};
-    case '\n': return (keymap_t){0, HID_KEY_ENTER};
-    case '\t': return (keymap_t){0, HID_KEY_TAB};
-    case '-': return (keymap_t){0, HID_KEY_MINUS};
-    case '=': return (keymap_t){0, HID_KEY_EQUAL};
-    case '[': return (keymap_t){0, HID_KEY_BRACKET_LEFT};
-    case ']': return (keymap_t){0, HID_KEY_BRACKET_RIGHT};
-    case '\\': return (keymap_t){0, HID_KEY_BACKSLASH};
-    case ';': return (keymap_t){0, HID_KEY_SEMICOLON};
-    case '\'': return (keymap_t){0, HID_KEY_APOSTROPHE};
-    case '`': return (keymap_t){0, HID_KEY_GRAVE};
-    case ',': return (keymap_t){0, HID_KEY_COMMA};
-    case '.': return (keymap_t){0, HID_KEY_PERIOD};
-    case '/': return (keymap_t){0, HID_KEY_SLASH};
-    case '!': return (keymap_t){SH, HID_KEY_1};
-    case '@': return (keymap_t){SH, HID_KEY_2};
-    case '#': return (keymap_t){SH, HID_KEY_3};
-    case '$': return (keymap_t){SH, HID_KEY_4};
-    case '%': return (keymap_t){SH, HID_KEY_5};
-    case '^': return (keymap_t){SH, HID_KEY_6};
-    case '&': return (keymap_t){SH, HID_KEY_7};
-    case '*': return (keymap_t){SH, HID_KEY_8};
-    case '(': return (keymap_t){SH, HID_KEY_9};
-    case ')': return (keymap_t){SH, HID_KEY_0};
-    case '_': return (keymap_t){SH, HID_KEY_MINUS};
-    case '+': return (keymap_t){SH, HID_KEY_EQUAL};
-    case '{': return (keymap_t){SH, HID_KEY_BRACKET_LEFT};
-    case '}': return (keymap_t){SH, HID_KEY_BRACKET_RIGHT};
-    case '|': return (keymap_t){SH, HID_KEY_BACKSLASH};
-    case ':': return (keymap_t){SH, HID_KEY_SEMICOLON};
-    case '"': return (keymap_t){SH, HID_KEY_APOSTROPHE};
-    case '~': return (keymap_t){SH, HID_KEY_GRAVE};
-    case '<': return (keymap_t){SH, HID_KEY_COMMA};
-    case '>': return (keymap_t){SH, HID_KEY_PERIOD};
-    case '?': return (keymap_t){SH, HID_KEY_SLASH};
-    }
-    return (keymap_t){0, 0};
-}
-
-// Italiano (QWERTY IT). Lettere e cifre come US; cambiano i simboli.
-static keymap_t map_it(char c)
-{
-    if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') ||
-        c == ' ' || c == '\n' || c == '\t' || c == '-' || c == ',' || c == '.')
-        return map_us(c);
-    switch (c) {
-    case '\'': return (keymap_t){0, HID_KEY_MINUS};        // tasto a destra dello 0
-    case '?': return (keymap_t){SH, HID_KEY_MINUS};
-    case 'ì': return (keymap_t){0, HID_KEY_EQUAL};
-    case '^': return (keymap_t){SH, HID_KEY_EQUAL};
-    case 'è': return (keymap_t){0, HID_KEY_BRACKET_LEFT};
-    case 'é': return (keymap_t){SH, HID_KEY_BRACKET_LEFT};
-    case '+': return (keymap_t){0, HID_KEY_BRACKET_RIGHT};
-    case '*': return (keymap_t){SH, HID_KEY_BRACKET_RIGHT};
-    case 'ò': return (keymap_t){0, HID_KEY_SEMICOLON};
-    case 'ç': return (keymap_t){SH, HID_KEY_SEMICOLON};
-    case 'à': return (keymap_t){0, HID_KEY_APOSTROPHE};
-    case '°': return (keymap_t){SH, HID_KEY_APOSTROPHE};
-    case '\\': return (keymap_t){0, HID_KEY_GRAVE};
-    case '|': return (keymap_t){SH, HID_KEY_GRAVE};
-    case 'ù': return (keymap_t){0, HID_KEY_BACKSLASH};
-    case '§': return (keymap_t){SH, HID_KEY_BACKSLASH};
-    case ';': return (keymap_t){SH, HID_KEY_COMMA};
-    case ':': return (keymap_t){SH, HID_KEY_PERIOD};
-    case '<': return (keymap_t){0, HID_KEY_EUROPE_2};
-    case '>': return (keymap_t){SH, HID_KEY_EUROPE_2};
-    case '/': return (keymap_t){SH, HID_KEY_7};
-    case '(': return (keymap_t){SH, HID_KEY_8};
-    case ')': return (keymap_t){SH, HID_KEY_9};
-    case '=': return (keymap_t){SH, HID_KEY_0};
-    case '!': return (keymap_t){SH, HID_KEY_1};
-    case '"': return (keymap_t){SH, HID_KEY_2};
-    case '£': return (keymap_t){SH, HID_KEY_3};
-    case '$': return (keymap_t){SH, HID_KEY_4};
-    case '%': return (keymap_t){SH, HID_KEY_5};
-    case '&': return (keymap_t){SH, HID_KEY_6};
-    // AltGr
-    case '@': return (keymap_t){AG, HID_KEY_SEMICOLON};
-    case '#': return (keymap_t){AG, HID_KEY_APOSTROPHE};
-    case '[': return (keymap_t){AG, HID_KEY_BRACKET_LEFT};
-    case ']': return (keymap_t){AG, HID_KEY_BRACKET_RIGHT};
-    case '{': return (keymap_t){AG | SH, HID_KEY_BRACKET_LEFT};
-    case '}': return (keymap_t){AG | SH, HID_KEY_BRACKET_RIGHT};
-    }
-    return (keymap_t){0, 0};
-}
-
-static keymap_t map_char(char c, int layout)
-{
-    return layout == KB_LAYOUT_IT ? map_it(c) : map_us(c);
 }
 
 static bool wait_ready(void)
@@ -225,21 +118,25 @@ static bool send(uint8_t mod, uint8_t key)
 int usbhid_type(const char *text, int len, int layout)
 {
     if (!installed) return 0;
-    cancel = false;
     if (len < 0) len = strlen(text);
     int done = 0;
-    uint8_t prev_key = 0;
-    for (int i = 0; i < len && !cancel; i++) {
-        keymap_t k = map_char(text[i], layout);
-        // UTF-8: salta i caratteri non gestiti dalla mappa (non rompe i codici ASCII)
-        if (!k.key) {
-            if ((unsigned char)text[i] >= 0x80) { while (i + 1 < len && ((unsigned char)text[i + 1] & 0xC0) == 0x80) i++; }
-            continue;
+    for (int i = 0; i < len && !cancel; ) {
+        // decodifica UTF-8 → codice del carattere (le lettere accentate sono 2 byte)
+        uint32_t c = (unsigned char)text[i];
+        int l = c >= 0xF0 ? 4 : c >= 0xE0 ? 3 : c >= 0xC0 ? 2 : 1;
+        if (i + l > len) break;
+        if (l > 1) {
+            c &= 0xFF >> (l + 1);
+            for (int k = 1; k < l; k++) c = (c << 6) | ((unsigned char)text[i + k] & 0x3F);
         }
-        // due volte lo stesso tasto di fila: serve un report vuoto in mezzo (già c'è)
-        (void)prev_key;
+        i += l;
+        kb_stroke_t k;
+        if (!kb_map(c, layout, &k)) continue;   // carattere che il layout non sa scrivere: saltato
+        // eventuale accento (tasto morto) prima, eventuale spazio dopo; tra due pressioni
+        // dello stesso tasto send() manda sempre un report vuoto che le separa
+        if (k.pkey && !send(k.pmod, k.pkey)) break;
         if (!send(k.mod, k.key)) break;
-        prev_key = k.key;
+        if (k.space && !send(0, K_SPACE)) break;
         done++;
     }
     tud_hid_keyboard_report(0, 0, NULL);

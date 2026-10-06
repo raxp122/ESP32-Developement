@@ -164,7 +164,12 @@ static float yin(const float *x, yin_work_t *w)
     for (int tau = lo; tau <= hi; tau++) if (r[tau - lo + 1] < r[bt - lo + 1]) bt = tau;
     float s0 = r[bt - lo], s1 = r[bt - lo + 1], s2 = r[bt - lo + 2], t = bt;
     float den = s0 + s2 - 2 * s1;
-    if (fabsf(den) > 1e-12f) t += 0.5f * (s0 - s2) / den;
+    // la parabola ha senso solo su un minimo vero (bt al bordo della finestra può non
+    // esserlo): altrimenti lo scostamento esplode e la frequenza diventa assurda
+    if (s1 <= s0 && s1 <= s2 && den > 1e-12f) {
+        float off = 0.5f * (s0 - s2) / den;
+        t += off > 1 ? 1 : off < -1 ? -1 : off;
+    }
     return FS / t;
 }
 
@@ -578,7 +583,7 @@ static const menu_item_t tuner_items[] = {
     {.icon = LV_SYMBOL_LIST, .label = "LA storici", .hint = "440, 442, 432, 415 barocco…", .app = &app_menu, .arg = &pitch_menu},
     {.icon = LV_SYMBOL_REFRESH, .label = "Riporta il LA a 440 Hz", .on_select = a_a4_reset},
 };
-menu_t tuner_menu = {"Accordatore", tuner_items, sizeof(tuner_items) / sizeof(tuner_items[0]), 0};
+menu_t tuner_menu = {"Accordatore", tuner_items, sizeof(tuner_items) / sizeof(tuner_items[0]), 0, NULL};
 
 void tuner_menu_init(void)
 {

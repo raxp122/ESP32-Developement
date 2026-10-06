@@ -34,6 +34,7 @@ void pwn_stop(void);
 bool pwn_running(void);
 
 void pwn_get_stats(pwn_stats_t *out);
+void pwn_set_name(const char *name);   // nome mostrato (anche a motore acceso)
 int  pwn_net_count(void);                     // reti note (nel Pokédex)
 bool pwn_net_get(int i, pwn_net_t *out);      // per indice, ordinate per ultima visita
 int  pwn_recent_channel(void);                // canale corrente dell'hopping

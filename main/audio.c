@@ -25,6 +25,7 @@ static es8311_handle_t codec;
 static volatile audio_synth_t synth;
 static TaskHandle_t task_h;
 static bool ok;
+static volatile bool in_synth;   // il task audio sta eseguendo il sintetizzatore
 
 static void audio_task(void *arg)
 {
@@ -32,7 +33,9 @@ static void audio_task(void *arg)
     for (;;) {
         audio_synth_t s = synth;
         if (!s) { ulTaskNotifyTake(pdTRUE, portMAX_DELAY); continue; }
+        in_synth = true;
         s(mono, BLOCK);
+        in_synth = false;
         for (int i = 0; i < BLOCK; i++) stereo[2 * i] = stereo[2 * i + 1] = mono[i];
         size_t w;
         i2s_channel_write(tx, stereo, sizeof(stereo), &w, portMAX_DELAY);
@@ -54,13 +57,12 @@ bool audio_init(void)
     };
     // MCLK = 512 × fs = 12,288 MHz: è la combinazione supportata sia da ES8311 sia da ES7210 a 24 kHz
     sc.clk_cfg.mclk_multiple = I2S_MCLK_MULTIPLE_512;
-    if (i2s_channel_init_std_mode(tx, &sc) != ESP_OK) return false;
-    if (i2s_channel_init_std_mode(rx, &sc) != ESP_OK) return false;
+    i2c_master_dev_handle_t dev = NULL;
+    if (i2s_channel_init_std_mode(tx, &sc) != ESP_OK || i2s_channel_init_std_mode(rx, &sc) != ESP_OK) goto fail;
     i2s_channel_enable(tx); // l'MCLK deve girare prima di configurare il codec
 
     i2c_device_config_t dc = {.dev_addr_length = I2C_ADDR_BIT_LEN_7, .device_address = ES8311_ADDRESS_0, .scl_speed_hz = 300000};
-    i2c_master_dev_handle_t dev;
-    if (i2c_master_bus_add_device(board_i2c0(), &dc, &dev) != ESP_OK) return false;
+    if (i2c_master_bus_add_device(board_i2c0(), &dc, &dev) != ESP_OK) { dev = NULL; goto fail; }
     codec = es8311_create(dev);
     es8311_clock_config_t clk = {
         .mclk_from_mclk_pin = true,
@@ -69,7 +71,7 @@ bool audio_init(void)
     };
     if (es8311_init(codec, &clk, ES8311_RESOLUTION_16, ES8311_RESOLUTION_16) != ESP_OK) {
         ESP_LOGE(TAG, "ES8311 non risponde");
-        return false;
+        goto fail;
     }
     audio_set_volume(g_set.volume);
 
@@ -98,6 +100,16 @@ bool audio_init(void)
     xTaskCreatePinnedToCore(audio_task, "audio", 4096, NULL, 6, &task_h, 0);
     ok = true;
     return true;
+
+fail:
+    // libera tutto: altrimenti l'I2S resta occupato e ogni tentativo successivo fallisce
+    if (codec) { es8311_delete(codec); codec = NULL; }
+    if (dev) i2c_master_bus_rm_device(dev);
+    i2s_channel_disable(tx);   // se non era abilitato restituisce solo un errore
+    i2s_del_channel(tx);
+    i2s_del_channel(rx);
+    tx = rx = NULL;
+    return false;
 }
 
 void audio_set_volume(int pct)
@@ -112,7 +124,22 @@ void audio_start(audio_synth_t s)
     xTaskNotifyGive(task_h);
 }
 
-void audio_stop(void) { synth = NULL; }
+// Dopo il ritorno il sintetizzatore non è più in esecuzione (chi lo ferma può liberarne
+// lo stato). Dal task audio stesso (un synth che si ferma da solo) non si aspetta.
+void audio_stop(void)
+{
+    synth = NULL;
+    if (!task_h || xTaskGetCurrentTaskHandle() == task_h) return;
+    for (int i = 0; in_synth && i < 20; i++) vTaskDelay(1);
+}
+
+// Ferma l'uscita solo se sta suonando ancora `s`: un sintetizzatore che finisce da solo
+// non deve spegnere quello appena avviato da un'altra app.
+void audio_stop_if(audio_synth_t s)
+{
+    audio_synth_t cur = s;
+    __atomic_compare_exchange_n(&synth, &cur, NULL, false, __ATOMIC_ACQ_REL, __ATOMIC_ACQUIRE);
+}
 
 audio_synth_t audio_current(void) { return synth; }
 bool audio_mic_active(void) { return rx_on; }

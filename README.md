@@ -82,10 +82,10 @@ Serve per ridigitare codici e stringhe su un PC facendo da tastiera USB. Dal lau
 
 1. **Ricevi dal PC** (Bluetooth): il Gadget si fa trovare per qualche minuto. Dal PC apri la pagina Appunti in Chrome o Edge, premi *Collega il Gadget*, scegli il nome `Gadget-xxxx`. Poi ogni testo che incolli nella pagina arriva nella lista del Gadget.
 2. **Scarica la pagina** (Wi-Fi): se sul PC non hai ancora la pagina, qui il Gadget apre un hotspot Wi-Fi con una pagina da salvare (premi *Scarica*). Chiudendo questa schermata l'hotspot si spegne e il Wi-Fi torna com'era. La pagina salvata funziona poi da sola (apri il file, usa il Bluetooth).
-3. **Codici salvati**: la lista. Swipe a destra su una voce apre il dettaglio; con la USB-C collegata a un PC, un secondo swipe la digita come se la scrivessi a tastiera. BOOT cancella la voce; *Cancella tutti* svuota la lista.
-4. **Layout tastiera**: come è impostata la tastiera del PC su cui digiti (Italiano di default, US, US internazionale, e altri). Per i codici BitLocker (cifre e trattini) non cambia nulla.
+3. **Codici salvati**: la lista. Swipe a destra su una voce apre il dettaglio; con la USB-C collegata a un PC, un secondo swipe la digita come se la scrivessi a tastiera. BOOT (due volte) cancella la voce; *Cancella tutti* svuota la lista.
+4. **Layout tastiera**: come è impostata la tastiera del PC su cui digiti: Italiano (predefinito), US, US internazionale, Regno Unito, Tedesco, Francese, Spagnolo. Scegli quello del PC, non quello della tastiera che vedi: il Gadget preme i tasti e il PC li traduce col suo layout. Le lettere accentate senza tasto proprio passano dal tasto morto (es. ´ poi a). Le cifre su Francese vogliono Shift: il Gadget lo fa da solo.
 
-I testi restano salvati finché non li cancelli tu. Attenzione: mentre la tastiera USB è attiva la console seriale su USB si sospende (sull'ESP32-S3 la porta fa una cosa per volta) e torna quando esci.
+Solo il PC collegato da *Ricevi dal PC* (o un dispositivo associato) può mandare testi: altri dispositivi nei paraggi vengono rifiutati. I testi restano salvati finché non li cancelli tu. Attenzione: mentre la tastiera USB è attiva la console seriale su USB si sospende (sull'ESP32-S3 la porta fa una cosa per volta) e torna quando esci.
 
 ## Backup e ripristino
 Impostazioni › Backup e ripristino:

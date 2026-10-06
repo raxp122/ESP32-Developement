@@ -271,7 +271,7 @@ static void imu_task(void *arg)
             swing = swing + (target - swing) * (target > swing ? 0.25f : 0.06f);
             spin_dps = wm;
 
-            int s = g_set.saber_clash;
+            int s = g_set.saber_clash % 3;   // indice di tabella: mai fuori misura
             bool on = synth_mode == S_ON;
             bool cooled = now - last_clash > 350000;
 
@@ -400,18 +400,22 @@ static void fx_cb(lv_timer_t *t)
     lv_obj_set_style_shadow_color(blade, flash ? lv_color_white() : c, 0);
     lv_obj_set_style_bg_color(blade, flash ? lv_color_white() : lv_color_mix(lv_color_white(), c, (lv_opa_t)(lvl * 70)), 0);
     lv_obj_set_style_height(core, stab ? 14 : 8 + (int)(lvl * 4), 0);
-    lv_obj_set_style_bg_color(root_obj, flash ? lv_color_hex(0x303030) : C_BG, 0);
+    // solo quando cambia: ogni 30 ms invalidava (e ridisegnava) l'intero schermo
+    ui_set_bg_color(root_obj, flash ? lv_color_hex(0x303030) : C_BG);
     if (now < spark_until) lv_obj_clear_flag(spark, LV_OBJ_FLAG_HIDDEN);
     else lv_obj_add_flag(spark, LV_OBJ_FLAG_HIDDEN);
 }
 
 /* ---------------- tocchi: breve = blaster, tenuto = lockup ---------------- */
 
+// stato del tocco: azzerato a ogni ingresso (uscendo con uno swipe il rilascio può
+// non essere visto, e il primo tocco della volta dopo sembrerebbe la sua continuazione)
+static bool down, moved, lock;
+static int sx, sy, rel;
+static uint32_t t0;
+
 static void touch_cb(lv_timer_t *t)
 {
-    static bool down, moved, lock;
-    static int sx, sy, rel;
-    static uint32_t t0;
     int x, y;
     bool p = input_touch(&x, &y);
     if (p) {
@@ -436,6 +440,8 @@ static void touch_cb(lv_timer_t *t)
 static void enter(lv_obj_t *root, void *arg)
 {
     root_obj = root;
+    down = moved = lock = false;
+    rel = 0;
     lv_obj_set_style_bg_color(root, C_BG, 0);
     lv_obj_set_style_bg_opa(root, LV_OPA_COVER, 0);
 
@@ -590,4 +596,4 @@ static const menu_item_t saber_items[] = {
     {.icon = ICON_BOLT, .label = "Sensibilità scontro", .value = v_clash, .on_adjust = j_clash},
     {.icon = ICON_INFO, .label = "Comandi", .value = v_help},
 };
-menu_t saber_menu = {"Spada laser", saber_items, sizeof(saber_items) / sizeof(saber_items[0]), 0};
+menu_t saber_menu = {"Spada laser", saber_items, sizeof(saber_items) / sizeof(saber_items[0]), 0, NULL};

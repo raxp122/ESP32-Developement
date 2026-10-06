@@ -18,7 +18,13 @@ static const char *onoff(bool v) { return v ? "Acceso" : "Spento"; }
 /* ---------------- Wi-Fi ---------------- */
 
 static void v_wifi_toggle(char *b, int n) { snprintf(b, n, "%s", onoff(g_set.wifi_on)); }
-static void a_wifi_toggle(void) { g_set.wifi_on = !g_set.wifi_on; settings_save(); wifi_mgr_apply(); }
+static void a_wifi_toggle(void)
+{
+    g_set.wifi_on = !g_set.wifi_on;
+    settings_save();
+    wifi_mgr_apply();
+    if (g_set.wifi_on) ota_auto_start();   // se all'avvio era spento, il controllo non era partito
+}
 
 static void v_wifi_net(char *b, int n)
 {
@@ -52,7 +58,7 @@ static const menu_item_t wifi_items[] = {
     {.icon = ICON_TOWER, .label = "Segnale", .value = v_wifi_rssi},
     {.icon = LV_SYMBOL_TRASH, .label = "Dimentica rete", .on_select = a_wifi_forget, .confirm = true},
 };
-static menu_t wifi_menu = {"Impostazioni › Wi-Fi", wifi_items, sizeof(wifi_items) / sizeof(wifi_items[0]), 0};
+static menu_t wifi_menu = {"Impostazioni › Wi-Fi", wifi_items, sizeof(wifi_items) / sizeof(wifi_items[0]), 0, NULL};
 
 /* ---------------- Bluetooth ---------------- */
 
@@ -90,7 +96,7 @@ static const menu_item_t ble_items[] = {
     {.icon = ICON_CHIP, .label = "Indirizzo", .value = v_ble_addr},
     {.icon = LV_SYMBOL_TRASH, .label = "Dimentica tutti i dispositivi", .on_select = a_ble_forget_all, .confirm = true},
 };
-static menu_t ble_menu = {"Impostazioni › Bluetooth", ble_items, sizeof(ble_items) / sizeof(ble_items[0]), 0};
+static menu_t ble_menu = {"Impostazioni › Bluetooth", ble_items, sizeof(ble_items) / sizeof(ble_items[0]), 0, NULL};
 
 /* ---------------- Schermo ---------------- */
 
@@ -152,7 +158,7 @@ static const menu_item_t screen_items[] = {
     {.icon = ICON_SLIDERS, .label = "Inverti scorrimento", .value = v_invert, .on_select = a_invert},
     {.icon = ICON_PALETTE, .label = "Colore", .value = v_accent, .on_adjust = j_accent},
 };
-static menu_t screen_menu = {"Impostazioni › Schermo", screen_items, sizeof(screen_items) / sizeof(screen_items[0]), 0};
+static menu_t screen_menu = {"Impostazioni › Schermo", screen_items, sizeof(screen_items) / sizeof(screen_items[0]), 0, NULL};
 
 /* ---------------- Data e ora ---------------- */
 
@@ -190,7 +196,7 @@ static const menu_item_t time_items[] = {
     {.icon = ICON_SYNC, .label = "Sincronizza ora", .value = v_tsrc, .on_select = a_sync},
     {.icon = LV_SYMBOL_GPS, .label = "Fuso orario", .value = v_tz},
 };
-static menu_t time_menu = {"Impostazioni › Data e ora", time_items, sizeof(time_items) / sizeof(time_items[0]), 0};
+static menu_t time_menu = {"Impostazioni › Data e ora", time_items, sizeof(time_items) / sizeof(time_items[0]), 0, NULL};
 
 /* ---------------- Sistema ---------------- */
 
@@ -246,7 +252,7 @@ static const menu_item_t sys_items[] = {
     {.icon = LV_SYMBOL_POWER, .label = "Spegni", .on_select = a_off, .confirm = true},
     {.icon = LV_SYMBOL_WARNING, .label = "Ripristina impostazioni", .on_select = a_reset, .confirm = true},
 };
-static menu_t sys_menu = {"Impostazioni › Sistema", sys_items, sizeof(sys_items) / sizeof(sys_items[0]), 0};
+static menu_t sys_menu = {"Impostazioni › Sistema", sys_items, sizeof(sys_items) / sizeof(sys_items[0]), 0, NULL};
 
 /* ---------------- Impostazioni ---------------- */
 
@@ -285,4 +291,4 @@ static const menu_item_t settings_items[] = {
     {.icon = ICON_CLOCK, .label = "Data e ora", .value = v_time, .app = &app_menu, .arg = &time_menu},
     {.icon = ICON_CHIP, .label = "Sistema", .value = v_fw, .app = &app_menu, .arg = &sys_menu},
 };
-menu_t settings_menu = {"Impostazioni", settings_items, sizeof(settings_items) / sizeof(settings_items[0]), 0};
+menu_t settings_menu = {"Impostazioni", settings_items, sizeof(settings_items) / sizeof(settings_items[0]), 0, NULL};

@@ -271,7 +271,10 @@ uint32_t pet_core_step(pet_t *p, uint32_t dt, const pet_clock_t *c)
     }
     if (needs & ~p->needs) {
         ev |= EV_CALL;
-        if (!(p->needs & ~NEED_TANTRUM)) p->t_needs = 0;
+        // il conto riparte se nessuna delle richieste di prima è ancora aperta: quando a
+        // nanna la fame è sostituita dalla luce (e viceversa al risveglio) l'errore non deve
+        // arrivare in anticipo, o subito
+        if (!(p->needs & needs & ~NEED_TANTRUM)) p->t_needs = 0;
     }
     p->needs = needs;
     p->mistake_done &= needs;

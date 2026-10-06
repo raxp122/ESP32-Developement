@@ -255,8 +255,15 @@ static uint32_t c_gen;
 static list_view_t c_lv;
 static char c_title[48], c_names[3][40];
 
+static const uint8_t *ent_addr(const entry_t *e) { return e->live ? e->c.addr : e->b.addr; }
+
 static void c_reload(void)
 {
+    // ricorda chi era selezionato: se la lista si riordina, la selezione (e una conferma
+    // già armata) deve restare su quel dispositivo, non passare a un altro
+    uint8_t keep[6];
+    bool had = c_sel < n_ents;
+    if (had) memcpy(keep, ent_addr(&ents[c_sel]), 6);
     ble_conn_t cs[BLE_MAX_CONN];
     ble_bond_t bs[8];
     int nc = ble_mgr_conns(cs, BLE_MAX_CONN), nb = ble_mgr_bonds(bs, 8);
@@ -267,6 +274,10 @@ static void c_reload(void)
         for (int k = 0; k < nc; k++) if (!memcmp(cs[k].addr, bs[i].addr, 6)) dup = true;
         if (!dup) ents[n_ents++] = (entry_t){.live = false, .b = bs[i]};
     }
+    bool found = false;
+    for (int i = 0; had && i < n_ents; i++)
+        if (!memcmp(ent_addr(&ents[i]), keep, 6)) { c_sel = i; found = true; break; }
+    if (had && !found) confirm_until = 0;   // il dispositivo selezionato non c'è più
     if (c_sel >= n_ents) c_sel = n_ents ? n_ents - 1 : 0;
 }
 

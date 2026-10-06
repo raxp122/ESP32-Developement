@@ -23,5 +23,6 @@ bool clips_get(int i, clip_t *out);             // i = 0 è il più recente
 int  clips_add(const char *text, int len);      // ritorna l'indice (0) o -1; dedup del più recente
 void clips_mark_used(uint32_t id);
 void clips_delete(int i);
+bool clips_delete_id(uint32_t id);              // per identificativo (la lista può essersi spostata)
 void clips_clear(void);
 uint32_t clips_gen(void);                       // cambia a ogni modifica (per aggiornare la UI)
