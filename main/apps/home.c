@@ -22,6 +22,7 @@ static menu_item_t items[] = {
     {.icon = ICON_SLIDERS,  .label = "Livella",           .app = &app_level},
     {.icon = LV_SYMBOL_COPY, .label = "Appunti",           .app = &app_menu, .arg = &clips_menu},
     {.icon = ICON_EYE,      .label = "8-Ball veggente",   .app = &app_8ball},
+    {.icon = ICON_GAMEPAD,  .label = "Snake",             .app = &app_snake},
     {.icon = ICON_GAMEPAD,  .label = "Q-20",              .app = &app_q20},
     {.icon = ICON_TUNER,    .label = "Theremin",          .app = &app_theremin},
     {.icon = LV_SYMBOL_SHUFFLE, .label = "Sismografo",     .app = &app_menu, .arg = &seismo_menu},
@@ -78,6 +79,7 @@ static const boot_app_t boot_apps[] = {
     {"Sismografo", &app_menu, &seismo_menu},   // al posto della Macchina della verità (stesso indice)
     {"Orologio scacchi", &app_menu, &chess_menu},
     {"Tester Wi-Fi", &app_wifitest, NULL},   // al posto della Mappa Wi-Fi (stesso indice)
+    {"Snake", &app_snake, NULL},
 };
 #define N_BOOT (int)(sizeof(boot_apps) / sizeof(boot_apps[0]))
 

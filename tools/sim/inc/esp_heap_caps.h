@@ -7,3 +7,4 @@
 #define heap_caps_calloc(a,b,c) calloc(a,b)
 #define heap_caps_get_free_size(c) 1000000
 #define heap_caps_get_largest_free_block(c) 1000000
+#define heap_caps_aligned_alloc(a,n,c) aligned_alloc(a,((n)+(a)-1)/(a)*(a))

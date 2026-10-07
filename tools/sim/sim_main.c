@@ -151,5 +151,25 @@ int main(int argc, char **argv)
         shot("20_tester_fuori");
         sim_ap_n = -1;
     }
+    // Snake: partenza, una partita giocata da un pilota automatico, pausa
+    ui_home(); run(300);
+    {
+        extern const app_t app_snake;
+        extern int snake_sim_dir(void);
+        srand(7);
+        ui_push(&app_snake, NULL); run(300);
+        shot("21_snake_via");
+        sim_nav(NAV_SELECT); run(50);
+        for (int s = 0; s < 900; s++) {
+            int d = snake_sim_dir();
+            static const nav_t NV[4] = {NAV_SELECT, NAV_PREV, NAV_BACK, NAV_NEXT};   // destra, giù, sinistra, su
+            sim_nav(NV[d]);
+            run(60);
+        }
+        shot("22_snake_gioco");
+        sim_nav(NAV_BTN); run(300);
+        shot("23_snake_pausa");
+        ui_pop(); run(300);
+    }
     return 0;
 }
