@@ -153,6 +153,11 @@ int main(int argc, char **argv)
         shot("18_mappa_rete");
         nav(NAV_SELECT);
         shot("19_mappa_reti");
+        ui_pop(); run(300);
+        sim_nav(NAV_HOLD); run(400);   // dito tenuto: condividi
+        shot("21_condividi");
+        nav(NAV_NEXT);
+        shot("22_condividi_2");
         ui_pop(); run(300); ui_pop(); run(300);
         shot("20_mappa_menu");
     }

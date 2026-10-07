@@ -54,3 +54,4 @@ float wm_rssi_dist(float rssi);                       // dBm → metri (stima)
 bool wm_save(const char *path);
 bool wm_load(const char *path);
 bool wm_export(const char *dir);                      // reti.csv e collegamenti.csv
+bool wm_export_html(const char *path, const char *when);   // pagina autonoma (wifimap_html.c)

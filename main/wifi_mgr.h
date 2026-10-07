@@ -45,6 +45,8 @@ const char *wifi_mgr_auth_name(int auth);
 // Portale: hotspot + pagina web per inserire la rete dal telefono
 void wifi_mgr_portal_start(void);         // pagina: configura il Wi-Fi
 void wifi_mgr_portal_start_clips(void);   // pagina: Appunti (manda testi via Bluetooth)
+// pagina: un file HTML (es. sulla microSD). "/" lo mostra, "/<download_name>" lo scarica
+void wifi_mgr_portal_start_file(const char *path, const char *download_name);
 void wifi_mgr_portal_open(void);          // interna: avvia l'hotspot con la pagina scelta
 void wifi_mgr_portal_stop(void);          // chiude l'hotspot e ripristina il Wi-Fi normale
 const char *wifi_mgr_portal_ssid(void);

@@ -74,6 +74,7 @@ bool wifi_mgr_portal_saved(void) { return false; }
 const char *wifi_mgr_portal_ssid(void) { return "Gadget-Setup"; }
 void wifi_mgr_portal_start(void) {}
 void wifi_mgr_portal_stop(void) {}
+void wifi_mgr_portal_start_file(const char *p, const char *n) {}
 int wifi_mgr_rssi(void) { return -55; }
 void wifi_mgr_scan_acquire(void) {}
 bool wifi_mgr_scan_busy(void) { return false; }

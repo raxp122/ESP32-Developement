@@ -12,6 +12,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
+#include <time.h>
 #include "esp_attr.h"
 
 #define MAP_DIR   SD_MOUNT "/wifimap"
@@ -26,6 +27,15 @@ static lv_color_t kind_color(int k)
     return k == WM_HOTSPOT ? lv_color_hex(0xFF4FD8) : k == WM_MOVING ? C_WARN : ui_accent();
 }
 static const char *kind_name(int k) { return k == WM_HOTSPOT ? "hotspot" : k == WM_MOVING ? "mobile" : "fissa"; }
+
+static lv_obj_t *mkl_c(lv_obj_t *p, const lv_font_t *f, lv_color_t c)
+{
+    lv_obj_t *l = lv_label_create(p);
+    lv_obj_set_style_text_font(l, f, 0);
+    lv_obj_set_style_text_color(l, c, 0);
+    lv_label_set_text(l, "");
+    return l;
+}
 
 static void load_once(void)
 {
@@ -103,6 +113,140 @@ static const app_t app_wifimap_list = {
     .name = "Reti della mappa", .icon = LV_SYMBOL_LIST,
     .enter = l_enter, .nav = l_nav, .title = l_title,
     .flags = APP_ROUND_OK,
+};
+
+/* ================= condividi sul telefono =================
+ * La mappa diventa una pagina HTML autonoma sulla microSD (wifimap/mappa.html, vedi
+ * wifimap_html.c); il Gadget apre un hotspot che la serve. Due QR: il primo collega il
+ * telefono all'hotspot (aperto), il secondo apre la pagina, se non si apre da sola. */
+
+#define HTML_FILE MAP_DIR "/mappa.html"
+
+static lv_obj_t *s_qr[2], *s_cap[2], *s_status, *s_text;
+static int s_step;            // tondo: quale QR si vede
+static bool s_ok;
+static char s_wifi_qr[64];
+
+static void s_show(void)
+{
+    if (!SCR_ROUND) return;
+    for (int i = 0; i < 2; i++) {
+        if (i == s_step) { lv_obj_clear_flag(s_qr[i], LV_OBJ_FLAG_HIDDEN); lv_obj_clear_flag(s_cap[i], LV_OBJ_FLAG_HIDDEN); }
+        else { lv_obj_add_flag(s_qr[i], LV_OBJ_FLAG_HIDDEN); lv_obj_add_flag(s_cap[i], LV_OBJ_FLAG_HIDDEN); }
+    }
+    ui_set_text(s_text, s_step == 0 ? "Inquadralo: il telefono si collega all'hotspot del Gadget"
+                                    : "Se la pagina non si apre da sola, inquadra questo");
+}
+
+static void s_tick(void)
+{
+    if (!s_ok) return;
+    char b[64];
+    int n = wifi_mgr_portal_clients();
+    if (n) snprintf(b, sizeof(b), LV_SYMBOL_OK " %d telefon%s collegat%s", n, n == 1 ? "o" : "i", n == 1 ? "o" : "i");
+    else if (SCR_ROUND) snprintf(b, sizeof(b), "Su/giù: l'altro QR");
+    else snprintf(b, sizeof(b), "Hotspot %s: in attesa…", wifi_mgr_portal_ssid());
+    ui_set_text(s_status, b);
+    ui_set_text_color(s_status, n ? C_OK : C_DIM);
+}
+
+static lv_obj_t *s_mkqr(lv_obj_t *root, int size, const char *data)
+{
+    lv_obj_t *q = lv_qrcode_create(root);
+    lv_qrcode_set_size(q, size);
+    lv_qrcode_set_dark_color(q, lv_color_hex(0x000000));
+    lv_qrcode_set_light_color(q, lv_color_hex(0xFFFFFF));
+    lv_qrcode_update(q, data, strlen(data));
+    // margine bianco attorno: senza, molte fotocamere non lo leggono su fondo nero
+    lv_obj_set_style_border_color(q, lv_color_hex(0xFFFFFF), 0);
+    lv_obj_set_style_border_width(q, 8, 0);
+    return q;
+}
+
+static void s_enter(lv_obj_t *root, void *arg)
+{
+    load_once();
+    bool r = SCR_ROUND;
+    s_ok = false;
+    s_step = 0;
+    s_text = mkl_c(root, &font_s, C_TEXT);
+    s_status = mkl_c(root, &font_s, C_DIM);
+    if (!sd_ok() || !wm_count()) {
+        ui_set_text(s_text, !sd_ok() ? "Serve la microSD: la pagina si salva lì" : "La mappa è vuota: aprila e cammina un po'");
+        lv_obj_set_width(s_text, r ? 340 : SCR_W - 40);
+        lv_label_set_long_mode(s_text, LV_LABEL_LONG_WRAP);
+        lv_obj_align(s_text, LV_ALIGN_CENTER, 0, 0);
+        return;
+    }
+    mkdir(MAP_DIR, 0775);
+    char when[48] = "";
+    time_t now = time(NULL);
+    struct tm t;
+    localtime_r(&now, &t);
+    if (t.tm_year >= 124) snprintf(when, sizeof(when), "%02d/%02d/%04d %02d:%02d", t.tm_mday, t.tm_mon + 1, t.tm_year + 1900, t.tm_hour, t.tm_min);
+    if (!wm_export_html(HTML_FILE, when)) {
+        ui_set_text(s_text, "Non riesco a scrivere sulla microSD");
+        lv_obj_align(s_text, LV_ALIGN_CENTER, 0, 0);
+        return;
+    }
+    wifi_mgr_portal_start_file(HTML_FILE, "mappa-wifi.html");
+    snprintf(s_wifi_qr, sizeof(s_wifi_qr), "WIFI:T:nopass;S:%s;;", wifi_mgr_portal_ssid());
+    s_ok = true;
+    if (r) {   // tondo: un QR alla volta, grande, al centro
+        for (int i = 0; i < 2; i++) {
+            s_cap[i] = mkl_c(root, &font_m, ui_accent());
+            lv_obj_set_width(s_cap[i], 340);
+            lv_obj_set_style_text_align(s_cap[i], LV_TEXT_ALIGN_CENTER, 0);
+            lv_obj_align(s_cap[i], LV_ALIGN_TOP_MID, 0, 0);
+            s_qr[i] = s_mkqr(root, 196, i ? "http://192.168.4.1/" : s_wifi_qr);
+            lv_obj_align(s_qr[i], LV_ALIGN_TOP_MID, 0, 36);
+        }
+        ui_set_text(s_cap[0], "1 · Collegati");
+        ui_set_text(s_cap[1], "2 · Apri la mappa");
+        lv_obj_set_width(s_text, 330);
+        lv_obj_set_style_text_align(s_text, LV_TEXT_ALIGN_CENTER, 0);
+        lv_label_set_long_mode(s_text, LV_LABEL_LONG_WRAP);
+        lv_obj_align(s_text, LV_ALIGN_TOP_MID, 0, 254);
+        lv_obj_set_width(s_status, 300);
+        lv_obj_set_style_text_align(s_status, LV_TEXT_ALIGN_CENTER, 0);
+        lv_obj_align(s_status, LV_ALIGN_TOP_MID, 0, 316);
+        s_show();
+    } else {   // 3.49: i due QR affiancati a sinistra, le istruzioni a destra
+        for (int i = 0; i < 2; i++) {
+            s_qr[i] = s_mkqr(root, 108, i ? "http://192.168.4.1/" : s_wifi_qr);
+            lv_obj_set_pos(s_qr[i], 14 + i * 140, 2);
+            s_cap[i] = mkl_c(root, &font_s, ui_accent());
+            lv_label_set_text(s_cap[i], i ? "2 · Apri la mappa" : "1 · Collegati");
+            lv_obj_set_width(s_cap[i], 132);
+            lv_obj_set_style_text_align(s_cap[i], LV_TEXT_ALIGN_CENTER, 0);
+            lv_obj_set_pos(s_cap[i], 2 + i * 140, 128);
+        }
+        lv_obj_set_width(s_text, SCR_W - 306);
+        lv_label_set_long_mode(s_text, LV_LABEL_LONG_WRAP);
+        lv_obj_set_pos(s_text, 296, 6);
+        lv_label_set_text(s_text, "Inquadra il primo QR con la fotocamera: il telefono si collega all'hotspot e "
+                                  "di solito la mappa si apre da sola; se no, il secondo QR. Sulla pagina: "
+                                  "Scarica immagine e Salva la pagina, da condividere.");
+        lv_obj_set_width(s_status, SCR_W - 306);
+        lv_obj_set_pos(s_status, 296, 124);
+    }
+    s_tick();
+}
+
+static void s_leave(void) { if (s_ok) wifi_mgr_portal_stop(); s_ok = false; }
+
+static bool s_nav(nav_t ev)
+{
+    if ((ev == NAV_NEXT || ev == NAV_PREV) && SCR_ROUND && s_ok) { s_step ^= 1; s_show(); return true; }
+    return false;
+}
+
+static const char *s_title(void *arg) { return "Mappa Wi-Fi » Condividi"; }
+
+static const app_t app_wifimap_share = {
+    .name = "Condividi la mappa", .icon = ICON_MOBILE,
+    .enter = s_enter, .leave = s_leave, .nav = s_nav, .tick = s_tick, .title = s_title,
+    .flags = APP_NO_SLEEP | APP_ROUND_OK,
 };
 
 /* ================= mappa ================= */
@@ -353,7 +497,7 @@ static void enter(lv_obj_t *root, void *arg)
         for (int i = 0; i < 4; i++) { lv_obj_set_width(ls[i], w); lv_obj_set_pos(ls[i], 12, ys[i]); }
         lv_label_set_long_mode(l_det, LV_LABEL_LONG_WRAP);
         lv_obj_set_pos(l_stat, 12, 86);   // sotto il dettaglio, che può andare su due righe
-        lv_label_set_text(l_hint, "Su/giù: rete · BOOT: pausa");
+        lv_label_set_text(l_hint, "Tieni premuto: condividi");
     }
     wifi_mgr_scan_acquire();
     seen_gen = wifi_mgr_scan_gen();
@@ -388,6 +532,7 @@ static bool nav(nav_t ev)
     case NAV_NEXT: select_step(+1); return true;
     case NAV_PREV: select_step(-1); return true;
     case NAV_SELECT: ui_push(&app_wifimap_list, NULL); return true;
+    case NAV_QUICK: ui_push(&app_wifimap_share, NULL); return true;   // dito tenuto o BOOT tenuto
     case NAV_BTN:
         paused = !paused;
         ui_toast(paused ? "Mappa in pausa" : "Mappa ripresa");
@@ -400,7 +545,7 @@ static bool nav(nav_t ev)
 const app_t app_wifimap = {
     .name = "Mappa Wi-Fi", .icon = LV_SYMBOL_WIFI,
     .enter = enter, .leave = leave, .nav = nav,
-    .flags = APP_NO_SLEEP | APP_ROUND_OK,
+    .flags = APP_NO_SLEEP | APP_OWN_QUICK | APP_ROUND_OK,
 };
 
 /* ================= menu ================= */
@@ -432,6 +577,7 @@ static void a_reset(void)
 static const menu_item_t items[] = {
     {.icon = LV_SYMBOL_PLAY, .label = "Apri la mappa", .value = v_count, .app = &app_wifimap},
     {.icon = LV_SYMBOL_LIST, .label = "Reti della mappa", .hint = "Fisse, mobili e hotspot", .app = &app_wifimap_list},
+    {.icon = ICON_MOBILE, .label = "Condividi sul telefono", .hint = "QR: pagina con la mappa, immagine e file", .app = &app_wifimap_share},
     {.icon = LV_SYMBOL_EYE_OPEN, .label = "Mostra le reti mobili", .value = v_mob, .on_select = a_mob},
     {.icon = LV_SYMBOL_SD_CARD, .label = "Esporta su microSD", .hint = "CSV per rifare la mappa sul PC", .on_select = a_export},
     {.icon = LV_SYMBOL_TRASH, .label = "Nuova mappa", .hint = "Cancella quella costruita finora", .on_select = a_reset, .confirm = true},
