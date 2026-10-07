@@ -52,7 +52,7 @@ void ui_fonts_init(void);          // dopo board_init
 #define C_WARN   lv_color_hex(0xFF6B57)
 #define C_OK     lv_color_hex(0x5CFF8A)
 
-#define STATUS_H   (SCR_ROUND ? 64 : 24)   // sul tondo: ora e icone in alto, sotto il titolo
+#define STATUS_H   (SCR_ROUND ? 78 : 24)   // sul tondo: ora e icone in alto, sotto il titolo
 #define CONTENT_H  (SCR_H - STATUS_H)
 
 enum {

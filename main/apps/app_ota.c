@@ -40,8 +40,9 @@ static void render(void)
     char t[128];
     ota_state_t s = ota_state();
     const char *latest = ota_latest();
-    snprintf(t, sizeof(t), "In uso: %s%s%s%s", ota_current(), latest[0] ? " · ultima: " : "", latest,
-             ble_paused ? " · Bluetooth in pausa" : "");
+    const char *sep = SCR_ROUND ? "\n" : " · ";   // sul tondo una cosa per riga
+    snprintf(t, sizeof(t), "In uso: %s%s%s%s%s%s", ota_current(), latest[0] ? sep : "", latest[0] ? "ultima: " : "", latest,
+             ble_paused ? sep : "", ble_paused ? "Bluetooth in pausa" : "");
     ui_set_text(l_ver, t);   // gira a ogni tick: solo i cambiamenti ridisegnano lo schermo
 
     bool confirming = lv_tick_get() < confirm_until && s == OTA_AVAILABLE;
@@ -85,7 +86,7 @@ static void enter(lv_obj_t *root, void *arg)
 {
     bool r = SCR_ROUND;
     l_ver = mk(root, &font_m, C_DIM, r ? 30 : 14);
-    l_state = mk(root, &font_l, C_TEXT, r ? 110 : 48);
+    l_state = mk(root, &font_l, C_TEXT, r ? 116 : 48);
     bar = lv_bar_create(root);
     if (r) {
         lv_obj_set_size(bar, 320, 12);

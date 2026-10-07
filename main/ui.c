@@ -97,6 +97,10 @@ static void bar_update(void)
     // ogni secondo si ridisegnerebbe (e invierebbe al pannello) tutto lo schermo
     const frame_t *f = &stack[depth - 1];
     const char *title = f->app->title ? f->app->title(f->arg) : f->app->name;
+    if (title && SCR_ROUND) {   // sul tondo c'è poco spazio: solo l'ultima parte del percorso
+        const char *last = strstr(title, "» ");
+        while (last) { title = last + strlen("» "); last = strstr(title, "» "); }
+    }
     ui_set_text(bar_title, title ? title : "");
 
     char t[24];
@@ -394,8 +398,8 @@ static lv_obj_t *mk_center(lv_obj_t *p, const lv_font_t *f, lv_color_t c, int w,
 
 static void list_view_create_round(list_view_t *v, lv_obj_t *root)
 {
-    v->prev = mk_center(root, &font_m, C_DIM, 300, ROUND_CY - 158);
-    v->icon = mk_center(root, &font_icon, ui_accent(), 120, ROUND_CY - 104);
+    v->prev = mk_center(root, &font_m, C_DIM, 300, ROUND_CY - 146);
+    v->icon = mk_center(root, &font_icon, ui_accent(), 120, ROUND_CY - 102);
     v->main = mk_center(root, &font_l, C_TEXT, 400, ROUND_CY - 30);
     v->sub = mk_center(root, &font_m, ui_accent(), 380, ROUND_CY + 22);
     lv_obj_set_style_radius(v->sub, 6, 0);
@@ -418,10 +422,18 @@ static void list_view_create_round(list_view_t *v, lv_obj_t *root)
     lv_obj_clear_flag(v->track, LV_OBJ_FLAG_CLICKABLE);
 }
 
-static void list_view_set_round(list_view_t *v, bool has_sub, int index, int count)
+static void list_view_set_round(list_view_t *v, const char *t, bool has_sub, int index, int count)
 {
+    // la voce corrente grande; se non ci sta, carattere medio su due righe. Si misura il
+    // testo passato: quello dell'etichetta, tagliato con i puntini, sarebbe già più corto
+    const lv_font_t *f = lv_text_get_width(t, strlen(t), &font_l, 0) > 390 ? &font_m : &font_l;
+    if (lv_obj_get_style_text_font(v->main, 0) != f) {
+        lv_obj_set_style_text_font(v->main, f, 0);
+        lv_label_set_long_mode(v->main, f == &font_m ? LV_LABEL_LONG_WRAP : LV_LABEL_LONG_DOT);
+    }
     lv_obj_t *o[] = {v->main, v->sub};
-    int ys[] = {has_sub ? ROUND_CY - 30 : ROUND_CY - 24, ROUND_CY + 22};
+    bool two = f == &font_m && lv_text_get_width(t, strlen(t), &font_m, 0) > 390;   // su due righe
+    int ys[] = {two ? ROUND_CY - 44 : has_sub ? ROUND_CY - 30 : ROUND_CY - 24, two ? ROUND_CY + 30 : ROUND_CY + 22};
     for (int i = 0; i < 2; i++)
         if (lv_obj_get_style_y(o[i], 0) != ys[i]) lv_obj_align(o[i], LV_ALIGN_TOP_MID, 0, ys[i]);
     if (count > 1) {
@@ -511,7 +523,7 @@ void list_view_set(list_view_t *v, const char *icon, const char *prev, const cha
     bool has_sub = sub && *sub;
     ui_set_text(v->sub, has_sub ? sub : "");
     if (SCR_ROUND) {
-        list_view_set_round(v, has_sub, index, count);
+        list_view_set_round(v, main ? main : "", has_sub, index, count);
         if (dir) {
             int dy = dir > 0 ? 22 : -22;
             anim_in(v->main, dy);
@@ -580,13 +592,18 @@ void ui_init(void)
     if (SCR_ROUND) {
         lv_obj_set_width(bar_title, 260);
         lv_obj_set_style_text_align(bar_title, LV_TEXT_ALIGN_CENTER, 0);
-        lv_obj_align(bar_title, LV_ALIGN_TOP_MID, 0, 38);
-        lv_obj_set_size(bar_right, LV_SIZE_CONTENT, 30);
-        lv_obj_align(bar_right, LV_ALIGN_TOP_MID, 0, 8);
+        lv_obj_align(bar_title, LV_ALIGN_TOP_MID, 0, 50);
+        // larghezza fissa: con LV_SIZE_CONTENT la riga non si allargava quando cambiavano
+        // i testi, e ora e Wi-Fi restavano tagliati fuori
+        // in cima il cerchio è stretto: la riga sta un po' più in basso, con voci più vicine
+        lv_obj_set_size(bar_right, 260, 30);
+        lv_obj_set_flex_align(bar_right, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+        lv_obj_set_style_pad_column(bar_right, 8, 0);
+        lv_obj_align(bar_right, LV_ALIGN_TOP_MID, 0, 18);
     } else {
         lv_obj_set_width(bar_title, 330);
         lv_obj_align(bar_title, LV_ALIGN_LEFT_MID, 10, 0);
-        lv_obj_set_size(bar_right, LV_SIZE_CONTENT, STATUS_H);
+        lv_obj_set_size(bar_right, 280, STATUS_H);   // fissa, voci allineate a destra (vedi sopra)
         lv_obj_align(bar_right, LV_ALIGN_RIGHT_MID, -10, 0);
     }
     bar_time = mk_label(bar_right, &font_s, C_TEXT);
