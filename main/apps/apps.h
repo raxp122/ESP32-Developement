@@ -37,6 +37,8 @@ extern const app_t app_q20;
 extern const app_t app_theremin;
 extern const app_t app_seismo;         // Sismografo
 extern menu_t seismo_menu;
+extern const app_t app_wifimap;        // Mappa Wi-Fi
+extern menu_t wifimap_menu;
 extern menu_t chess_menu;              // Orologio per scacchi
 void chess_menu_init(void);
 
