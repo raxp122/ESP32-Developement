@@ -6,6 +6,7 @@
 #include "board.h"
 #include "settings.h"
 #include "wifi_mgr.h"
+#include "audio.h"
 #include "ble_mgr.h"
 #include "ota.h"
 #include "radio.h"
@@ -74,22 +75,34 @@ bool wifi_mgr_portal_saved(void) { return false; }
 const char *wifi_mgr_portal_ssid(void) { return "Gadget-Setup"; }
 void wifi_mgr_portal_start(void) {}
 void wifi_mgr_portal_stop(void) {}
-void wifi_mgr_portal_start_file(const char *p, const char *n) {}
 int wifi_mgr_rssi(void) { return -55; }
 void wifi_mgr_scan_acquire(void) {}
 bool wifi_mgr_scan_busy(void) { return false; }
-uint32_t wifi_mgr_scan_gen(void) { return 1; }
+// la scena può dare i suoi risultati (sim_ap_n >= 0) e far avanzare le scansioni
+wifi_ap_t sim_aps[32];
+int sim_ap_n = -1;
+uint32_t sim_scan_gen = 1;
+uint32_t wifi_mgr_scan_gen(void) { return sim_scan_gen; }
 void wifi_mgr_scan_release(void) {}
 int wifi_mgr_scan_results(wifi_ap_t *o, int max)
 {
     static const wifi_ap_t a[] = {
         {"Casa", -48, 6, 3}, {"Casa_5G", -61, 36, 3}, {"Vodafone-A1B2C3", -70, 11, 3}, {"Ospiti", -77, 1, 0},
     };
+    if (sim_ap_n >= 0) {
+        int n = sim_ap_n < max ? sim_ap_n : max;
+        memcpy(o, sim_aps, n * sizeof(wifi_ap_t));
+        return n;
+    }
     int n = sizeof(a) / sizeof(a[0]);
     memcpy(o, a, sizeof(a));
     return n;
 }
 bool wifi_mgr_scan_start(void) { return true; }
+bool wifi_mgr_scan_start_ex(const char *ssid, uint16_t m) { return true; }
+bool audio_init(void) { return false; }
+void audio_start(audio_synth_t s) {}
+void audio_stop_if(audio_synth_t s) {}
 wifi_state_t wifi_mgr_state(void) { return sim_wifi; }
 void wifi_mgr_sync_time(void) {}
 bool wifi_mgr_time_saved(void) { return true; }

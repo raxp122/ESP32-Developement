@@ -37,6 +37,8 @@ void wifi_mgr_forget(void);
 void wifi_mgr_scan_acquire(void);
 void wifi_mgr_scan_release(void);
 bool wifi_mgr_scan_start(void);
+// solo una rete (ssid, NULL = tutte) e solo alcuni canali (bit n = canale n, 0 = tutti)
+bool wifi_mgr_scan_start_ex(const char *ssid, uint16_t ch_mask);
 bool wifi_mgr_scan_busy(void);
 uint32_t wifi_mgr_scan_gen(void);          // aumenta a ogni scansione completata
 int  wifi_mgr_scan_results(wifi_ap_t *out, int max);
@@ -45,8 +47,6 @@ const char *wifi_mgr_auth_name(int auth);
 // Portale: hotspot + pagina web per inserire la rete dal telefono
 void wifi_mgr_portal_start(void);         // pagina: configura il Wi-Fi
 void wifi_mgr_portal_start_clips(void);   // pagina: Appunti (manda testi via Bluetooth)
-// pagina: un file HTML (es. sulla microSD). "/" lo mostra, "/<download_name>" lo scarica
-void wifi_mgr_portal_start_file(const char *path, const char *download_name);
 void wifi_mgr_portal_open(void);          // interna: avvia l'hotspot con la pagina scelta
 void wifi_mgr_portal_stop(void);          // chiude l'hotspot e ripristina il Wi-Fi normale
 const char *wifi_mgr_portal_ssid(void);

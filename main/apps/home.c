@@ -25,7 +25,7 @@ static menu_item_t items[] = {
     {.icon = ICON_GAMEPAD,  .label = "Q-20",              .app = &app_q20},
     {.icon = ICON_TUNER,    .label = "Theremin",          .app = &app_theremin},
     {.icon = LV_SYMBOL_SHUFFLE, .label = "Sismografo",     .app = &app_menu, .arg = &seismo_menu},
-    {.icon = LV_SYMBOL_WIFI, .label = "Mappa Wi-Fi",       .app = &app_menu, .arg = &wifimap_menu},
+    {.icon = LV_SYMBOL_WIFI, .label = "Tester Wi-Fi",      .app = &app_wifitest},
     {.icon = ICON_CLOCK,    .label = "Orologio scacchi",  .app = &app_menu, .arg = &chess_menu},
     {.icon = LV_SYMBOL_SETTINGS, .label = "Impostazioni", .app = &app_menu, .arg = &settings_menu},
 };
@@ -77,7 +77,7 @@ static const boot_app_t boot_apps[] = {
     {"Theremin", &app_theremin, NULL},
     {"Sismografo", &app_menu, &seismo_menu},   // al posto della Macchina della verità (stesso indice)
     {"Orologio scacchi", &app_menu, &chess_menu},
-    {"Mappa Wi-Fi", &app_menu, &wifimap_menu},
+    {"Tester Wi-Fi", &app_wifitest, NULL},   // al posto della Mappa Wi-Fi (stesso indice)
 };
 #define N_BOOT (int)(sizeof(boot_apps) / sizeof(boot_apps[0]))
 
