@@ -35,6 +35,9 @@ extern const app_t app_clip_list;
 extern const app_t app_8ball;
 extern const app_t app_q20;
 extern const app_t app_theremin;
+extern const app_t app_lie;            // Macchina della verità
+extern menu_t chess_menu;              // Orologio per scacchi
+void chess_menu_init(void);
 
 // App all'avvio (Impostazioni): elenco con indici stabili, salvati in g_set.boot_app
 int  boot_app_count(void);

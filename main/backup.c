@@ -43,7 +43,7 @@ static const char *TAG = "backup";
 #define MAX_FILE    (256 * 1024)
 
 // Cosa finisce nel backup. Un namespace o un file nuovo va aggiunto qui.
-static const char *const NAMESPACES[] = {"gadget", "pet", "pwn", "level", "theremin"};
+static const char *const NAMESPACES[] = {"gadget", "pet", "pwn", "level", "theremin", "chess"};
 static const char *const FILES[] = {"pwn/pokedex.dat", "q20/kb.txt"};   // q20: quello che ha imparato
 #define N_NS    (int)(sizeof(NAMESPACES) / sizeof(NAMESPACES[0]))
 #define N_FILES (int)(sizeof(FILES) / sizeof(FILES[0]))
