@@ -54,4 +54,5 @@ void wifi_mgr_portal_poll(void);          // dal task dell'interfaccia: applica 
 
 // Ora
 bool wifi_mgr_time_synced(void);
+bool wifi_mgr_time_saved(void);    // l'ultima sincronizzazione è stata scritta (e riletta) nell'RTC
 void wifi_mgr_sync_time(void);

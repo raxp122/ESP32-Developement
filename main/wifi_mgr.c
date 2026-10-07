@@ -45,7 +45,7 @@ static SemaphoreHandle_t mtx;
 static esp_timer_handle_t reconnect_timer;
 static int retry_ms = 1000;
 static bool sntp_started;
-static volatile bool synced;
+static volatile bool synced, rtc_saved;
 static httpd_handle_t httpd;
 static volatile bool dns_run;
 static volatile bool portal_saved;
@@ -85,8 +85,8 @@ static void time_cb(struct timeval *tv)
     synced = true;
     struct tm utc;
     gmtime_r(&tv->tv_sec, &utc);
-    board_rtc_write(&utc);
-    ESP_LOGI(TAG, "ora sincronizzata");
+    rtc_saved = board_rtc_write(&utc);
+    ESP_LOGI(TAG, "ora sincronizzata%s", rtc_saved ? " e salvata nell'RTC" : ", ma l'RTC non l'ha presa");
 }
 
 static void sntp_kick(void)
@@ -102,6 +102,7 @@ static void sntp_kick(void)
 }
 
 bool wifi_mgr_time_synced(void) { return synced; }
+bool wifi_mgr_time_saved(void) { return rtc_saved; }
 void wifi_mgr_sync_time(void) { if (state == WIFI_CONNECTED) sntp_kick(); }
 
 /* ---------------- connessione ---------------- */

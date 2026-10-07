@@ -45,8 +45,11 @@ void  board_power_off(void);               // rilascia il latch (solo a batteria
 float board_battery_volts(void);            // tensione batteria (0 se non leggibile)
 int   board_battery_percent(float v);
 
+typedef enum { RTC_OK, RTC_NO_CHIP, RTC_STOPPED, RTC_UNSET } rtc_status_t;
+rtc_status_t board_rtc_get(struct tm *utc);      // RTC_STOPPED: l'oscillatore si è fermato (è rimasto senza corrente)
 bool  board_rtc_read(struct tm *utc);       // false se l'orario nell'RTC non è valido
-void  board_rtc_write(const struct tm *utc);
+bool  board_rtc_write(const struct tm *utc);   // scrive e rilegge: false se non ha preso l'ora
+rtc_status_t board_rtc_boot_status(void);   // com'era l'RTC alla prima lettura (all'accensione)
 
 bool  board_imu_ok(void);
 bool  board_imu_accel(vec3_t *g);           // accelerazione in g

@@ -145,11 +145,15 @@ int board_battery_percent(float v)
 static uint8_t bcd2bin(uint8_t v) { return (v >> 4) * 10 + (v & 0x0F); }
 static uint8_t bin2bcd(uint8_t v) { return ((v / 10) << 4) | (v % 10); }
 
-bool board_rtc_read(struct tm *t)
+static int rtc_boot = -1;
+
+rtc_status_t board_rtc_boot_status(void) { return rtc_boot < 0 ? RTC_NO_CHIP : (rtc_status_t)rtc_boot; }
+
+static rtc_status_t rtc_get(struct tm *t)
 {
     uint8_t r[7];
-    if (reg_read(dev_rtc, 0x04, r, 7) != ESP_OK) return false;
-    if (r[0] & 0x80) return false; // flag OS: oscillatore fermato, orario non affidabile
+    if (reg_read(dev_rtc, 0x04, r, 7) != ESP_OK) return RTC_NO_CHIP;
+    if (r[0] & 0x80) return RTC_STOPPED; // flag OS: oscillatore fermato (senza corrente), orario non affidabile
     memset(t, 0, sizeof(*t));
     t->tm_sec = bcd2bin(r[0] & 0x7F);
     t->tm_min = bcd2bin(r[1] & 0x7F);
@@ -157,10 +161,19 @@ bool board_rtc_read(struct tm *t)
     t->tm_mday = bcd2bin(r[3] & 0x3F);
     t->tm_mon = bcd2bin(r[5] & 0x1F) - 1;
     t->tm_year = bcd2bin(r[6]) + 100;
-    return t->tm_year >= 124; // almeno 2024
+    return t->tm_year >= 124 ? RTC_OK : RTC_UNSET; // almeno 2024
 }
 
-void board_rtc_write(const struct tm *t)
+rtc_status_t board_rtc_get(struct tm *t)
+{
+    rtc_status_t s = rtc_get(t);
+    if (rtc_boot < 0) rtc_boot = s;
+    return s;
+}
+
+bool board_rtc_read(struct tm *t) { return board_rtc_get(t) == RTC_OK; }
+
+bool board_rtc_write(const struct tm *t)
 {
     uint8_t b[8] = {
         0x04,
@@ -168,7 +181,15 @@ void board_rtc_write(const struct tm *t)
         bin2bcd(t->tm_mday), (uint8_t)t->tm_wday, bin2bcd(t->tm_mon + 1),
         bin2bcd((t->tm_year - 100) % 100),
     };
-    i2c_master_transmit(dev_rtc, b, sizeof(b), 50);
+    for (int tries = 0; tries < 3; tries++) {
+        if (i2c_master_transmit(dev_rtc, b, sizeof(b), 50) != ESP_OK) continue;
+        struct tm r;
+        if (rtc_get(&r) != RTC_OK) continue;
+        // rilettura: stessa data e al massimo un paio di secondi di differenza
+        int d = (r.tm_hour * 3600 + r.tm_min * 60 + r.tm_sec) - (t->tm_hour * 3600 + t->tm_min * 60 + t->tm_sec);
+        if (r.tm_mday == t->tm_mday && r.tm_mon == t->tm_mon && r.tm_year == t->tm_year && d >= 0 && d <= 2) return true;
+    }
+    return false;
 }
 
 bool board_imu_ok(void) { return imu_ok; }

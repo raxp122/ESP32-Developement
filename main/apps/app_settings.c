@@ -188,7 +188,30 @@ static void v_date(char *b, int n)
 }
 static void v_tsrc(char *b, int n)
 {
-    snprintf(b, n, "%s", wifi_mgr_time_synced() ? "Internet (NTP), salvata nell'RTC" : "Orologio interno (RTC)");
+    if (wifi_mgr_time_synced())
+        snprintf(b, n, "%s", wifi_mgr_time_saved() ? "Internet (NTP), salvata nell'RTC" : "Internet (NTP), ma l'RTC non l'ha presa");
+    else if (board_rtc_boot_status() == RTC_OK) snprintf(b, n, "Orologio della scheda (RTC)");
+    else snprintf(b, n, "Nessuna: serve il Wi-Fi");
+}
+// L'RTC (PCF85063) ha l'ora in UTC; qui si vede in ora locale, letta adesso dal chip, e
+// com'era all'accensione: se si è fermato è rimasto senza corrente mentre la scheda era spenta.
+static void v_rtc(char *b, int n)
+{
+    static const char *const boot[] = {"all'accensione aveva l'ora", "non risponde",
+                                       "all'accensione era fermo (senza corrente da spento)",
+                                       "all'accensione non aveva un'ora"};
+    struct tm u;
+    rtc_status_t s = board_rtc_get(&u);
+    if (s != RTC_OK) { snprintf(b, n, "%s · %s", s == RTC_NO_CHIP ? "Non risponde" : "Senza ora", boot[board_rtc_boot_status()]); return; }
+    // UTC → locale, senza toccare il fuso (lo usano anche gli altri task): giorni dal 1970
+    int y = u.tm_year + 1900, m = u.tm_mon + 1;
+    y -= m <= 2;
+    int era = y / 400, yoe = y - era * 400, mp = (m + 9) % 12;
+    long days = era * 146097L + yoe * 365 + yoe / 4 - yoe / 100 + (153 * mp + 2) / 5 + u.tm_mday - 1 - 719468;
+    time_t t = (time_t)days * 86400 + u.tm_hour * 3600 + u.tm_min * 60 + u.tm_sec;
+    struct tm l;
+    localtime_r(&t, &l);
+    snprintf(b, n, "%02d:%02d:%02d · %s", l.tm_hour, l.tm_min, l.tm_sec, boot[board_rtc_boot_status()]);
 }
 static void a_sync(void)
 {
@@ -202,6 +225,7 @@ static const menu_item_t time_items[] = {
     {.icon = ICON_CLOCK, .label = "Ora", .value = v_time},
     {.icon = LV_SYMBOL_LIST, .label = "Data", .value = v_date},
     {.icon = ICON_SYNC, .label = "Sincronizza ora", .value = v_tsrc, .on_select = a_sync},
+    {.icon = ICON_CHIP, .label = "Orologio della scheda", .value = v_rtc},
     {.icon = LV_SYMBOL_GPS, .label = "Fuso orario", .value = v_tz},
 };
 static menu_t time_menu = {"Impostazioni » Data e ora", time_items, sizeof(time_items) / sizeof(time_items[0]), 0, NULL};
