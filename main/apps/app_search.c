@@ -44,24 +44,39 @@ static void index_menu(menu_t *m, const char *where, int depth)
 
 /* ---------------- ricerca ---------------- */
 
-#define MAX_RES 12
+#define MAX_RES 16
 static char query[24];
 static int res[MAX_RES], n_res, sel;
+
+// punteggio (più basso = prima): conta soprattutto dove si trova la corrispondenza
+// (inizio del nome, inizio di una parola, in mezzo), poi le app del launcher prima delle
+// voci dei sottomenu, poi i menu meno profondi. Così "polipetto" trova prima l'app e
+// dopo le impostazioni con lo stesso nome.
+static int score(const entry_t *e, const char *p)
+{
+    int where = p == e->norm ? 0 : (p[-1] == ' ' || p[-1] == '-') ? 1 : 2;
+    int exact = !strcmp(e->norm, query) ? 0 : 1;
+    return where * 4 + (e->menu == &home_menu ? 0 : 2) + exact;
+}
 
 static void do_search(void)
 {
     n_res = 0;
     sel = 0;
     if (!query[0]) return;
-    // prima le parole che iniziano con la ricerca, poi le corrispondenze interne
-    for (int pass = 0; pass < 2; pass++)
-        for (int i = 0; i < n_entries && n_res < MAX_RES; i++) {
-            const char *p = strstr(entries[i].norm, query);
-            if (!p) continue;
-            bool word_start = p == entries[i].norm || p[-1] == ' ' || p[-1] == '-';
-            if ((pass == 0) != word_start) continue;
-            res[n_res++] = i;
+    static int sc[MAX_RES];
+    for (int i = 0; i < n_entries; i++) {
+        const char *p = strstr(entries[i].norm, query);
+        if (!p) continue;
+        int s = score(&entries[i], p);
+        // inserimento ordinato (a parità resta l'ordine dei menu); tiene i MAX_RES migliori
+        int k = n_res < MAX_RES ? n_res++ : MAX_RES;
+        while (k > 0 && sc[k - 1] > s) {
+            if (k < MAX_RES) { sc[k] = sc[k - 1]; res[k] = res[k - 1]; }
+            k--;
         }
+        if (k < MAX_RES) { sc[k] = s; res[k] = i; }
+    }
 }
 
 static void open_result(void)

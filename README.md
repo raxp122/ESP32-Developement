@@ -27,6 +27,8 @@ Sullo schermo tondo è tutto più grande (caratteri circa 1,4 volte, generati co
 
 Gli swipe lenti sono supportati: il dito si considera sollevato solo dopo ~85 ms senza contatto.
 
+**Cerca** (dal launcher): scrivi con la tastiera e trova app e voci di tutti i menu. Prima vengono i nomi che iniziano con quello che hai scritto, poi le parole interne; a parità, le app del launcher prima delle voci dei sottomenu (così "polipetto" apre l'app, e sotto ci sono le sue impostazioni). Su/giù scorre i risultati, destra apre.
+
 ## Doom
 Copia un IWAD nella cartella `doom` della microSD (FAT32): `doom1.wad` (shareware) oppure `doom.wad`, `doom2.wad`, `freedoom1.wad`…
 Dal launcher: Doom › Gioca. La scheda si riavvia in modalità Doom (Wi-Fi e Bluetooth spenti, tutta la memoria al gioco).
@@ -104,6 +106,13 @@ Pulsanti a destra:
 - **Comandi**: quale movimento cambia la nota (inclinazione o rotazione), cosa fa l'altro (volume, vibrato, timbro o niente: volume fisso, quello del menu Suono), quanti gradi servono per tutte le note e per l'altro movimento (da 20° a 180°, cioè da rivolta in su a rivolta in giù), inversione dei due movimenti, "suona sempre", volume del microfono.
 - **Registra**: registra quello che suoni in un file WAV nella cartella `theremin` della microSD. Con **Mic: sì** mixa anche il microfono, per cantare mentre suoni (il microfono sente anche l'altoparlante).
 - **Registrazioni**: elenco per riascoltarle (swipe a destra) o cancellarle (BOOT due volte).
+
+## Snake
+Dal launcher: **Snake**, in pixel art con i colori del Polipetto: un serpente di quadratini arancioni (la testa ha gli occhi) che mangia i pesci gialli. Con gli swipe nelle quattro direzioni si gira; muri e coda fanno perdere, e ogni pesce lo rende un po' più veloce. Lo schermo resta tutto per il gioco: sul 3,49" una griglia 53×12, sul tondo 20×20 con quadratini più grandi.
+
+- **Partenza**: uno swipe qualsiasi (sinistra esce).
+- **Pausa**: BOOT o dito tenuto. In pausa e a fine partita: destra riprende o ricomincia, sinistra esce.
+- **Record**: resta in memoria anche spegnendo.
 
 ## Tester Wi-Fi
 Dal launcher: **Tester Wi-Fi**. Per controllare la copertura di una rete girando per le stanze.
