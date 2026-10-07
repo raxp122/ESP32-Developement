@@ -4,6 +4,7 @@
 #include "sdmmc_cmd.h"
 #include "driver/sdmmc_host.h"
 #include "esp_log.h"
+#include "board.h"
 
 static sdmmc_card_t *card;
 
@@ -19,9 +20,15 @@ bool sd_mount(void)
     host.max_freq_khz = SDMMC_FREQ_HIGHSPEED;
     sdmmc_slot_config_t slot = SDMMC_SLOT_CONFIG_DEFAULT();
     slot.width = 1;
-    slot.clk = 41;
-    slot.cmd = 39;
-    slot.d0 = 40;
+    if (BOARD_IS_ROUND()) {   // AMOLED 1.75
+        slot.clk = 2;
+        slot.cmd = 1;
+        slot.d0 = 3;
+    } else {                  // 3.49
+        slot.clk = 41;
+        slot.cmd = 39;
+        slot.d0 = 40;
+    }
     slot.flags |= SDMMC_SLOT_FLAG_INTERNAL_PULLUP;
     if (esp_vfs_fat_sdmmc_mount(SD_MOUNT, &host, &slot, &mc, &card) != ESP_OK) {
         card = NULL;

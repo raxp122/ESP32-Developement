@@ -21,6 +21,6 @@ typedef enum {
 typedef void (*nav_handler_t)(nav_t ev);
 
 void input_init(nav_handler_t handler);   // da chiamare con LVGL bloccato
-bool input_touch(int *x, int *y);         // stato attuale (coordinate orizzontali 640×172)
+bool input_touch(int *x, int *y);         // stato attuale, in coordinate dello schermo (SCR_W×SCR_H)
 uint32_t input_idle_ms(void);
 void input_mark_activity(void);

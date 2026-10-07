@@ -1,4 +1,5 @@
 // doom_boot.c — ricerca dei file di gioco e passaggio launcher → Doom
+#include "board.h"
 #include "doom_app.h"
 #include "sd.h"
 #include <stdio.h>
@@ -28,6 +29,7 @@ bool doom_find_wad(char *path, size_t n)
 
 void doom_launch(void)
 {
+    if (BOARD_IS_ROUND()) return;   // Doom disegna direttamente sul pannello della 3.49
     boot_magic = BOOT_DOOM_MAGIC;
     esp_restart();
 }

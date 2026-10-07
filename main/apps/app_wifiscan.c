@@ -95,6 +95,13 @@ static void result_enter(lv_obj_t *root, void *arg)
     lv_label_set_long_mode(res_sub, LV_LABEL_LONG_WRAP);
     lv_obj_align(res_main, LV_ALIGN_LEFT_MID, 130, -16);
     lv_obj_align(res_sub, LV_ALIGN_LEFT_MID, 130, 22);
+    if (SCR_ROUND) {   // icona sopra, testi centrati sotto
+        lv_obj_align(res_icon, LV_ALIGN_TOP_MID, 0, 40);
+        lv_obj_align(res_main, LV_ALIGN_TOP_MID, 0, 120);
+        lv_obj_set_width(res_sub, 360);
+        lv_obj_set_style_text_align(res_sub, LV_TEXT_ALIGN_CENTER, 0);
+        lv_obj_align(res_sub, LV_ALIGN_TOP_MID, 0, 180);
+    }
     result_tick();   // subito il testo giusto, non quello predefinito di LVGL
 }
 
@@ -142,7 +149,7 @@ static bool result_nav(nav_t ev)
 
 static const app_t app_wifi_result = {
     .name = "Connessione", .enter = result_enter, .tick = result_tick, .nav = result_nav,
-    .flags = APP_NO_SLEEP,
+    .flags = APP_NO_SLEEP | APP_ROUND_OK,
 };
 
 /* ---- connessione: tastiera per la password ---- */
@@ -173,7 +180,7 @@ static bool kb_nav(nav_t ev) { return keyboard_nav(ev); }
 
 static const app_t app_wifi_pass = {
     .name = "Password", .enter = kb_enter, .leave = kb_leave, .nav = kb_nav,
-    .flags = APP_FULLSCREEN | APP_OWN_QUICK,
+    .flags = APP_FULLSCREEN | APP_OWN_QUICK | APP_ROUND_OK,
 };
 
 static void connect_sel(void)
@@ -209,5 +216,5 @@ static const char *title(void *arg)
 const app_t app_wifiscan = {
     .name = "Scanner Wi-Fi", .icon = LV_SYMBOL_WIFI,
     .enter = enter, .leave = leave, .nav = nav, .tick = tick, .title = title,
-    .flags = APP_OWN_QUICK,   // il tocco prolungato rifà la scansione
+    .flags = APP_OWN_QUICK | APP_ROUND_OK,   // il tocco prolungato rifà la scansione
 };

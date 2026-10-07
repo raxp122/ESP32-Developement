@@ -11,6 +11,7 @@
 #include "esp_lcd_panel_io.h"
 #include "esp_lcd_panel_ops.h"
 #include "esp_lcd_axs15231b.h"
+#include "display_round.h"
 #include "esp_timer.h"
 #include "esp_log.h"
 
@@ -18,6 +19,9 @@
 #define CHUNK_ROWS    64
 #define CHUNK_BYTES   (LCD_W * CHUNK_ROWS * 2)
 #define FRAME_BYTES   (LCD_W * LCD_H * 2)
+
+int16_t g_scr_w = 640, g_scr_h = 172;
+static bool round_scr;
 
 static esp_lcd_panel_handle_t panel;
 static SemaphoreHandle_t flush_sem, lv_mux;
@@ -85,11 +89,12 @@ static void flush_cb(lv_display_t *d, const lv_area_t *area, uint8_t *px)
     lv_display_flush_ready(d);
 }
 
-uint16_t *display_frame(void) { return (uint16_t *)rot_buf; }
-void display_push(void) { push_frame((uint16_t *)rot_buf); }
+uint16_t *display_frame(void) { return (uint16_t *)rot_buf; }   // NULL sullo schermo tondo
+void display_push(void) { if (rot_buf) push_frame((uint16_t *)rot_buf); }
 
 void display_keep_rows(int y0, int y1)
 {
+    if (round_scr) return;
     if (!lv_tmp) lv_tmp = heap_caps_malloc(FRAME_BYTES, MALLOC_CAP_SPIRAM);
     if (!lv_tmp) return;   // senza memoria niente righe protette (meglio che scrivere su NULL)
     keep_y0 = y0;
@@ -122,6 +127,23 @@ void display_set_brightness(int pct)
 {
     if (pct < 0) pct = 0;
     if (pct > 100) pct = 100;
+    if (round_scr) {
+        if (dark && pct > 0 && lv_task_on) {
+            display_lock();
+            dark = false;
+            lv_timer_resume(lv_display_get_refr_timer(disp));
+            lv_obj_invalidate(lv_screen_active());
+            lv_refr_now(disp);
+            display_unlock();
+        } else if (!dark && pct == 0 && lv_task_on) {
+            display_lock();
+            lv_timer_pause(lv_display_get_refr_timer(disp));
+            display_unlock();
+        }
+        dark = pct == 0;
+        display_round_brightness(pct);
+        return;
+    }
     if (dark && pct > 0 && rot_buf) {
         display_lock();
         dark = false;
@@ -150,9 +172,21 @@ void display_set_brightness(int pct)
 
 void display_init(bool flipped)
 {
+    lv_mux = xSemaphoreCreateRecursiveMutex();
+    if (BOARD_IS_ROUND()) {
+        round_scr = true;
+        g_scr_w = R_LCD_W;
+        g_scr_h = R_LCD_H;
+        lv_init();
+        disp = display_round_init(&dark);
+        const esp_timer_create_args_t ta = {.callback = tick_cb, .name = "lv_tick"};
+        esp_timer_handle_t th;
+        esp_timer_create(&ta, &th);
+        esp_timer_start_periodic(th, 2000);
+        return;
+    }
     backlight_init();
     flush_sem = xSemaphoreCreateBinary();
-    lv_mux = xSemaphoreCreateRecursiveMutex();
 
     gpio_config_t rst = {.pin_bit_mask = 1ULL << PIN_LCD_RST, .mode = GPIO_MODE_OUTPUT, .pull_up_en = 1};
     gpio_config(&rst);
@@ -223,6 +257,7 @@ void display_init(bool flipped)
 
 void display_set_flipped(bool flipped)
 {
+    if (round_scr) return;   // sullo schermo tondo la rotazione non serve (per ora)
     is_flipped = flipped;
     lv_display_set_rotation(disp, flipped ? LV_DISPLAY_ROTATION_270 : LV_DISPLAY_ROTATION_90);
 }

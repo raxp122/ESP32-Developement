@@ -6,11 +6,16 @@
 #include "display.h"
 
 // ---- Font (generati con lv_font_conv, includono accenti e icone) ----
-extern const lv_font_t font_s;     // 14 px, testo + icone
-extern const lv_font_t font_m;     // 20 px, testo + icone
-extern const lv_font_t font_l;     // 34 px, testo + icone
-extern const lv_font_t font_xl;    // 72 px, cifre e maiuscole
-extern const lv_font_t font_icon;  // 44 px, solo icone
+// Due serie, scelte all'avvio in base alla scheda (fonts_sel.c): sullo schermo tondo i pixel
+// sono più piccoli e i caratteri sono circa 1,4 volte più grandi (fra parentesi).
+// Nel codice si usano come prima: &font_m, ecc.
+extern const lv_font_t *ui_font_s, *ui_font_m, *ui_font_l, *ui_font_xl, *ui_font_icon;
+#define font_s    (*ui_font_s)     // 14 px (20), testo + icone
+#define font_m    (*ui_font_m)     // 20 px (28), testo + icone
+#define font_l    (*ui_font_l)     // 34 px (46), testo + icone
+#define font_xl   (*ui_font_xl)    // 72 px (96), cifre e maiuscole
+#define font_icon (*ui_font_icon)  // 44 px (60), solo icone
+void ui_fonts_init(void);          // dopo board_init
 
 // ---- Icone extra (Font Awesome 5) oltre a LV_SYMBOL_* ----
 #define ICON_DICE      "\xEF\x94\xA2"  // f522
@@ -47,13 +52,14 @@ extern const lv_font_t font_icon;  // 44 px, solo icone
 #define C_WARN   lv_color_hex(0xFF6B57)
 #define C_OK     lv_color_hex(0x5CFF8A)
 
-#define STATUS_H   24
+#define STATUS_H   (SCR_ROUND ? 64 : 24)   // sul tondo: ora e icone in alto, sotto il titolo
 #define CONTENT_H  (SCR_H - STATUS_H)
 
 enum {
     APP_FULLSCREEN = 1 << 0,  // nasconde la barra di stato
     APP_NO_SLEEP   = 1 << 1,  // lo schermo non si spegne
     APP_OWN_QUICK  = 1 << 2,  // il tocco prolungato va all'app invece che all'azione rapida
+    APP_ROUND_OK   = 1 << 3,  // disegnata anche per lo schermo tondo (le altre lì non si aprono)
 };
 
 typedef struct app_s {

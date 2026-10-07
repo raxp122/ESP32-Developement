@@ -19,9 +19,16 @@ static lv_obj_t *mk(lv_obj_t *root, const lv_font_t *f, lv_color_t c, int y)
     lv_obj_t *l = lv_label_create(root);
     lv_obj_set_style_text_font(l, f, 0);
     lv_obj_set_style_text_color(l, c, 0);
-    lv_obj_set_width(l, SCR_W - 48);
-    lv_label_set_long_mode(l, LV_LABEL_LONG_DOT);
-    lv_obj_set_pos(l, 24, y);
+    if (SCR_ROUND) {   // centrate e su più righe dentro il cerchio
+        lv_obj_set_width(l, 360);
+        lv_obj_set_style_text_align(l, LV_TEXT_ALIGN_CENTER, 0);
+        lv_label_set_long_mode(l, LV_LABEL_LONG_WRAP);
+        lv_obj_align(l, LV_ALIGN_TOP_MID, 0, y);
+    } else {
+        lv_obj_set_width(l, SCR_W - 48);
+        lv_label_set_long_mode(l, LV_LABEL_LONG_DOT);
+        lv_obj_set_pos(l, 24, y);
+    }
     lv_label_set_text(l, "");
     return l;
 }
@@ -76,16 +83,22 @@ static void render(void)
 
 static void enter(lv_obj_t *root, void *arg)
 {
-    l_ver = mk(root, &font_m, C_DIM, 14);
-    l_state = mk(root, &font_l, C_TEXT, 48);
+    bool r = SCR_ROUND;
+    l_ver = mk(root, &font_m, C_DIM, r ? 30 : 14);
+    l_state = mk(root, &font_l, C_TEXT, r ? 110 : 48);
     bar = lv_bar_create(root);
-    lv_obj_set_size(bar, SCR_W - 48, 10);
-    lv_obj_set_pos(bar, 24, 98);
+    if (r) {
+        lv_obj_set_size(bar, 320, 12);
+        lv_obj_align(bar, LV_ALIGN_TOP_MID, 0, 230);
+    } else {
+        lv_obj_set_size(bar, SCR_W - 48, 10);
+        lv_obj_set_pos(bar, 24, 98);
+    }
     lv_obj_set_style_bg_color(bar, C_FAINT, LV_PART_MAIN);
     lv_obj_set_style_bg_opa(bar, LV_OPA_COVER, LV_PART_MAIN);
     lv_obj_set_style_bg_color(bar, ui_accent(), LV_PART_INDICATOR);
     lv_bar_set_range(bar, 0, 100);
-    l_hint = mk(root, &font_s, C_DIM, 118);
+    l_hint = mk(root, &font_s, C_DIM, r ? 260 : 118);
     confirm_until = 0;
     // Wi-Fi e Bluetooth condividono la radio: durante controllo e download tutta al Wi-Fi
     ble_paused = ble_mgr_on();
@@ -129,5 +142,5 @@ static const char *title(void *arg) { return "Impostazioni » Aggiornamento firm
 const app_t app_ota = {
     .name = "Aggiornamento", .icon = LV_SYMBOL_DOWNLOAD,
     .enter = enter, .leave = leave, .nav = nav, .tick = render, .title = title,
-    .flags = APP_NO_SLEEP,
+    .flags = APP_NO_SLEEP | APP_ROUND_OK,
 };

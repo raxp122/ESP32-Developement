@@ -43,12 +43,13 @@ void app_main(void)
 {
     logcon_init();         // conserva in RAM anche i log di avvio (comando "L" dal monitor)
     board_init();          // subito dopo: tiene accesa la scheda quando va a batteria
+    ui_fonts_init();       // caratteri per lo schermo della scheda riconosciuta
     settings_load();
     time_from_rtc();
     sd_mount();
     clips_init();          // Appunti: testi ricevuti dal PC
 
-    if (doom_boot_requested()) {
+    if (doom_boot_requested() && !BOARD_IS_ROUND()) {
         // modalità Doom: niente Wi-Fi/Bluetooth, tutta la memoria al gioco
         display_init(g_set.flipped);
         logcon_start();

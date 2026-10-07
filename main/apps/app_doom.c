@@ -102,6 +102,7 @@ static void v_wad(char *b, int n)
 static void a_play(void)
 {
     char p[64];
+    if (SCR_ROUND) { ui_toast("Doom per ora c'è solo sulla scheda 3.49"); return; }
     if (!doom_find_wad(p, sizeof(p))) { ui_toast("Nessun file WAD sulla microSD"); return; }
     ui_toast("Avvio Doom…");
     lv_refr_now(NULL);
