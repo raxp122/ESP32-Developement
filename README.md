@@ -93,6 +93,25 @@ Pulsanti a destra:
 - **Registra**: registra quello che suoni in un file WAV nella cartella `theremin` della microSD. Con **Mic: sì** mixa anche il microfono, per cantare mentre suoni (il microfono sente anche l'altoparlante).
 - **Registrazioni**: elenco per riascoltarle (swipe a destra) o cancellarle (BOOT due volte).
 
+## Macchina della verità
+Dal launcher: **Macchina della verità**. Il soggetto tiene il Gadget con il braccio teso davanti a sé, con lo schermo verso l'operatore, che legge le istruzioni e fa le domande. Il Gadget misura il tremore della mano (giroscopio e accelerometro, 200 letture al secondo, senza i movimenti lenti del braccio); il grafico a destra mostra il tremore rispetto alla traccia base.
+
+1. **Traccia base**: 10 s fermo e in silenzio.
+2. **Calibrazione**: quattro domande, due con risposta vera e due con risposta falsa (l'ordine è V F F V o F V V F, così la stanchezza del braccio pesa uguale). Per ognuna tocca *Registra*, aspetta il via e fai la domanda: si registrano 6 s.
+3. **Domande vere**: il tremore della risposta si confronta con quello delle risposte vere e false della calibrazione. Il risultato è *Verità*, *Bugia*, *Incerto* o *Non si capisce* (se nella calibrazione vere e false si somigliano troppo), con la probabilità di bugia e l'affidabilità della calibrazione.
+
+Se il braccio si muove troppo la misura va ripetuta. È un gioco: il tremore cambia con l'emozione ma anche con la stanchezza e la concentrazione, non è una prova di nulla.
+
+## Orologio scacchi
+Dal launcher: **Orologio scacchi** → *Nuova partita*. Lo schermo è diviso in due: chi ha mosso tocca la sua metà e parte l'orologio dell'avversario (all'inizio il nero tocca la sua metà per far partire il bianco). **BOOT** mette in pausa (con *Riprendi* e *Azzera*); in partita gli swipe non fanno nulla, si esce dalla pausa con swipe a sinistra.
+
+Impostazioni nel menu:
+- **Cadenza**: Bullet 1+0 e 2+1, Blitz 3+0, 3+2, 5+0, 5+3, Rapid 10+0, 10+5, 15+10, 25+10, Classica 30+0, 60+30, 90+30, FIDE (90' per 40 mosse + 30', +30" a mossa), Ritardo 5 min 5", Clessidra 1 min; cambiando le voci sotto diventa *Personalizzata*.
+- **Tempo** e **Tempo del nero** (diverso per dare un handicap), da 15 s a 3 ore.
+- **Modalità**: incremento (Fischer), Bronstein, ritardo (delay), clessidra o nessun incremento; **Secondi per mossa** (0–60).
+- **Secondo periodo**: dopo 20–60 mosse si aggiunge del tempo (5–90 min).
+- **Lato del bianco**, **Suoni** (clic della mossa, avvisi, tempo scaduto), **Avviso tempo basso** (10 s – 1 min: tempo in rosso, un bip, poi un tic al secondo negli ultimi 10), **Conta le mosse**.
+
 ## Q-20
 Dal launcher: **Q-20**. Pensa a qualcosa (animale, oggetto, cibo, luogo, persona…) e rispondi alle domande toccando *Sì*, *Forse sì*, *Non so*, *Forse no*, *No*. Dopo una ventina di domande (prima, se è sicuro) prova a indovinare; se sbaglia continua, fino a 30. Se vince lui, ricorda ancora meglio quella cosa; se perde ti chiede cosa pensavi e la impara. Il pulsante ← (o BOOT) torna indietro all'ultima domanda se cambi idea, anche quando sta già provando a indovinare.
 

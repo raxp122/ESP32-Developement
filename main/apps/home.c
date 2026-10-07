@@ -24,6 +24,8 @@ static menu_item_t items[] = {
     {.icon = ICON_EYE,      .label = "8-Ball veggente",   .app = &app_8ball},
     {.icon = ICON_GAMEPAD,  .label = "Q-20",              .app = &app_q20},
     {.icon = ICON_TUNER,    .label = "Theremin",          .app = &app_theremin},
+    {.icon = ICON_EYE,      .label = "Macchina della verità", .app = &app_lie},
+    {.icon = ICON_CLOCK,    .label = "Orologio scacchi",  .app = &app_menu, .arg = &chess_menu},
     {.icon = LV_SYMBOL_SETTINGS, .label = "Impostazioni", .app = &app_menu, .arg = &settings_menu},
 };
 
@@ -44,6 +46,7 @@ static int by_label(const void *a, const void *b)
 void home_init(void)
 {
     tuner_menu_init();
+    chess_menu_init();
     qsort(items + 1, home_menu.count - 1, sizeof(menu_item_t), by_label);
 }
 
@@ -71,6 +74,8 @@ static const boot_app_t boot_apps[] = {
     {"8-Ball veggente", &app_8ball, NULL},
     {"Q-20", &app_q20, NULL},
     {"Theremin", &app_theremin, NULL},
+    {"Macchina della verità", &app_lie, NULL},
+    {"Orologio scacchi", &app_menu, &chess_menu},
 };
 #define N_BOOT (int)(sizeof(boot_apps) / sizeof(boot_apps[0]))
 
