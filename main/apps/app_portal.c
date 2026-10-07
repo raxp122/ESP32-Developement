@@ -46,9 +46,34 @@ static void tick(void)
     ui_set_text_color(l_status, c);
 }
 
+// schermo tondo: tutto centrato, una riga sotto l'altra
+static lv_obj_t *mkc(lv_obj_t *p, const lv_font_t *f, lv_color_t c, int y, const char *txt)
+{
+    lv_obj_t *l = lv_label_create(p);
+    lv_obj_set_style_text_font(l, f, 0);
+    lv_obj_set_style_text_color(l, c, 0);
+    lv_obj_set_width(l, 360);
+    lv_obj_set_style_text_align(l, LV_TEXT_ALIGN_CENTER, 0);
+    lv_label_set_long_mode(l, LV_LABEL_LONG_WRAP);
+    lv_label_set_text(l, txt);
+    lv_obj_align(l, LV_ALIGN_TOP_MID, 0, y);
+    return l;
+}
+
+static void enter_round(lv_obj_t *root)
+{
+    l_step1 = mkc(root, &font_m, C_TEXT, 24, "1 · Dal telefono collegati alla rete");
+    mkc(root, &font_m, ui_accent(), 90, wifi_mgr_portal_ssid());
+    l_step2 = mkc(root, &font_m, C_TEXT, 136, "2 · Si apre la pagina, altrimenti vai su");
+    mkc(root, &font_m, ui_accent(), 202, "192.168.4.1");
+    l_status = mkc(root, &font_m, C_DIM, 256, "");
+    tick();
+}
+
 static void enter(lv_obj_t *root, void *arg)
 {
     wifi_mgr_portal_start();
+    if (SCR_ROUND) { enter_round(root); return; }
     l_step1 = mk(root, &font_m, C_TEXT, 24, 14);
     lv_label_set_text(l_step1, "1  Dal telefono collegati alla rete");
     lv_obj_t *v1 = mk(root, &font_m, ui_accent(), 0, 14);
@@ -69,5 +94,5 @@ static void leave(void) { wifi_mgr_portal_stop(); }
 
 const app_t app_portal = {
     .name = "Configura Wi-Fi", .icon = ICON_MOBILE,
-    .enter = enter, .leave = leave, .tick = tick, .flags = APP_NO_SLEEP,
+    .enter = enter, .leave = leave, .tick = tick, .flags = APP_NO_SLEEP | APP_ROUND_OK,
 };

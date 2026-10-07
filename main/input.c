@@ -8,8 +8,9 @@
 #include "esp_timer.h"
 
 #define POLL_MS        12
-#define TAP_MAX_MOVE   18    // px
-#define SWIPE_MIN      30    // px
+// in pixel della 3.49; sullo schermo tondo i pixel sono più piccoli (circa 1,4 volte)
+#define TAP_MAX_MOVE   (SCR_ROUND ? 25 : 18)
+#define SWIPE_MIN      (SCR_ROUND ? 42 : 30)
 #define HOLD_MS        1000
 // Il controller a volte "perde" il dito per qualche lettura durante uno swipe lento:
 // consideriamo il dito sollevato solo dopo ~85 ms di letture vuote consecutive.
@@ -44,8 +45,30 @@ static bool touch_read_raw(int *px, int *py)
     return true;
 }
 
+// CST9217 (AMOLED 1.75): comando 0xD000, poi conferma 0xAB. Un dito: stato 0x06 nei 4 bit
+// bassi del primo byte, coordinate a 12 bit. Il pannello è montato girato: si specchiano
+// tutte e due le coordinate (come nel BSP Waveshare).
+static bool touch_read_round(int *x, int *y)
+{
+    static const uint8_t rd[2] = {0xD0, 0x00}, ack[3] = {0xD0, 0x00, 0xAB};
+    uint8_t b[15] = {0};
+    if (i2c_master_transmit_receive(board_touch_dev(), rd, 2, b, sizeof(b), 20) != ESP_OK) return false;
+    i2c_master_transmit(board_touch_dev(), ack, 3, 20);
+    if (b[6] != 0xAB) return false;
+    int n = b[5] & 0x7F;
+    if (n == 0 || n > 2 || (b[0] & 0x0F) != 0x06) return false;
+    int rx = (b[1] << 4) | (b[3] >> 4);
+    int ry = (b[2] << 4) | (b[3] & 0x0F);
+    if (rx > R_LCD_W - 1) rx = R_LCD_W - 1;
+    if (ry > R_LCD_H - 1) ry = R_LCD_H - 1;
+    *x = R_LCD_W - 1 - rx;
+    *y = R_LCD_H - 1 - ry;
+    return true;
+}
+
 bool input_touch(int *x, int *y)
 {
+    if (BOARD_IS_ROUND()) return touch_read_round(x, y);
     int px, py;
     if (!touch_read_raw(&px, &py)) return false;
     // stessa trasformazione che LVGL applica con la rotazione 90°/270°

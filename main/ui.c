@@ -97,6 +97,10 @@ static void bar_update(void)
     // ogni secondo si ridisegnerebbe (e invierebbe al pannello) tutto lo schermo
     const frame_t *f = &stack[depth - 1];
     const char *title = f->app->title ? f->app->title(f->arg) : f->app->name;
+    if (title && SCR_ROUND) {   // sul tondo c'è poco spazio: solo l'ultima parte del percorso
+        const char *last = strstr(title, "» ");
+        while (last) { title = last + strlen("» "); last = strstr(title, "» "); }
+    }
     ui_set_text(bar_title, title ? title : "");
 
     char t[24];
@@ -139,7 +143,8 @@ static void bar_update(void)
         ble_mgr_set_battery(p);
         const char *ic = p > 85 ? LV_SYMBOL_BATTERY_FULL : p > 60 ? LV_SYMBOL_BATTERY_3
                        : p > 35 ? LV_SYMBOL_BATTERY_2 : p > 12 ? LV_SYMBOL_BATTERY_1 : LV_SYMBOL_BATTERY_EMPTY;
-        snprintf(t, sizeof(t), "%s %d%%", ic, p);
+        // sull'AMOLED l'AXP2101 dice anche se è in carica
+        snprintf(t, sizeof(t), "%s%s %d%%", board_charging() ? LV_SYMBOL_CHARGE " " : "", ic, p);
         ui_set_text(bar_batt, t);
         ui_set_text_color(bar_batt, p <= 12 ? C_WARN : C_TEXT);
     } else {
@@ -206,6 +211,12 @@ static void close_top(void)
 void ui_push(const app_t *app, void *arg)
 {
     if (depth >= STACK_MAX) return;
+    // sullo schermo tondo le app si adattano una alla volta: quelle non ancora pronte
+    // non si aprono (la loro grafica è fatta per 640×172)
+    if (SCR_ROUND && !(app->flags & APP_ROUND_OK)) {
+        ui_toast("Su questo schermo arriva con un prossimo aggiornamento");
+        return;
+    }
     if (depth > 0) leave_top();
     stack[depth++] = (frame_t){app, arg};
     show_top(+1);
@@ -370,8 +381,79 @@ static void bar_cb(lv_timer_t *t)
 
 /* ---------------- lista "precedente / corrente / successiva" ---------------- */
 
+/* Sullo schermo tondo (stile smartwatch) tutto è centrato: sopra la voce precedente,
+ * poi l'icona, la voce corrente grande con il valore sotto, in basso la successiva; la
+ * posizione nella lista è un arco sul bordo destro. Le altezze sono riferite al centro
+ * del cerchio (ROUND_CY nel contenuto, sotto la barra). */
+#define ROUND_CY (SCR_H / 2 - STATUS_H)
+
+static lv_obj_t *mk_center(lv_obj_t *p, const lv_font_t *f, lv_color_t c, int w, int y)
+{
+    lv_obj_t *l = mk_label(p, f, c);
+    lv_obj_set_width(l, w);
+    lv_obj_set_style_text_align(l, LV_TEXT_ALIGN_CENTER, 0);
+    lv_obj_align(l, LV_ALIGN_TOP_MID, 0, y);
+    return l;
+}
+
+static void list_view_create_round(list_view_t *v, lv_obj_t *root)
+{
+    v->prev = mk_center(root, &font_m, C_DIM, 300, ROUND_CY - 146);
+    v->icon = mk_center(root, &font_icon, ui_accent(), 120, ROUND_CY - 102);
+    v->main = mk_center(root, &font_l, C_TEXT, 400, ROUND_CY - 30);
+    v->sub = mk_center(root, &font_m, ui_accent(), 380, ROUND_CY + 22);
+    lv_obj_set_style_radius(v->sub, 6, 0);
+    v->next = mk_center(root, &font_m, C_DIM, 280, ROUND_CY + 128);
+    v->marker = NULL;
+    v->thumb = NULL;
+    // arco sul bordo destro: tutta la lista, e in colore la posizione
+    v->track = lv_arc_create(root);
+    lv_obj_remove_style_all(v->track);
+    lv_obj_set_size(v->track, SCR_W - 16, SCR_H - 16);
+    lv_obj_set_pos(v->track, 8, 8 - STATUS_H);
+    lv_arc_set_bg_angles(v->track, 325, 35);
+    lv_obj_set_style_arc_width(v->track, 4, LV_PART_MAIN);
+    lv_obj_set_style_arc_color(v->track, C_FAINT, LV_PART_MAIN);
+    lv_obj_set_style_arc_rounded(v->track, true, LV_PART_MAIN);
+    lv_obj_set_style_arc_width(v->track, 4, LV_PART_INDICATOR);
+    lv_obj_set_style_arc_color(v->track, ui_accent(), LV_PART_INDICATOR);
+    lv_obj_set_style_arc_rounded(v->track, true, LV_PART_INDICATOR);
+    lv_arc_set_mode(v->track, LV_ARC_MODE_NORMAL);
+    lv_obj_clear_flag(v->track, LV_OBJ_FLAG_CLICKABLE);
+}
+
+static void list_view_set_round(list_view_t *v, const char *t, bool has_sub, int index, int count)
+{
+    // la voce corrente grande; se non ci sta, carattere medio su due righe. Si misura il
+    // testo passato: quello dell'etichetta, tagliato con i puntini, sarebbe già più corto
+    const lv_font_t *f = lv_text_get_width(t, strlen(t), &font_l, 0) > 390 ? &font_m : &font_l;
+    if (lv_obj_get_style_text_font(v->main, 0) != f) {
+        lv_obj_set_style_text_font(v->main, f, 0);
+        lv_label_set_long_mode(v->main, f == &font_m ? LV_LABEL_LONG_WRAP : LV_LABEL_LONG_DOT);
+    }
+    lv_obj_t *o[] = {v->main, v->sub};
+    bool two = f == &font_m && lv_text_get_width(t, strlen(t), &font_m, 0) > 390;   // su due righe
+    int ys[] = {two ? ROUND_CY - 44 : has_sub ? ROUND_CY - 30 : ROUND_CY - 24, two ? ROUND_CY + 30 : ROUND_CY + 22};
+    for (int i = 0; i < 2; i++)
+        if (lv_obj_get_style_y(o[i], 0) != ys[i]) lv_obj_align(o[i], LV_ALIGN_TOP_MID, 0, ys[i]);
+    if (count > 1) {
+        // l'arco va da 325° a 35° (70°): il segno è lungo 70/count, almeno 8°
+        int span = 70 / count;
+        if (span < 8) span = 8;
+        int start = 325 + (70 - span) * index / (count - 1);
+        int s = start % 360, e = (start + span) % 360;
+        if (lv_arc_get_angle_start(v->track) != s || lv_arc_get_angle_end(v->track) != e) lv_arc_set_angles(v->track, s, e);
+        if (!lv_color_eq(lv_obj_get_style_arc_color(v->track, LV_PART_INDICATOR), ui_accent()))
+            lv_obj_set_style_arc_color(v->track, ui_accent(), LV_PART_INDICATOR);
+        set_hidden(v->track, false);
+    } else {
+        set_hidden(v->track, true);
+    }
+}
+
 void list_view_create(list_view_t *v, lv_obj_t *root)
 {
+    if (SCR_ROUND) { list_view_create_round(v, root); return; }
     v->prev = mk_label(root, &font_m, C_DIM);
     lv_obj_set_pos(v->prev, 76, 8);
     lv_obj_set_width(v->prev, 520);
@@ -430,8 +512,8 @@ void list_view_set(list_view_t *v, const char *icon, const char *prev, const cha
 {
     // i menu si ridisegnano ogni secondo per i valori dinamici: si cambia solo il necessario
     lv_color_t acc = ui_accent();
-    set_bg(v->marker, acc);
-    set_bg(v->thumb, acc);
+    if (v->marker) set_bg(v->marker, acc);
+    if (v->thumb) set_bg(v->thumb, acc);
     ui_set_text_color(v->icon, acc);
     ui_set_text_color(v->sub, acc);
     ui_set_text(v->icon, icon ? icon : "");
@@ -440,6 +522,16 @@ void list_view_set(list_view_t *v, const char *icon, const char *prev, const cha
     ui_set_text(v->main, main ? main : "");
     bool has_sub = sub && *sub;
     ui_set_text(v->sub, has_sub ? sub : "");
+    if (SCR_ROUND) {
+        list_view_set_round(v, main ? main : "", has_sub, index, count);
+        if (dir) {
+            int dy = dir > 0 ? 22 : -22;
+            anim_in(v->main, dy);
+            anim_in(v->icon, dy);
+            anim_in(v->sub, dy);
+        }
+        return;
+    }
     int x = icon ? 76 : 22;
     set_width(v->main, SCR_W - x - 24);
     set_width(v->sub, SCR_W - x - 24);
@@ -483,22 +575,37 @@ void ui_init(void)
     bar = lv_obj_create(scr);
     lv_obj_remove_style_all(bar);
     lv_obj_set_size(bar, SCR_W, STATUS_H);
-    lv_obj_set_style_border_side(bar, LV_BORDER_SIDE_BOTTOM, 0);
-    lv_obj_set_style_border_width(bar, 1, 0);
-    lv_obj_set_style_border_color(bar, C_FAINT, 0);
+    if (!SCR_ROUND) {
+        lv_obj_set_style_border_side(bar, LV_BORDER_SIDE_BOTTOM, 0);
+        lv_obj_set_style_border_width(bar, 1, 0);
+        lv_obj_set_style_border_color(bar, C_FAINT, 0);
+    }
 
     bar_title = mk_label(bar, &font_s, C_DIM);
-    lv_obj_set_width(bar_title, 330);
-    lv_obj_align(bar_title, LV_ALIGN_LEFT_MID, 10, 0);
-
-    // a destra: ora, Wi-Fi, Bluetooth, batteria in una riga flex
+    // ora, Wi-Fi, Bluetooth, batteria in una riga flex: a destra sulla 3.49; sul tondo
+    // centrata in cima (dove il cerchio è stretto) con il titolo sotto
     bar_right = lv_obj_create(bar);
     lv_obj_remove_style_all(bar_right);
-    lv_obj_set_size(bar_right, LV_SIZE_CONTENT, STATUS_H);
     lv_obj_set_flex_flow(bar_right, LV_FLEX_FLOW_ROW);
     lv_obj_set_flex_align(bar_right, LV_FLEX_ALIGN_END, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
     lv_obj_set_style_pad_column(bar_right, 12, 0);
-    lv_obj_align(bar_right, LV_ALIGN_RIGHT_MID, -10, 0);
+    if (SCR_ROUND) {
+        lv_obj_set_width(bar_title, 260);
+        lv_obj_set_style_text_align(bar_title, LV_TEXT_ALIGN_CENTER, 0);
+        lv_obj_align(bar_title, LV_ALIGN_TOP_MID, 0, 50);
+        // larghezza fissa: con LV_SIZE_CONTENT la riga non si allargava quando cambiavano
+        // i testi, e ora e Wi-Fi restavano tagliati fuori
+        // in cima il cerchio è stretto: la riga sta un po' più in basso, con voci più vicine
+        lv_obj_set_size(bar_right, 260, 30);
+        lv_obj_set_flex_align(bar_right, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+        lv_obj_set_style_pad_column(bar_right, 8, 0);
+        lv_obj_align(bar_right, LV_ALIGN_TOP_MID, 0, 18);
+    } else {
+        lv_obj_set_width(bar_title, 330);
+        lv_obj_align(bar_title, LV_ALIGN_LEFT_MID, 10, 0);
+        lv_obj_set_size(bar_right, 280, STATUS_H);   // fissa, voci allineate a destra (vedi sopra)
+        lv_obj_align(bar_right, LV_ALIGN_RIGHT_MID, -10, 0);
+    }
     bar_time = mk_label(bar_right, &font_s, C_TEXT);
     bar_wifi = mk_label(bar_right, &font_s, C_TEXT);
     bar_ble = mk_label(bar_right, &font_s, C_TEXT);
@@ -520,7 +627,14 @@ void ui_init(void)
     lv_obj_set_style_pad_hor(toast, 14, 0);
     lv_obj_set_style_pad_ver(toast, 6, 0);
     lv_obj_set_style_radius(toast, 6, 0);
-    lv_obj_align(toast, LV_ALIGN_BOTTOM_MID, 0, -8);
+    if (SCR_ROUND) {   // più in alto (in basso il cerchio è stretto) e su più righe
+        lv_obj_set_style_max_width(toast, 340, 0);
+        lv_obj_set_style_text_align(toast, LV_TEXT_ALIGN_CENTER, 0);
+        lv_label_set_long_mode(toast, LV_LABEL_LONG_WRAP);
+        lv_obj_align(toast, LV_ALIGN_BOTTOM_MID, 0, -60);
+    } else {
+        lv_obj_align(toast, LV_ALIGN_BOTTOM_MID, 0, -8);
+    }
     lv_obj_add_flag(toast, LV_OBJ_FLAG_HIDDEN);
 
     home_init();

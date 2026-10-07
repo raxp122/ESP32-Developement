@@ -9,12 +9,13 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <math.h>
 
 #define KEY_H    42
 #define KB_Y     (SCR_H - 3 * KEY_H)    // 46: sopra resta la riga del testo
 #define KEY_W    64
 #define ROW3_W   56                     // tasti lettera della terza riga (lascia spazio ai comandi)
-#define MAX_SHOW 46                     // caratteri visibili nella riga del testo
+#define MAX_SHOW (SCR_ROUND ? 20 : 46)   // caratteri visibili nella riga del testo
 // Il controller del touch a volte "perde" il dito per qualche lettura anche se è fermo:
 // se bastassero due letture vuote, un solo tocco diventerebbe due lettere. Il dito conta
 // come sollevato solo dopo RELEASE_MS senza letture; un tocco più corto di PRESS_MIN_MS
@@ -41,6 +42,7 @@ typedef struct { char str[8]; int code; int x, y, w; lv_obj_t *obj; } kb_key_t;
 
 static kb_key_t keys[32];
 static int n_keys, page, key_down = -1;
+static int key_h = KEY_H;      // altezza della riga (più alta sullo schermo tondo)
 static bool caps;              // maiuscolo fisso
 static uint32_t shift_tick;    // per il doppio tocco
 static char text[72];
@@ -77,9 +79,58 @@ static void add_row(const char *row, int x, int y, int w)
     }
 }
 
-static void build_keys(void)
+/* Schermo tondo: quattro righe, ognuna larga quanto il cerchio a quell'altezza.
+ *   10 lettere · 9 lettere · maiuscole + 7 lettere + cancella · scheda, spazio, invio */
+#define R_KEY_H  62
+#define R_ROW0   146
+
+static int chord(int y)   // larghezza utile del cerchio all'altezza y (con margine)
+{
+    int r = SCR_W / 2, dy = y - SCR_H / 2;
+    int half = (int)sqrtf((float)(r * r - dy * dy));
+    return 2 * half - 24;
+}
+
+static void add_row_fit(const char *row, int extra_left, int extra_right, int y, int *x_out, int *w_out)
+{
+    int n = 0;
+    for (const char *c = row; *c; c += utf8_len(c)) n++;
+    // la riga più stretta fra il bordo alto e quello basso dei tasti
+    int wmax = chord(y) < chord(y + R_KEY_H) ? chord(y) : chord(y + R_KEY_H);
+    int w = wmax / (n + extra_left + extra_right);
+    if (w > 48) w = 48;
+    int x = (SCR_W - w * (n + extra_left + extra_right)) / 2;
+    *x_out = x;
+    *w_out = w;
+    add_row(row, x + extra_left * w, y, w);
+}
+
+static void build_keys_round(void)
 {
     n_keys = 0;
+    key_h = R_KEY_H;
+    bool letters = page == P_LOWER || page == P_UPPER;
+    int x, w, y = R_ROW0;
+    add_row_fit(rows[page][0], 0, 0, y, &x, &w);
+    y += R_KEY_H;
+    add_row_fit(rows[page][1], 0, 0, y, &x, &w);
+    y += R_KEY_H;
+    add_row_fit(rows[page][2], 1, 1, y, &x, &w);
+    add(letters ? LV_SYMBOL_UP : "abc", letters ? K_SHIFT : K_LETTERS, x, y, w);
+    add(LV_SYMBOL_BACKSPACE, K_BS, x + 8 * w, y, w);
+    y += R_KEY_H;
+    int wl = chord(y + R_KEY_H);
+    x = (SCR_W - wl) / 2;
+    add(page_next_label[page], K_PAGE, x, y, wl / 4);
+    add("spazio", K_SPACE, x + wl / 4, y, wl / 2);
+    add(LV_SYMBOL_NEW_LINE, K_ENTER, x + 3 * wl / 4, y, wl / 4);
+}
+
+static void build_keys(void)
+{
+    if (SCR_ROUND) { build_keys_round(); return; }
+    n_keys = 0;
+    key_h = KEY_H;
     bool letters = page == P_LOWER || page == P_UPPER;
     add_row(rows[page][0], 0, KB_Y, KEY_W);
     add_row(rows[page][1], 0, KB_Y + KEY_H, KEY_W);
@@ -110,7 +161,7 @@ static void render_keys(void)
         lv_obj_t *o = lv_obj_create(kb_cont);
         lv_obj_remove_style_all(o);
         lv_obj_set_pos(o, keys[i].x + 2, keys[i].y + 2);
-        lv_obj_set_size(o, keys[i].w - 4, KEY_H - 4);
+        lv_obj_set_size(o, keys[i].w - 4, key_h - 4);
         lv_obj_set_style_radius(o, 6, 0);
         lv_obj_set_style_bg_opa(o, LV_OPA_COVER, 0);
         lv_obj_t *l = lv_label_create(o);
@@ -221,7 +272,7 @@ static void press(int i)
 static int hit(int x, int y)
 {
     for (int i = 0; i < n_keys; i++)
-        if (x >= keys[i].x && x < keys[i].x + keys[i].w && y >= keys[i].y && y < keys[i].y + KEY_H) return i;
+        if (x >= keys[i].x && x < keys[i].x + keys[i].w && y >= keys[i].y && y < keys[i].y + key_h) return i;
     return -1;
 }
 
@@ -282,13 +333,21 @@ void keyboard_open(lv_obj_t *root, const char *title, const char *initial, bool 
     // riga del testo: titolo piccolo, testo, contatore. I tasti iniziano sotto (y = 46).
     l_title = mk_label(&font_s, C_DIM);
     lv_label_set_text(l_title, title ? title : "");
-    lv_obj_set_pos(l_title, 12, 2);
     l_text = mk_label(&font_m, C_TEXT);
-    lv_obj_set_pos(l_text, 12, 19);
-    lv_obj_set_width(l_text, SCR_W - 90);
     lv_label_set_long_mode(l_text, LV_LABEL_LONG_CLIP);
     l_count = mk_label(&font_s, C_DIM);
-    lv_obj_align(l_count, LV_ALIGN_TOP_RIGHT, -10, 24);
+    if (SCR_ROUND) {   // in cima al cerchio, centrati: titolo, testo, contatore
+        lv_obj_align(l_title, LV_ALIGN_TOP_MID, 0, 40);
+        lv_obj_set_width(l_text, 340);
+        lv_obj_set_style_text_align(l_text, LV_TEXT_ALIGN_CENTER, 0);
+        lv_obj_align(l_text, LV_ALIGN_TOP_MID, 0, 66);
+        lv_obj_align(l_count, LV_ALIGN_TOP_MID, 0, 102);
+    } else {
+        lv_obj_set_pos(l_title, 12, 2);
+        lv_obj_set_pos(l_text, 12, 19);
+        lv_obj_set_width(l_text, SCR_W - 90);
+        lv_obj_align(l_count, LV_ALIGN_TOP_RIGHT, -10, 24);
+    }
     show_text();
 
     rebuild();

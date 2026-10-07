@@ -43,7 +43,7 @@ static void render(int dir)
     ui_set_text_color(lv.sub, editing ? C_BG : (confirm_idx == m->sel ? C_WARN : ui_accent()));
     int32_t pad = editing ? 8 : 0;
     if (lv_obj_get_style_pad_left(lv.sub, 0) != pad) lv_obj_set_style_pad_hor(lv.sub, pad, 0);
-    int32_t w = editing ? LV_SIZE_CONTENT : SCR_W - 100;
+    int32_t w = editing ? LV_SIZE_CONTENT : SCR_ROUND ? 380 : SCR_W - 100;
     if (lv_obj_get_style_width(lv.sub, 0) != w) lv_obj_set_width(lv.sub, w);
 }
 
@@ -134,4 +134,5 @@ const app_t app_menu = {
     .nav = nav,
     .tick = tick,
     .title = title,
+    .flags = APP_ROUND_OK,
 };

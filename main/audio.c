@@ -1,6 +1,8 @@
 // audio.c
-// Pin dal firmware di fabbrica Waveshare (board S3_LCD_3_49): MCLK 7, BCLK 15, WS 46, DOUT 45.
-// L'amplificatore è abilitato da EXIO7 del TCA9554 (già alto all'avvio).
+// 3.49: pin dal firmware di fabbrica Waveshare (MCLK 7, BCLK 15, WS 46, DOUT 45, DIN 6);
+// l'amplificatore è abilitato da EXIO7 del TCA9554 (già alto all'avvio).
+// AMOLED 1.75: MCLK 42, BCLK 9, WS 45, DOUT 8, DIN 10 (ES7210, MIC1/MIC2 su SDOUT1);
+// l'amplificatore NS4150B si abilita con GPIO46.
 #include "audio.h"
 #include "board.h"
 #include "settings.h"
@@ -10,12 +12,14 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "esp_log.h"
+#include "driver/gpio.h"
 
-#define PIN_MCLK 7
-#define PIN_BCLK 15
-#define PIN_WS   46
-#define PIN_DOUT 45
-#define PIN_DIN  6
+#define PIN_MCLK (BOARD_IS_ROUND() ? 42 : 7)
+#define PIN_BCLK (BOARD_IS_ROUND() ? 9 : 15)
+#define PIN_WS   (BOARD_IS_ROUND() ? 45 : 46)
+#define PIN_DOUT (BOARD_IS_ROUND() ? 8 : 45)
+#define PIN_DIN  (BOARD_IS_ROUND() ? 10 : 6)
+#define PIN_PA_ROUND 46
 #define BLOCK    240   // 10 ms
 
 static const char *TAG = "audio";
@@ -74,6 +78,11 @@ bool audio_init(void)
         goto fail;
     }
     audio_set_volume(g_set.volume);
+    if (BOARD_IS_ROUND()) {   // amplificatore acceso
+        gpio_config_t pa = {.pin_bit_mask = 1ULL << PIN_PA_ROUND, .mode = GPIO_MODE_OUTPUT};
+        gpio_config(&pa);
+        gpio_set_level(PIN_PA_ROUND, 1);
+    }
 
     // ES7210 (microfoni): l'indirizzo dipende dai pin A0/A1, lo cerco
     for (uint8_t a = 0x40; a <= 0x43 && !mic_ok; a++) {

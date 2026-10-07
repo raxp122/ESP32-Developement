@@ -6,11 +6,17 @@
 #include "esp_adc/adc_cali.h"
 #include "esp_adc/adc_cali_scheme.h"
 #include "esp_log.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
 
 static const char *TAG = "board";
 
 static i2c_master_bus_handle_t bus0, bus1;
-static i2c_master_dev_handle_t dev_tca, dev_rtc, dev_imu, dev_touch;
+static i2c_master_dev_handle_t dev_tca, dev_rtc, dev_imu, dev_touch, dev_axp;
+static board_kind_t kind = BOARD_LCD349;
+
+board_kind_t board_kind(void) { return kind; }
+const char *board_name(void) { return kind == BOARD_AMOLED175 ? "ESP32-S3-Touch-AMOLED-1.75" : "ESP32-S3-Touch-LCD-3.49"; }
 static adc_oneshot_unit_handle_t adc;
 static adc_cali_handle_t adc_cali;
 static bool imu_ok;
@@ -63,20 +69,106 @@ static void imu_init(void)
     imu_ok = true;
 }
 
-void board_init(void)
+static i2c_master_bus_handle_t new_bus(int port, int sda, int scl)
 {
     i2c_master_bus_config_t bc = {
         .clk_source = I2C_CLK_SRC_DEFAULT,
-        .i2c_port = I2C_NUM_0,
-        .scl_io_num = PIN_I2C0_SCL,
-        .sda_io_num = PIN_I2C0_SDA,
+        .i2c_port = port,
+        .scl_io_num = scl,
+        .sda_io_num = sda,
         .glitch_ignore_cnt = 7,
         .flags.enable_internal_pullup = true,
     };
-    ESP_ERROR_CHECK(i2c_new_master_bus(&bc, &bus0));
-    bc.i2c_port = I2C_NUM_1;
-    bc.scl_io_num = PIN_I2C1_SCL;
-    bc.sda_io_num = PIN_I2C1_SDA;
+    i2c_master_bus_handle_t b = NULL;
+    if (i2c_new_master_bus(&bc, &b) != ESP_OK) return NULL;
+    return b;
+}
+
+/* ---------------- AMOLED 1.75: AXP2101 ---------------- */
+
+static uint8_t axp_get(uint8_t reg)
+{
+    uint8_t v = 0;
+    reg_read(dev_axp, reg, &v, 1);
+    return v;
+}
+
+static void axp_init(void)
+{
+    // misura della tensione della batteria (ADC) e misuratore di carica accesi
+    reg_write(dev_axp, 0x30, axp_get(0x30) | 0x01);
+    reg_write(dev_axp, 0x18, axp_get(0x18) | 0x08);
+    // tasto PWR tenuto: lo spegnimento "di forza" dell'AXP solo dopo 10 s
+    // (a 2 s spegne il firmware, con la sua schermata)
+    reg_write(dev_axp, 0x27, axp_get(0x27) | 0x0C);
+}
+
+static void amoled_init(void)
+{
+    dev_axp = add_dev(bus0, R_ADDR_AXP2101);
+    dev_tca = add_dev(bus0, ADDR_TCA9554);
+    dev_rtc = add_dev(bus0, ADDR_RTC);
+    dev_imu = add_dev(bus0, ADDR_IMU);
+    dev_touch = add_dev(bus0, R_ADDR_TOUCH);
+    axp_init();
+    // TCA9554: tutto in ingresso tranne il reset del GPS (versione -G), tenuto alto
+    uint8_t out = 0xFF, cfg = 0xFF;
+    reg_read(dev_tca, 0x01, &out, 1);
+    reg_read(dev_tca, 0x03, &cfg, 1);
+    out |= 1 << R_EXIO_GPS_RST;
+    cfg &= ~(1 << R_EXIO_GPS_RST);
+    if (reg_write(dev_tca, 0x01, out) != ESP_OK || reg_write(dev_tca, 0x03, cfg) != ESP_OK)
+        ESP_LOGW(TAG, "TCA9554 non risponde");
+    // reset del touch (il display ha il suo, in display.c)
+    gpio_config_t rst = {.pin_bit_mask = 1ULL << R_PIN_TP_RST, .mode = GPIO_MODE_OUTPUT};
+    gpio_config(&rst);
+    gpio_set_level(R_PIN_TP_RST, 0);
+    vTaskDelay(pdMS_TO_TICKS(10));
+    gpio_set_level(R_PIN_TP_RST, 1);
+    vTaskDelay(pdMS_TO_TICKS(50));
+    imu_init();
+    gpio_config_t io = {.pin_bit_mask = 1ULL << PIN_BTN_BOOT, .mode = GPIO_MODE_INPUT, .pull_up_en = GPIO_PULLUP_ENABLE};
+    gpio_config(&io);
+}
+
+void board_init(void)
+{
+    // Quale scheda? Prima la 3.49 (TCA9554 sul bus 47/48: sull'AMOLED quei pin non sono
+    // collegati) e subito, perché a batteria il suo latch va tenuto acceso al più presto.
+    // Poi l'AMOLED: AXP2101 (id 0x4A) sul bus 15/14. Sulla 3.49 i pin 14 e 15 sono del
+    // display e dell'audio, quindi non si tocca nulla lì se la 3.49 risponde.
+    bus0 = new_bus(I2C_NUM_0, PIN_I2C0_SDA, PIN_I2C0_SCL);
+    if (bus0 && i2c_master_probe(bus0, ADDR_TCA9554, 50) == ESP_OK) {
+        kind = BOARD_LCD349;
+    } else {
+        if (bus0) i2c_del_master_bus(bus0);
+        bus0 = new_bus(I2C_NUM_0, R_PIN_I2C_SDA, R_PIN_I2C_SCL);
+        uint8_t id = 0, reg = 0x03;
+        i2c_device_config_t dc = {.dev_addr_length = I2C_ADDR_BIT_LEN_7, .device_address = R_ADDR_AXP2101, .scl_speed_hz = 300000};
+        i2c_master_dev_handle_t d = NULL;
+        if (bus0 && i2c_master_probe(bus0, R_ADDR_AXP2101, 50) == ESP_OK &&
+            i2c_master_bus_add_device(bus0, &dc, &d) == ESP_OK &&
+            i2c_master_transmit_receive(d, &reg, 1, &id, 1, 50) == ESP_OK && id == 0x4A) {
+            kind = BOARD_AMOLED175;
+        } else {
+            // né l'una né l'altra: si parte come 3.49 (la scheda di sempre)
+            ESP_LOGE(TAG, "scheda non riconosciuta (AXP2101 id=0x%02x)", id);
+            if (bus0) i2c_del_master_bus(bus0);
+            bus0 = new_bus(I2C_NUM_0, PIN_I2C0_SDA, PIN_I2C0_SCL);
+        }
+        if (d) i2c_master_bus_rm_device(d);
+    }
+    ESP_LOGI(TAG, "scheda: %s", board_name());
+    if (kind == BOARD_AMOLED175) { amoled_init(); return; }
+
+    i2c_master_bus_config_t bc = {
+        .clk_source = I2C_CLK_SRC_DEFAULT,
+        .i2c_port = I2C_NUM_1,
+        .scl_io_num = PIN_I2C1_SCL,
+        .sda_io_num = PIN_I2C1_SDA,
+        .glitch_ignore_cnt = 7,
+        .flags.enable_internal_pullup = true,
+    };
     ESP_ERROR_CHECK(i2c_new_master_bus(&bc, &bus1));
 
     dev_tca = add_dev(bus0, ADDR_TCA9554);
@@ -110,14 +202,30 @@ i2c_master_bus_handle_t board_i2c0(void) { return bus0; }
 
 void board_power_off(void)
 {
+    if (kind == BOARD_AMOLED175) {   // AXP2101: bit 0 del registro 0x10 spegne tutto
+        reg_write(dev_axp, 0x10, axp_get(0x10) | 0x01);
+        return;
+    }
     uint8_t out = 0xFF;
     reg_read(dev_tca, 0x01, &out, 1);
     out &= ~(1 << EXIO_POWER_HOLD);
     reg_write(dev_tca, 0x01, out);
 }
 
+bool board_charging(void)
+{
+    if (kind != BOARD_AMOLED175) return false;
+    return ((axp_get(0x01) >> 5) & 0x03) == 0x01;   // direzione della corrente: in carica
+}
+
 float board_battery_volts(void)
 {
+    if (kind == BOARD_AMOLED175) {
+        if (!(axp_get(0x00) & 0x08)) return 0;   // batteria assente
+        uint8_t r[2] = {0};
+        if (reg_read(dev_axp, 0x34, r, 2) != ESP_OK) return 0;
+        return (((r[0] & 0x3F) << 8) | r[1]) / 1000.0f;
+    }
     int raw = 0, mv = 0;
     if (adc_oneshot_read(adc, ADC_CHANNEL_3, &raw) != ESP_OK) return 0;
     if (adc_cali) adc_cali_raw_to_voltage(adc_cali, raw, &mv);
@@ -127,6 +235,10 @@ float board_battery_volts(void)
 
 int board_battery_percent(float v)
 {
+    if (kind == BOARD_AMOLED175) {   // il misuratore dell'AXP2101 è più preciso della curva
+        uint8_t p = axp_get(0xA4);
+        if (p <= 100) return p;
+    }
     // curva approssimata per una Li-ion a vuoto
     static const float tab[][2] = {
         {4.15f, 100}, {4.05f, 90}, {3.95f, 78}, {3.85f, 62}, {3.78f, 50},
@@ -229,4 +341,12 @@ bool board_imu_read6(vec3_t *g, vec3_t *w)
 }
 
 bool board_btn_boot(void) { return gpio_get_level(PIN_BTN_BOOT) == 0; }
-bool board_btn_pwr(void) { return gpio_get_level(PIN_BTN_PWR) == 0; }
+bool board_btn_pwr(void)
+{
+    if (kind == BOARD_AMOLED175) {   // dal TCA9554 (ingresso 4 alto = premuto)
+        uint8_t in = 0;
+        if (reg_read(dev_tca, 0x00, &in, 1) != ESP_OK) return false;
+        return (in >> R_EXIO_PWR) & 1;
+    }
+    return gpio_get_level(PIN_BTN_PWR) == 0;
+}

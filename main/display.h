@@ -1,10 +1,15 @@
-// display.h — pannello AXS15231B + LVGL 9 in orizzontale (640×172 logici)
+// display.h — schermo e LVGL 9. Le dimensioni dipendono dalla scheda (board.h):
+//   3.49: pannello AXS15231B in orizzontale, 640×172 logici (rotazione software)
+//   AMOLED 1.75: tondo 466×466 (display_round.c)
 #pragma once
 #include <stdbool.h>
+#include <stdint.h>
 #include "lvgl.h"
 
-#define SCR_W 640
-#define SCR_H 172
+extern int16_t g_scr_w, g_scr_h;   // fissati da display_init
+#define SCR_W ((int)g_scr_w)
+#define SCR_H ((int)g_scr_h)
+#define SCR_ROUND (g_scr_w == g_scr_h)   // schermo tondo: tutto deve stare nel cerchio
 
 void display_init(bool flipped);          // flipped = ruotato di 180°
 void display_set_flipped(bool flipped);

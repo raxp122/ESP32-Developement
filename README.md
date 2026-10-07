@@ -1,6 +1,18 @@
-# Gadget — launcher per Waveshare ESP32-S3-Touch-LCD-3.49 (V1)
+# Gadget — launcher per Waveshare ESP32-S3-Touch-LCD-3.49 (V1) e ESP32-S3-Touch-AMOLED-1.75
 
-Firmware ESP-IDF 5.4 + LVGL 9.2 con schermo in orizzontale (640×172), menu a gesti e app modulari.
+Firmware ESP-IDF 5.4 + LVGL 9.2 con menu a gesti e app modulari. Lo stesso firmware gira su due schede e all'avvio riconosce su quale si trova:
+- **ESP32-S3-Touch-LCD-3.49**: schermo in orizzontale 640×172;
+- **ESP32-S3-Touch-AMOLED-1.75** (anche -B e -G): AMOLED tondo 466×466, interfaccia in stile smartwatch.
+
+## Scheda tonda (AMOLED 1.75)
+Il riconoscimento è automatico: se sul bus I2C dei pin 47/48 risponde il TCA9554 è la 3.49, se sui pin 15/14 risponde l'AXP2101 è l'AMOLED. Pin, display, touch, alimentazione, batteria, microSD e audio si configurano di conseguenza. Il primo flash si fa via USB (`gadget.bin` a `0x0`), poi gli aggiornamenti OTA sono gli stessi della 3.49.
+
+Sullo schermo tondo è tutto più grande (caratteri circa 1,4 volte, generati con `tools/gen_fonts_round.py` dai font di `tools/fonts`) e centrato:
+- in cima ora, Wi-Fi, Bluetooth e batteria (con il simbolo di carica), sotto il titolo;
+- le liste: voce precedente in alto, icona, voce corrente grande con il valore, la successiva in basso, e la posizione su un arco a destra;
+- gli stessi gesti di sempre (swipe, BOOT, PWR: clic = schermo, tenuto 2 s = spegnimento dall'AXP2101).
+
+**Fase 1, la base:** menu e impostazioni, orologio, aggiornamento OTA, Wi-Fi (ricerca reti con tastiera tonda, o configurazione dal telefono). Le altre app sullo schermo tondo non si aprono ancora (un avviso lo dice): arriveranno adattate una alla volta. Doom resta solo sulla 3.49.
 
 ## Comandi
 | Gesto / tasto | Azione |
@@ -93,14 +105,12 @@ Pulsanti a destra:
 - **Registra**: registra quello che suoni in un file WAV nella cartella `theremin` della microSD. Con **Mic: sì** mixa anche il microfono, per cantare mentre suoni (il microfono sente anche l'altoparlante).
 - **Registrazioni**: elenco per riascoltarle (swipe a destra) o cancellarle (BOOT due volte).
 
-## Macchina della verità
-Dal launcher: **Macchina della verità**. Il soggetto tiene il Gadget con il braccio teso davanti a sé, con lo schermo verso l'operatore, che legge le istruzioni e fa le domande. Il Gadget misura il tremore della mano (giroscopio e accelerometro, 200 letture al secondo, senza i movimenti lenti del braccio); il grafico a destra mostra il tremore rispetto alla traccia base.
+## Sismografo
+Dal launcher: **Sismografo** → *Avvia*. Appoggia il Gadget su una superficie ferma (tavolo, pavimento): l'accelerometro misura le vibrazioni 200 volte al secondo e, tolta la gravità, il grafico mostra l'asse verticale con la scala che si adatta da sola. In alto la vibrazione attuale e il picco in mg (millesimi di g), con un'intensità locale stimata sulla scala Mercalli (Wald 1999: è quella che sente il Gadget, non quella del terremoto). BOOT azzera il picco, swipe a destra apre gli eventi. Lo schermo può spegnersi: le letture continuano finché l'app è aperta.
 
-1. **Traccia base**: 10 s fermo e in silenzio.
-2. **Calibrazione**: quattro domande, due con risposta vera e due con risposta falsa (l'ordine è V F F V o F V V F, così la stanchezza del braccio pesa uguale). Per ognuna tocca *Registra*, aspetta il via e fai la domanda: si registrano 6 s.
-3. **Domande vere**: il tremore della risposta si confronta con quello delle risposte vere e false della calibrazione. Il risultato è *Verità*, *Bugia*, *Incerto* o *Non si capisce* (se nella calibrazione vere e false si somigliano troppo), con la probabilità di bugia e l'affidabilità della calibrazione.
-
-Se il braccio si muove troppo la misura va ripetuta. È un gioco: il tremore cambia con l'emozione ma anche con la stanchezza e la concentrazione, non è una prova di nulla.
+- **Eventi**: dopo 20 s di calibrazione, un evento scatta quando la media breve dell'energia (STA, 0,5 s) supera di 3,5–5 volte quella lunga (LTA, 20 s) e la vibrazione supera la soglia scelta (metodo STA/LTA dei sismografi). Finisce dopo 2 s di calma (al massimo 2 minuti).
+- **Sensibilità**: alta (anche vibrazioni deboli), media, bassa (solo scosse forti). I colpi secchi e brevi (un passo, una porta) di solito non bastano: serve una vibrazione che duri almeno qualche decimo di secondo.
+- **Registra sulla microSD**: ogni evento, con 5 s prima e 5 s dopo, va in `sismo/AAAAMMGG-hhmmss.csv` (100 campioni al secondo, x/y/z in mg: si apre con Excel); il registro di tutti è `sismo/eventi.csv`. Dal menu si consultano gli ultimi 50 e si cancellano.
 
 ## Orologio scacchi
 Dal launcher: **Orologio scacchi** → *Nuova partita*. Lo schermo è diviso in due: chi ha mosso tocca la sua metà e parte l'orologio dell'avversario (all'inizio il nero tocca la sua metà per far partire il bianco). **BOOT** mette in pausa (con *Riprendi* e *Azzera*); in partita gli swipe non fanno nulla, si esce dalla pausa con swipe a sinistra.
@@ -163,9 +173,10 @@ Dalla 0.14 le impostazioni (NVS) stanno in fondo alla flash (`0xFF0000`): né l'
 **Passaggio dalla 0.13 (una volta sola):** la tabella delle partizioni cambia, quindi serve un flash via USB. Con l'immagine unica le impostazioni vecchie si perdono (stavano proprio nella zona che l'immagine riempie). Per conservarle, flasha invece i file separati della release/artifact: `bootloader.bin` a `0x0`, `partition-table.bin` a `0x8000`, `ota_data_initial.bin` a `0xf000`, `gadget-app.bin` a `0x20000`. Al primo avvio vengono copiate nella nuova posizione.
 
 ## Struttura
-- `main/board.*` pin, latch di alimentazione (TCA9554 EXIO6), batteria, RTC PCF85063, IMU QMI8658, pulsanti
-- `main/display.*` pannello AXS15231B in QSPI, rotazione software, task LVGL
-- `main/input.*` touch + riconoscimento gesti + pulsanti → eventi `nav_t`
+- `main/board.*` riconoscimento della scheda, pin, alimentazione (3.49: latch TCA9554 EXIO6 e batteria sull'ADC; AMOLED: AXP2101), RTC PCF85063, IMU QMI8658, pulsanti
+- `main/display.*` dimensioni dello schermo, pannello AXS15231B in QSPI (rotazione software), task LVGL · `main/display_round.*` AMOLED CO5300 466×466 (invio delle sole zone cambiate)
+- `main/fonts_sel.c` caratteri per la scheda (`main/fonts/font_*_r.c` per il tondo)
+- `main/input.*` touch (AXS15231B o CST9217) + riconoscimento gesti + pulsanti → eventi `nav_t`
 - `main/ui.*` pila di schermate, barra di stato, spegnimento schermo, azione rapida, `list_view`
 - `main/menu.c` menu generico (usato da home e impostazioni)
 - `main/wifi_mgr.*` Wi-Fi, scansione, portale captive per configurare la rete dal telefono, NTP
@@ -195,6 +206,6 @@ static bool nav(nav_t ev) {
 const app_t app_ciao = { .name = "Ciao", .icon = ICON_GHOST, .enter = enter, .nav = nav };
 ```
 Poi aggiungi `extern const app_t app_ciao;` in `apps/apps.h` e una voce in `apps/home.c`.
-Il file viene compilato in automatico. Flag utili: `APP_FULLSCREEN`, `APP_NO_SLEEP`, `APP_OWN_QUICK`.
+Il file viene compilato in automatico. Flag utili: `APP_FULLSCREEN`, `APP_NO_SLEEP`, `APP_OWN_QUICK`, `APP_ROUND_OK` (l'app è disegnata anche per lo schermo tondo: usa `SCR_W`/`SCR_H`/`SCR_ROUND` invece di coordinate fisse).
 Il callback `tick` viene chiamato ogni 200 ms mentre l'app è aperta. Tutto gira nel task LVGL:
 dagli altri task non toccare oggetti LVGL senza `display_lock()`.
