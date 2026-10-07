@@ -105,6 +105,15 @@ Pulsanti a destra:
 - **Registra**: registra quello che suoni in un file WAV nella cartella `theremin` della microSD. Con **Mic: sì** mixa anche il microfono, per cantare mentre suoni (il microfono sente anche l'altoparlante).
 - **Registrazioni**: elenco per riascoltarle (swipe a destra) o cancellarle (BOOT due volte).
 
+## Mappa Wi-Fi
+Dal launcher: **Mappa Wi-Fi** → *Apri la mappa*, poi cammina per l'edificio. Non serve una pianta: il Gadget costruisce una mappa relativa, cioè un grafo delle reti che vede.
+
+- **Punti** = reti, nei colori: fissa (colore d'accento), mobile (rosso), hotspot di un telefono (magenta). I **fili** collegano le reti viste nella stessa scansione. Il **punto bianco** sei tu, con la scia del percorso. In basso a destra c'è la larghezza della mappa in metri.
+- **Come funziona**: dalla potenza di ogni rete stima la distanza (-40 dBm a 1 m, esponente 2,7). Le ultime 48 scansioni sono le tue posizioni, ognuna con le distanze dalle reti viste. Posizioni e reti si sistemano insieme finché le distanze tornano, sapendo che tra una scansione e l'altra fai pochi passi: è il metodo dei robot che si orientano solo con le distanze. Le distanze sono indicative (in una prova su un edificio simulato di 30×15 m l'errore medio è di circa 3 m) e l'orientamento della mappa è arbitrario.
+- **Fisse e mobili**: hotspot = indirizzo casuale o nome da telefono (iPhone, Android, DIRECT-…); mobile = una rete che nella mappa continua a spostarsi molto più delle altre. Le reti che si muovono di poco o lentamente possono restare tra le fisse. Hotspot e mobili non deformano la mappa: si stimano a parte, con la loro scia.
+- **Comandi**: su/giù sceglie una rete (nome, potenza, distanza da te, numero di fili), swipe a destra apre l'elenco, BOOT mette in pausa.
+- **Salvataggio**: la mappa si salva sulla microSD (`wifimap/mappa.bin`) e riprende la volta dopo. *Esporta su microSD* scrive `wifimap/reti.csv` e `collegamenti.csv` per rifarla sul PC; *Nuova mappa* ricomincia.
+
 ## Sismografo
 Dal launcher: **Sismografo** → *Avvia*. Appoggia il Gadget su una superficie ferma (tavolo, pavimento): l'accelerometro misura le vibrazioni 200 volte al secondo e, tolta la gravità, il grafico mostra l'asse verticale con la scala che si adatta da sola. In alto la vibrazione attuale e il picco in mg (millesimi di g), con un'intensità locale stimata sulla scala Mercalli (Wald 1999: è quella che sente il Gadget, non quella del terremoto). BOOT azzera il picco, swipe a destra apre gli eventi. Lo schermo può spegnersi: le letture continuano finché l'app è aperta.
 
@@ -143,7 +152,7 @@ Solo il PC collegato da *Ricevi dal PC* (o un dispositivo associato) può mandar
 
 ## Backup e ripristino
 Impostazioni › Backup e ripristino:
-- **Crea un backup ora**: salva tutto (impostazioni, Wi-Fi, polipetto, Radar e Pokédex, livella, quello che il Q-20 ha imparato) in un file della cartella `backup` sulla microSD.
+- **Crea un backup ora**: salva tutto (impostazioni, Wi-Fi, polipetto, Radar e Pokédex, livella, quello che il Q-20 ha imparato, la mappa Wi-Fi) in un file della cartella `backup` sulla microSD.
 - **Ripristina un backup**: elenca i backup; si possono usare solo quelli fatti con questa versione del firmware o con una più vecchia. Da un backup vecchio le impostazioni nuove prendono il valore predefinito e quelle che non esistono più si ignorano. Dopo il ripristino la scheda si riavvia.
 - **Backup prima degli aggiornamenti**: prima di ogni aggiornamento OTA ne crea uno da solo.
 
