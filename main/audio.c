@@ -29,6 +29,7 @@ static es8311_handle_t codec;
 static volatile audio_synth_t synth;
 static TaskHandle_t task_h;
 static bool ok;
+static const char *status = "Non ancora avviato";
 static volatile bool in_synth;   // il task audio sta eseguendo il sintetizzatore
 
 static void audio_task(void *arg)
@@ -51,7 +52,7 @@ bool audio_init(void)
     if (ok) return true;
     i2s_chan_config_t cc = I2S_CHANNEL_DEFAULT_CONFIG(I2S_NUM_0, I2S_ROLE_MASTER);
     cc.auto_clear = true;
-    if (i2s_new_channel(&cc, &tx, &rx) != ESP_OK) return false;   // full duplex: stessi clock
+    if (i2s_new_channel(&cc, &tx, &rx) != ESP_OK) { status = "I2S occupato"; return false; }   // full duplex: stessi clock
     i2s_std_config_t sc = {
         .clk_cfg = I2S_STD_CLK_DEFAULT_CONFIG(AUDIO_RATE),
         .slot_cfg = I2S_STD_PHILIPS_SLOT_DEFAULT_CONFIG(I2S_DATA_BIT_WIDTH_16BIT, I2S_SLOT_MODE_STEREO),
@@ -62,10 +63,12 @@ bool audio_init(void)
     // MCLK = 512 × fs = 12,288 MHz: è la combinazione supportata sia da ES8311 sia da ES7210 a 24 kHz
     sc.clk_cfg.mclk_multiple = I2S_MCLK_MULTIPLE_512;
     i2c_master_dev_handle_t dev = NULL;
+    status = "I2S non configurabile";
     if (i2s_channel_init_std_mode(tx, &sc) != ESP_OK || i2s_channel_init_std_mode(rx, &sc) != ESP_OK) goto fail;
     i2s_channel_enable(tx); // l'MCLK deve girare prima di configurare il codec
 
     i2c_device_config_t dc = {.dev_addr_length = I2C_ADDR_BIT_LEN_7, .device_address = ES8311_ADDRESS_0, .scl_speed_hz = 300000};
+    status = "ES8311 non risponde";
     if (i2c_master_bus_add_device(board_i2c0(), &dc, &dev) != ESP_OK) { dev = NULL; goto fail; }
     codec = es8311_create(dev);
     es8311_clock_config_t clk = {
@@ -108,6 +111,7 @@ bool audio_init(void)
     }
     xTaskCreatePinnedToCore(audio_task, "audio", 4096, NULL, 6, &task_h, 0);
     ok = true;
+    status = "Pronto";
     return true;
 
 fail:
@@ -152,6 +156,8 @@ void audio_stop_if(audio_synth_t s)
 
 audio_synth_t audio_current(void) { return synth; }
 bool audio_mic_active(void) { return rx_on; }
+const char *audio_status(void) { return status; }
+bool audio_mic_ok(void) { return mic_ok; }
 
 bool audio_mic_start(void)
 {

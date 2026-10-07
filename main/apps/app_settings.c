@@ -12,6 +12,8 @@
 #include "esp_timer.h"
 #include "esp_idf_version.h"
 #include "ota.h"
+#include "audio.h"
+#include <math.h>
 
 
 static const char *onoff(bool v) { return v ? "Acceso" : "Spento"; }
@@ -286,6 +288,58 @@ static const menu_item_t sys_items[] = {
 };
 static menu_t sys_menu = {"Impostazioni » Sistema", sys_items, sizeof(sys_items) / sizeof(sys_items[0]), 0, NULL};
 
+/* ---------------- Audio ---------------- */
+
+// prova: tre note che salgono (do-mi-sol, 1,2 s), poi l'uscita si libera da sola
+static volatile uint32_t t_n;
+static float t_ph;
+static void test_synth(int16_t *b, int n)
+{
+    static const float NOTE[3] = {523.25f, 659.25f, 783.99f};
+    const uint32_t len = AUDIO_RATE * 4 / 10;
+    for (int i = 0; i < n; i++) {
+        uint32_t t = t_n;
+        if (t >= 3 * len) { b[i] = 0; continue; }
+        t_ph += NOTE[t / len] / AUDIO_RATE;
+        if (t_ph >= 1) t_ph -= 1;
+        float env = (t % len) < 240 ? (t % len) / 240.0f : (len - t % len) < 1200 ? (len - t % len) / 1200.0f : 1;
+        b[i] = (int16_t)(sinf(6.2831853f * t_ph) * env * 12000);
+        t_n = t + 1;
+    }
+    if (t_n >= 3 * len) audio_stop_if(test_synth);
+}
+
+static void v_audio(char *b, int n)
+{
+    audio_synth_t cur = audio_current();
+    snprintf(b, n, "%s%s%s", audio_status(),
+             audio_status()[0] == 'P' ? (audio_mic_ok() ? " · microfoni ok" : " · microfoni assenti") : "",
+             cur && cur != test_synth ? " · uscita occupata da un'app" : audio_mic_active() ? " · microfoni in ascolto" : "");
+}
+static void a_audio_test(void)
+{
+    if (!audio_init()) { ui_toast(audio_status()); return; }
+    if (g_set.volume == 0) ui_toast("Il volume è a 0%");
+    audio_set_volume(g_set.volume);
+    t_n = 0;
+    t_ph = 0;
+    audio_start(test_synth);
+}
+static void v_volume(char *b, int n) { snprintf(b, n, "%d%%", g_set.volume); }
+static void j_volume(int d)
+{
+    int v = g_set.volume + d * 10;
+    g_set.volume = v < 0 ? 0 : v > 100 ? 100 : v;
+    audio_set_volume(g_set.volume);
+    settings_save();
+}
+
+static const menu_item_t audio_items[] = {
+    {.icon = LV_SYMBOL_PLAY, .label = "Prova audio", .value = v_audio, .on_select = a_audio_test},
+    {.icon = LV_SYMBOL_VOLUME_MAX, .label = "Volume", .value = v_volume, .on_adjust = j_volume},
+};
+static menu_t audio_menu = {"Impostazioni » Audio", audio_items, sizeof(audio_items) / sizeof(audio_items[0]), 0, NULL};
+
 /* ---------------- Impostazioni ---------------- */
 
 static void v_wifi_sum(char *b, int n)
@@ -316,6 +370,7 @@ static const menu_item_t settings_items[] = {
     {.icon = LV_SYMBOL_WIFI, .label = "Wi-Fi", .value = v_wifi_sum, .app = &app_menu, .arg = &wifi_menu},
     {.icon = LV_SYMBOL_BLUETOOTH, .label = "Bluetooth", .value = v_ble, .app = &app_menu, .arg = &ble_menu},
     {.icon = ICON_SUN, .label = "Schermo", .app = &app_menu, .arg = &screen_menu},
+    {.icon = LV_SYMBOL_VOLUME_MAX, .label = "Audio", .value = v_volume, .app = &app_menu, .arg = &audio_menu},
     {.icon = ICON_BOLT, .label = "Azione rapida", .value = v_quick, .on_adjust = j_quick},
     {.icon = LV_SYMBOL_HOME, .label = "App all'avvio", .value = v_boot, .on_adjust = j_boot},
     {.icon = ICON_GAMEPAD, .label = "Polipetto", .app = &app_menu, .arg = &pet_settings_menu},
