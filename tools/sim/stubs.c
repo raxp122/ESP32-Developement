@@ -96,7 +96,7 @@ bool wifi_mgr_time_synced(void) { return true; }
 
 #define DUMMY_APP(n) static void n##_e(lv_obj_t *r, void *a) {} const app_t n = {.name = #n, .enter = n##_e};
 DUMMY_APP(app_8ball) DUMMY_APP(app_bercio) DUMMY_APP(app_ble_conns) DUMMY_APP(app_ble_pair) DUMMY_APP(app_blescan)
-DUMMY_APP(app_level) DUMMY_APP(app_lie) DUMMY_APP(app_pet) DUMMY_APP(app_q20) DUMMY_APP(app_search)
+DUMMY_APP(app_level) DUMMY_APP(app_pet) DUMMY_APP(app_q20) DUMMY_APP(app_search)
 DUMMY_APP(app_theremin) DUMMY_APP(app_torch)
 static const menu_item_t none[] = {{.label = "x"}};
 menu_t backup_menu = {"Backup", none, 1, 0, NULL}, chess_menu = {"Scacchi", none, 1, 0, NULL},
@@ -105,4 +105,5 @@ menu_t backup_menu = {"Backup", none, 1, 0, NULL}, chess_menu = {"Scacchi", none
        radar_menu = {"Radar", none, 1, 0, NULL}, saber_menu = {"Spada", none, 1, 0, NULL},
        tuner_menu = {"Accordatore", none, 1, 0, NULL};
 void chess_menu_init(void) {}
+bool sd_ok(void) { return true; }
 void tuner_menu_init(void) {}

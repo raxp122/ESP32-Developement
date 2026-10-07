@@ -105,14 +105,12 @@ Pulsanti a destra:
 - **Registra**: registra quello che suoni in un file WAV nella cartella `theremin` della microSD. Con **Mic: sì** mixa anche il microfono, per cantare mentre suoni (il microfono sente anche l'altoparlante).
 - **Registrazioni**: elenco per riascoltarle (swipe a destra) o cancellarle (BOOT due volte).
 
-## Macchina della verità
-Dal launcher: **Macchina della verità**. Il soggetto tiene il Gadget con il braccio teso davanti a sé, con lo schermo verso l'operatore, che legge le istruzioni e fa le domande. Il Gadget misura il tremore della mano (giroscopio e accelerometro, 200 letture al secondo, senza i movimenti lenti del braccio); il grafico a destra mostra il tremore rispetto alla traccia base.
+## Sismografo
+Dal launcher: **Sismografo** → *Avvia*. Appoggia il Gadget su una superficie ferma (tavolo, pavimento): l'accelerometro misura le vibrazioni 200 volte al secondo e, tolta la gravità, il grafico mostra l'asse verticale con la scala che si adatta da sola. In alto la vibrazione attuale e il picco in mg (millesimi di g), con un'intensità locale stimata sulla scala Mercalli (Wald 1999: è quella che sente il Gadget, non quella del terremoto). BOOT azzera il picco, swipe a destra apre gli eventi. Lo schermo può spegnersi: le letture continuano finché l'app è aperta.
 
-1. **Traccia base**: 10 s fermo e in silenzio.
-2. **Calibrazione**: quattro domande, due con risposta vera e due con risposta falsa (l'ordine è V F F V o F V V F, così la stanchezza del braccio pesa uguale). Per ognuna tocca *Registra*, aspetta il via e fai la domanda: si registrano 6 s.
-3. **Domande vere**: il tremore della risposta si confronta con quello delle risposte vere e false della calibrazione. Il risultato è *Verità*, *Bugia*, *Incerto* o *Non si capisce* (se nella calibrazione vere e false si somigliano troppo), con la probabilità di bugia e l'affidabilità della calibrazione.
-
-Se il braccio si muove troppo la misura va ripetuta. È un gioco: il tremore cambia con l'emozione ma anche con la stanchezza e la concentrazione, non è una prova di nulla.
+- **Eventi**: dopo 20 s di calibrazione, un evento scatta quando la media breve dell'energia (STA, 0,5 s) supera di 3,5–5 volte quella lunga (LTA, 20 s) e la vibrazione supera la soglia scelta (metodo STA/LTA dei sismografi). Finisce dopo 2 s di calma (al massimo 2 minuti).
+- **Sensibilità**: alta (anche vibrazioni deboli), media, bassa (solo scosse forti). I colpi secchi e brevi (un passo, una porta) di solito non bastano: serve una vibrazione che duri almeno qualche decimo di secondo.
+- **Registra sulla microSD**: ogni evento, con 5 s prima e 5 s dopo, va in `sismo/AAAAMMGG-hhmmss.csv` (100 campioni al secondo, x/y/z in mg: si apre con Excel); il registro di tutti è `sismo/eventi.csv`. Dal menu si consultano gli ultimi 50 e si cancellano.
 
 ## Orologio scacchi
 Dal launcher: **Orologio scacchi** → *Nuova partita*. Lo schermo è diviso in due: chi ha mosso tocca la sua metà e parte l'orologio dell'avversario (all'inizio il nero tocca la sua metà per far partire il bianco). **BOOT** mette in pausa (con *Riprendi* e *Azzera*); in partita gli swipe non fanno nulla, si esce dalla pausa con swipe a sinistra.

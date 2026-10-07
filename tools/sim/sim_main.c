@@ -9,6 +9,8 @@
 #include "settings.h"
 #include "wifi_mgr.h"
 #include "ota.h"
+#include "seismo.h"
+#include <math.h>
 
 extern int sim_round;
 extern int16_t g_scr_w, g_scr_h;
@@ -90,5 +92,25 @@ int main(int argc, char **argv)
     ui_home(); run(300);
     ui_toast("Su questo schermo arriva con un prossimo aggiornamento");
     shot("13_avviso");
+    ui_home(); run(2000);
+    ui_push(&app_menu, &seismo_menu);
+    shot("14_sismo_menu");
+    ui_push(&app_seismo, NULL);
+    // 25 s di fondo (calibrazione), poi una scossa: si danno le letture 200 al secondo
+    srand(3);
+    for (int i = 0; i < 200 * 34; i++) {
+        double t = i / 200.0, nz = ((rand() % 2001) - 1000) / 1000.0 * 0.002;
+        double z = 1.0 + nz, x = ((rand() % 2001) - 1000) / 1000.0 * 0.002, y = 0;
+        if (t > 28) { double a = 0.02 * exp(-(t - 28) / 2.5); z += a * sin(2 * M_PI * 6 * t); x += a * 0.6 * sin(2 * M_PI * 4 * t); }
+        seismo_feed(x, y, z);
+        if (i % 20 == 0) run(100);
+    }
+    shot("15_sismo_evento");
+    for (int i = 0; i < 200 * 14; i++) {
+        double z = 1.0 + ((rand() % 2001) - 1000) / 1000.0 * 0.002;
+        seismo_feed(((rand() % 2001) - 1000) / 1000.0 * 0.002, 0, z);
+        if (i % 20 == 0) run(100);
+    }
+    shot("16_sismo_ascolto");
     return 0;
 }
