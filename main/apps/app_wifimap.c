@@ -299,12 +299,55 @@ static void place_dot(lv_obj_t *o, float x, float y, int size)
     lv_obj_set_pos(o, X(x) - size / 2, Y(y) - size / 2);
 }
 
+// posizioni sullo schermo dei punti: quelli troppo vicini si allargano quanto basta per
+// distinguerli (restando il più possibile al loro posto)
+static float SXp[WM_MAX], SYp[WM_MAX];
+static bool node_vis(const wm_node_t *p) { return p && p->placed && (show_mobile || p->kind == WM_FIXED); }
+
+static void spread(void)
+{
+    const float d = SCR_ROUND ? 16 : 13;
+    float ox_[WM_MAX], oy_[WM_MAX];
+    int n = wm_count();
+    for (int i = 0; i < n; i++) {
+        const wm_node_t *p = wm_node(i);
+        SXp[i] = ox_[i] = ox + p->x * sc;
+        SYp[i] = oy_[i] = oy + p->y * sc;
+    }
+    for (int it = 0; it < 80; it++) {
+        for (int i = 0; i < n; i++) {
+            if (!node_vis(wm_node(i))) continue;
+            for (int j = i + 1; j < n; j++) {
+                if (!node_vis(wm_node(j))) continue;
+                float dx = SXp[j] - SXp[i], dy = SYp[j] - SYp[i], l = sqrtf(dx * dx + dy * dy);
+                if (l >= d) continue;
+                if (l < 0.01f) { dx = cosf(i + j * 2.4f); dy = sinf(i + j * 2.4f); l = 1; }
+                float f = (d - l) / 2 / l;
+                SXp[i] -= dx * f; SYp[i] -= dy * f;
+                SXp[j] += dx * f; SYp[j] += dy * f;
+            }
+        }
+        for (int i = 0; i < n; i++) {
+            if (it < 65) { SXp[i] += (ox_[i] - SXp[i]) * 0.05f; SYp[i] += (oy_[i] - SYp[i]) * 0.05f; }
+            SXp[i] = fminf(bw - 7, fmaxf(7, SXp[i]));
+            SYp[i] = fminf(bh - 7, fmaxf(7, SYp[i]));
+        }
+    }
+}
+
+static void place_node(lv_obj_t *o, int i, int size)
+{
+    lv_obj_set_size(o, size, size);
+    lv_obj_set_pos(o, (int)lroundf(SXp[i]) - size / 2, (int)lroundf(SYp[i]) - size / 2);
+}
+
 typedef struct { int a, b, n; } edge_ref_t;
 static int by_count(const void *x, const void *y) { return ((const edge_ref_t *)y)->n - ((const edge_ref_t *)x)->n; }
 
 static void redraw(void)
 {
     fit();
+    spread();
     // fili: le coppie di reti fisse viste insieme più spesso (al massimo MAX_EDGES)
     EXT_RAM_BSS_ATTR static edge_ref_t all[WM_MAX * (WM_MAX - 1) / 2];
     int na = 0;
@@ -319,9 +362,9 @@ static void redraw(void)
     edge_ref_t *best = all;
     for (int e = 0; e < MAX_EDGES; e++) {
         if (e >= ne) { lv_obj_add_flag(edge_line[e], LV_OBJ_FLAG_HIDDEN); continue; }
-        const wm_node_t *a = wm_node(best[e].a), *b = wm_node(best[e].b);
-        edge_pts[e][0].x = X(a->x); edge_pts[e][0].y = Y(a->y);
-        edge_pts[e][1].x = X(b->x); edge_pts[e][1].y = Y(b->y);
+        int a = best[e].a, b = best[e].b;
+        edge_pts[e][0].x = (int)lroundf(SXp[a]); edge_pts[e][0].y = (int)lroundf(SYp[a]);
+        edge_pts[e][1].x = (int)lroundf(SXp[b]); edge_pts[e][1].y = (int)lroundf(SYp[b]);
         lv_line_set_points(edge_line[e], edge_pts[e], 2);
         lv_obj_clear_flag(edge_line[e], LV_OBJ_FLAG_HIDDEN);
     }
@@ -341,10 +384,9 @@ static void redraw(void)
     int nm = 0;
     for (int i = 0; i < WM_MAX; i++) {
         const wm_node_t *p = wm_node(i);
-        bool vis = p && p->placed && (show_mobile || p->kind == WM_FIXED);
-        if (!vis) { lv_obj_add_flag(dots[i], LV_OBJ_FLAG_HIDDEN); continue; }
+        if (!node_vis(p)) { lv_obj_add_flag(dots[i], LV_OBJ_FLAG_HIDDEN); continue; }
         bool recent = wm_scans() - p->last < 3;
-        place_dot(dots[i], p->x, p->y, recent ? 12 : 9);
+        place_node(dots[i], i, recent ? 12 : 9);
         lv_obj_set_style_bg_color(dots[i], kind_color(p->kind), 0);
         lv_obj_set_style_bg_opa(dots[i], recent ? LV_OPA_COVER : LV_OPA_50, 0);
         lv_obj_clear_flag(dots[i], LV_OBJ_FLAG_HIDDEN);
@@ -364,12 +406,12 @@ static void redraw(void)
     // rete scelta
     char b[112];
     const wm_node_t *p = sel >= 0 ? wm_node(sel) : NULL;
-    if (p && p->placed && (show_mobile || p->kind == WM_FIXED)) {
-        place_dot(sel_ring, p->x, p->y, 22);
+    if (node_vis(p)) {
+        place_node(sel_ring, sel, 22);
         lv_obj_clear_flag(sel_ring, LV_OBJ_FLAG_HIDDEN);
         ui_set_text(sel_name, p->ssid);
-        int nx = X(p->x) + 14, ny = Y(p->y) - 10;
-        if (nx > bw - 90) nx = X(p->x) - 104;
+        int sx = (int)lroundf(SXp[sel]), nx = sx + 14, ny = (int)lroundf(SYp[sel]) - 10;
+        if (nx > bw - 90) nx = sx - 104;
         lv_obj_set_pos(sel_name, nx < 2 ? 2 : nx, ny < 2 ? 2 : ny > bh - 22 ? bh - 22 : ny);
         lv_obj_clear_flag(sel_name, LV_OBJ_FLAG_HIDDEN);
         ui_set_text(l_sel_lbl, p->ssid);
