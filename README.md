@@ -159,6 +159,9 @@ Serve per ridigitare codici e stringhe su un PC facendo da tastiera USB. Dal lau
 
 Solo il PC collegato da *Ricevi dal PC* (o un dispositivo associato) può mandare testi: altri dispositivi nei paraggi vengono rifiutati. I testi restano salvati finché non li cancelli tu. Attenzione: mentre la tastiera USB è attiva la console seriale su USB si sospende (sull'ESP32-S3 la porta fa una cosa per volta) e torna quando esci.
 
+## Audio
+Impostazioni › **Audio**: *Prova audio* suona tre note (do-mi-sol) e accanto dice com'è andato l'avvio dell'audio: "Pronto" (con i microfoni ok o assenti), oppure "ES8311 non risponde" / "I2S occupato" se qualcosa non va, e se l'uscita è occupata da un'app. *Volume* è lo stesso della Spada laser e vale per tutte le app (Theremin, Polipetto, scacchi, Doom).
+
 ## Backup e ripristino
 Impostazioni › Backup e ripristino:
 - **Crea un backup ora**: salva tutto (impostazioni, Wi-Fi, polipetto, Radar e Pokédex, livella, quello che il Q-20 ha imparato, la mappa Wi-Fi) in un file della cartella `backup` sulla microSD.

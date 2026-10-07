@@ -15,6 +15,8 @@ void audio_stop_if(audio_synth_t synth); // ferma solo se sta suonando proprio q
 void audio_set_volume(int percent);    // 0–100
 audio_synth_t audio_current(void);     // sintetizzatore in uso (NULL se l'uscita è libera)
 bool audio_mic_active(void);           // i microfoni sono in ascolto
+const char *audio_status(void);        // per la diagnostica: com'è andato l'avvio
+bool audio_mic_ok(void);               // i microfoni (ES7210) hanno risposto
 
 // Microfoni (ES7210, due canali): campioni stereo interlacciati a 16 bit
 bool audio_mic_start(void);

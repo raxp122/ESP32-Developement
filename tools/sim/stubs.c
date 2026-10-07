@@ -103,6 +103,11 @@ bool wifi_mgr_scan_start_ex(const char *ssid, uint16_t m) { return true; }
 bool audio_init(void) { return false; }
 void audio_start(audio_synth_t s) {}
 void audio_stop_if(audio_synth_t s) {}
+audio_synth_t audio_current(void) { return NULL; }
+bool audio_mic_active(void) { return false; }
+bool audio_mic_ok(void) { return true; }
+const char *audio_status(void) { return "Pronto"; }
+void audio_set_volume(int p) {}
 wifi_state_t wifi_mgr_state(void) { return sim_wifi; }
 void wifi_mgr_sync_time(void) {}
 bool wifi_mgr_time_saved(void) { return true; }
