@@ -10,12 +10,14 @@
 #include "wifi_mgr.h"
 #include "ota.h"
 #include "seismo.h"
-#include "wifimap.h"
 #include <math.h>
 
 extern int sim_round;
 extern int16_t g_scr_w, g_scr_h;
 extern nav_handler_t sim_nav;
+extern wifi_ap_t sim_aps[32];
+extern int sim_ap_n;
+extern uint32_t sim_scan_gen;
 extern ota_state_t sim_ota;
 static uint32_t now_ms;
 static uint32_t tick(void) { return now_ms; }
@@ -114,52 +116,40 @@ int main(int argc, char **argv)
     }
     shot("16_sismo_ascolto");
 
-    // Mappa Wi-Fi: una passeggiata finta in un edificio 30x15 m con 7 reti fisse,
-    // un furgone che passa e l'hotspot di un telefono che segue
+    // Tester Wi-Fi: "Casa" esce da due apparecchi (router e ripetitore); camminando dal
+    // router al ripetitore il migliore cambia, poi si esce dalla portata di entrambi
     ui_home(); run(300);
     {
-        static const struct { const char *n; double x, y; uint8_t b0; } AP[] = {
-            {"Casa", 2, 2, 0x10}, {"Casa_5G", 3, 2.5, 0x10}, {"Ufficio", 25, 3, 0x20}, {"Vicino", 14, 13, 0x30},
-            {"Stampante", 28, 13, 0x40}, {"Sala", 12, 4, 0x50}, {"Garage", -2, 12, 0x60}, {"Furgone", 0, 0, 0x70},
-            {"iPhone di Ugo", 0, 0, 0x72}};
-        double px[] = {0, 28, 28, 0, 0, 14, 14, 28}, py[] = {1, 1, 13, 13, 1, 1, 13, 13}, L[7], tot = 0;
-        for (int q = 0; q < 7; q++) { L[q] = hypot(px[q + 1] - px[q], py[q + 1] - py[q]); tot += L[q]; }
-        srand(2);
-        ui_push(&app_menu, &wifimap_menu);
-        ui_push(&app_wifimap, NULL);
-        wm_reset();   // dopo l'apertura, che riprende la mappa salvata
-        for (int s = 0; s < 260; s++) {
-            double u = fmod(s * 2.0, tot); int k = 0;
-            while (u > L[k]) { u -= L[k]; k++; }
-            double x = px[k] + (px[k + 1] - px[k]) * u / L[k], y = py[k] + (py[k + 1] - py[k]) * u / L[k];
-            wifi_ap_t sc[12]; int n = 0;
-            for (int a = 0; a < 9; a++) {
-                double ax = AP[a].x, ay = AP[a].y;
-                if (a == 7) { ax = 15 + 12 * sin(s * 0.08); ay = 18; }
-                if (a == 8) { ax = x + 3; ay = y + 1; }
-                double d = hypot(x - ax, y - ay); if (d < 0.5) d = 0.5;
-                double g = ((rand() % 2001) - 1000) / 1000.0 * 6.9;   // ~4 dB di rumore
-                double rssi = -40 - 27 * log10(d) + g;
-                if (rssi < -90) continue;
-                memset(&sc[n], 0, sizeof(sc[n]));
-                snprintf(sc[n].ssid, 33, "%s", AP[a].n); sc[n].rssi = rssi; sc[n].bssid[0] = AP[a].b0; sc[n].bssid[5] = a; n++;
-            }
-            wm_add_scan(sc, n);
-            if (s % 10 == 0) run(220);
+        static const struct { const char *n; int ch; uint8_t b5; } AP[] = {
+            {"Casa", 6, 0xA1}, {"Casa", 11, 0x3F}, {"Vodafone-A1B2C3", 1, 0x10}, {"Ospiti", 6, 0x20}};
+        sim_ap_n = 4;
+        for (int a = 0; a < 4; a++) {
+            memset(&sim_aps[a], 0, sizeof(sim_aps[a]));
+            snprintf(sim_aps[a].ssid, 33, "%s", AP[a].n);
+            sim_aps[a].channel = AP[a].ch; sim_aps[a].auth = 3;
+            sim_aps[a].bssid[0] = 0x24; sim_aps[a].bssid[4] = 0xC0; sim_aps[a].bssid[5] = AP[a].b5;
         }
-        run(400);
-        shot("17_mappa");
-        nav(NAV_NEXT); nav(NAV_NEXT);
-        shot("18_mappa_rete");
+        sim_aps[0].rssi = -50; sim_aps[1].rssi = -71; sim_aps[2].rssi = -66; sim_aps[3].rssi = -80;
+        ui_push(&app_wifitest, NULL);
+        sim_scan_gen++; run(500);
+        shot("17_tester_reti");
+        srand(4);
+        // misura: 40 passi dal router (AP 1) al ripetitore (AP 2), poi lontano da tutti
+        sim_ap_n = 2;
         nav(NAV_SELECT);
-        shot("19_mappa_reti");
-        ui_pop(); run(300);
-        sim_nav(NAV_HOLD); run(400);   // dito tenuto: condividi
-        shot("21_condividi");
-        nav(NAV_NEXT);
-        shot("22_condividi_2");
-        ui_pop(); run(300); ui_pop(); run(300);
-        shot("20_mappa_menu");
+        for (int s = 0; s < 70; s++) {
+            double t = s < 40 ? s / 40.0 : 1;
+            double n1 = ((rand() % 2001) - 1000) / 1000.0 * 2, n2 = ((rand() % 2001) - 1000) / 1000.0 * 2;
+            sim_aps[0].rssi = (int8_t)(-50 - 32 * t + n1);
+            sim_aps[1].rssi = (int8_t)(-71 + 20 * t + n2);
+            if (s == 40) shot("18_tester_ripetitore");
+            sim_scan_gen++; run(300);
+        }
+        shot("19_tester_misura");
+        sim_ap_n = 0;
+        for (int s = 0; s < 6; s++) { sim_scan_gen++; run(300); }
+        shot("20_tester_fuori");
+        sim_ap_n = -1;
     }
     return 0;
 }

@@ -17,7 +17,7 @@ if [ ! -f obj/liblvgl.a ]; then
     wait
     ar rcs obj/liblvgl.a obj/*.o
 fi
-SRC="$M/ui.c $M/menu.c $M/apps/home.c $M/apps/keyboard.c $M/apps/app_ota.c $M/apps/app_clock.c $M/apps/app_wifiscan.c $M/apps/app_portal.c $M/apps/app_settings.c $M/apps/app_seismo.c $M/seismo.c $M/apps/app_wifimap.c $M/wifimap.c $M/wifimap_html.c $M/fonts_sel.c $M/fonts/*.c"
+SRC="$M/ui.c $M/menu.c $M/apps/home.c $M/apps/keyboard.c $M/apps/app_ota.c $M/apps/app_clock.c $M/apps/app_wifiscan.c $M/apps/app_portal.c $M/apps/app_settings.c $M/apps/app_seismo.c $M/seismo.c $M/apps/app_wifitest.c $M/fonts_sel.c $M/fonts/*.c"
 gcc $CFLAGS -DSEISMO_SIM -I$M -I$M/apps $SRC stubs.c sim_main.c obj/liblvgl.a -lm -o obj/sim
 ./obj/sim round
 ./obj/sim lcd

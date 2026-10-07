@@ -5,7 +5,6 @@
 #include "board.h"
 #include <string.h>
 #include <stdio.h>
-#include <stdlib.h>
 #include <ctype.h>
 #include <sys/time.h>
 #include "freertos/FreeRTOS.h"
@@ -52,8 +51,7 @@ static volatile bool dns_run;
 static volatile bool portal_saved;
 static volatile int portal_clients;
 static char ap_ssid[24];
-static int portal_kind;   // 0 = configura Wi-Fi, 1 = pagina Appunti, 2 = file dalla microSD
-static char portal_file[64], portal_dl[32];   // kind 2: il file e il nome per scaricarlo
+static int portal_kind;   // 0 = configura Wi-Fi, 1 = pagina Appunti
 static char pend_ssid[33], pend_pass[65];   // credenziali dal portale, da applicare
 static bool pend_creds;
 
@@ -358,13 +356,25 @@ void wifi_mgr_forget(void)
 void wifi_mgr_scan_acquire(void) { scan_users++; update_mode(); }
 void wifi_mgr_scan_release(void) { if (scan_users > 0) scan_users--; update_mode(); }
 
-bool wifi_mgr_scan_start(void)
+bool wifi_mgr_scan_start(void) { return wifi_mgr_scan_start_ex(NULL, 0); }
+
+bool wifi_mgr_scan_start_ex(const char *ssid, uint16_t ch_mask)
 {
     // non scansionare durante un tentativo di connessione: i due usi della radio si
     // escludono a vicenda e lascerebbero il Wi-Fi bloccato
     if (!started || scanning || attempt) return false;
+    static uint8_t want[33];   // il driver lo legge durante la scansione
     wifi_scan_config_t sc = {.show_hidden = false};
-    if (state == WIFI_CONNECTED) {
+    if (ssid && ssid[0]) {
+        strlcpy((char *)want, ssid, sizeof(want));
+        sc.ssid = want;
+    }
+    if (ch_mask) {
+        // pochi canali, tempi brevi: una misura ogni qualche decimo di secondo
+        sc.channel_bitmap.ghz_2_channels = ch_mask;
+        sc.scan_time.active.min = 40;
+        sc.scan_time.active.max = 80;
+    } else if (state == WIFI_CONNECTED) {
         // da connessi la radio torna sul canale della rete tra un canale e l'altro:
         // tempi per canale più corti, così la connessione non risente della scansione
         sc.scan_time.active.min = 60;
@@ -545,39 +555,14 @@ static const char PAGE_CLIPS[] =
     "var a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='gadget-appunti.html';a.click();};"
     "</script></html>";
 
-// kind 2: la pagina è un file (es. la Mappa Wi-Fi). "/" la mostra, "/<nome>" la scarica.
-static esp_err_t send_file(httpd_req_t *r, bool download)
-{
-    FILE *f = fopen(portal_file, "r");
-    if (!f) {
-        httpd_resp_set_type(r, "text/html; charset=utf-8");
-        return httpd_resp_sendstr(r, "<!doctype html><meta charset=utf-8><p>File non trovato sulla microSD.</p>");
-    }
-    httpd_resp_set_type(r, "text/html; charset=utf-8");
-    char disp[80];
-    if (download) {
-        snprintf(disp, sizeof(disp), "attachment; filename=\"%s\"", portal_dl);
-        httpd_resp_set_hdr(r, "Content-Disposition", disp);
-    }
-    char *b = malloc(2048);
-    size_t n;
-    esp_err_t e = ESP_OK;
-    while (b && e == ESP_OK && (n = fread(b, 1, 2048, f)) > 0) e = httpd_resp_send_chunk(r, b, n);
-    free(b);
-    fclose(f);
-    return e == ESP_OK ? httpd_resp_send_chunk(r, NULL, 0) : e;
-}
-
 static esp_err_t page_get(httpd_req_t *r)
 {
-    if (portal_kind == 2 && r->uri[0] == '/' && !strcmp(r->uri + 1, portal_dl)) return send_file(r, true);
     if (strcmp(r->uri, "/") != 0) {
         // qualsiasi altro indirizzo (es. i controlli captive di Android/iOS) porta al portale
         httpd_resp_set_status(r, "302 Found");
         httpd_resp_set_hdr(r, "Location", "http://192.168.4.1/");
         return httpd_resp_send(r, NULL, 0);
     }
-    if (portal_kind == 2) return send_file(r, false);
     if (portal_kind == 1) {
         httpd_resp_set_type(r, "text/html; charset=utf-8");
         httpd_resp_sendstr_chunk(r, PAGE_CLIPS);
@@ -676,13 +661,6 @@ void wifi_mgr_portal_poll(void)
 
 void wifi_mgr_portal_start(void)      { portal_kind = 0; wifi_mgr_portal_open(); }
 void wifi_mgr_portal_start_clips(void) { portal_kind = 1; wifi_mgr_portal_open(); }
-void wifi_mgr_portal_start_file(const char *path, const char *download_name)
-{
-    strlcpy(portal_file, path, sizeof(portal_file));
-    strlcpy(portal_dl, download_name, sizeof(portal_dl));
-    portal_kind = 2;
-    wifi_mgr_portal_open();
-}
 
 void wifi_mgr_portal_open(void)
 {

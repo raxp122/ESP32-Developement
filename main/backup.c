@@ -44,7 +44,7 @@ static const char *TAG = "backup";
 
 // Cosa finisce nel backup. Un namespace o un file nuovo va aggiunto qui.
 static const char *const NAMESPACES[] = {"gadget", "pet", "pwn", "level", "theremin", "chess", "sismo"};
-static const char *const FILES[] = {"pwn/pokedex.dat", "q20/kb.txt", "wifimap/mappa.bin"};   // q20: quello che ha imparato
+static const char *const FILES[] = {"pwn/pokedex.dat", "q20/kb.txt"};   // q20: quello che ha imparato
 #define N_NS    (int)(sizeof(NAMESPACES) / sizeof(NAMESPACES[0]))
 #define N_FILES (int)(sizeof(FILES) / sizeof(FILES[0]))
 
