@@ -27,4 +27,5 @@ bool input_touch(int *x, int *y);         // stato attuale, in coordinate dello 
 void input_set_locked(bool locked);
 bool input_locked(void);
 uint32_t input_idle_ms(void);
+void input_touch_stats(char *buf, int n);   // diagnostica per il monitor seriale
 void input_mark_activity(void);

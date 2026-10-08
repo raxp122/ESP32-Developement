@@ -68,7 +68,12 @@ static void render(void)
         hint = "Non spegnere la scheda";
         break;
     case OTA_DONE:       state = "Installato! Riavvio…"; col = C_OK; break;
-    case OTA_ERROR:      state = ota_error(); col = C_WARN; hint = "Swipe a destra: riprova"; break;
+    case OTA_ERROR:
+        state = ota_error();
+        col = C_WARN;
+        if (ota_error_detail()[0]) { snprintf(t, sizeof(t), "%s · swipe a destra: riprova", ota_error_detail()); hint = t; }
+        else hint = "Swipe a destra: riprova";
+        break;
     }
     ui_set_text(l_state, state);
     ui_set_text_color(l_state, col);

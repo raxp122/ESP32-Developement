@@ -376,7 +376,7 @@ Il file è di testo con un controllo CRC: un backup rovinato o incompleto viene 
 Impostazioni › App all'avvio: se scegli un'app (o una sua schermata interna, stesso elenco automatico dell'Azione rapida), all'accensione si apre quella; swipe indietro torna al menu. "Nessuna" lascia tutto com'era. Le scelte fatte con i firmware precedenti vengono convertite da sole.
 
 ## Aggiornamenti
-- **Dalla scheda (OTA):** Impostazioni › Sistema › Aggiornamento firmware. Ogni merge su `main` pubblica una release su GitHub con il firmware; la scheda la scarica via Wi-Fi e si riavvia. Se il nuovo firmware non riesce ad avviarsi, al riavvio torna da solo quello precedente. Mentre sei nella schermata di aggiornamento il Bluetooth va in pausa (la radio è condivisa col Wi-Fi) e si riaccende uscendo. Con "Cerca aggiornamenti da solo" avvisa quando ne esce uno nuovo. Se il controllo fallisce due volte, il Gadget ricollega da capo il Wi-Fi (indirizzo e DNS nuovi, con un DNS di riserva) e riprova. L'errore dice anche il motivo: *(DNS)* se il nome di GitHub non si risolve, *(connessione)* o *(TLS …)* se il server non risponde; nel log seriale c'è il dettaglio.
+- **Dalla scheda (OTA):** Impostazioni › Sistema › Aggiornamento firmware. Ogni merge su `main` pubblica una release su GitHub con il firmware; la scheda la scarica via Wi-Fi e si riavvia. Se il nuovo firmware non riesce ad avviarsi, al riavvio torna da solo quello precedente. Mentre sei nella schermata di aggiornamento il Bluetooth va in pausa (la radio è condivisa col Wi-Fi) e si riaccende uscendo. Con "Cerca aggiornamenti da solo" avvisa quando ne esce uno nuovo. Se il controllo fallisce due volte, il Gadget ricollega da capo il Wi-Fi (indirizzo e DNS nuovi, con un DNS di riserva) e riprova. Sotto l'errore compare il motivo (DNS, connessione rifiutata, nessuna risposta, tempo scaduto, con il codice); nel log seriale c'è il dettaglio.
 - **Via USB:** `gadget.bin` a `0x0` (immagine unica) oppure solo `gadget-app.bin` a `0x20000`.
 
 Dalla 0.14 le impostazioni (NVS) stanno in fondo alla flash (`0xFF0000`): né l'OTA né i file qui sopra le toccano più.
@@ -404,7 +404,7 @@ Il firmware conserva in RAM gli ultimi 16 KB di log dall'accensione. Dal monitor
 
 **Cicli di riavvii.** Se la scheda si riavvia per un errore mentre il Bluetooth è acceso, al riavvio il Bluetooth resta spento (con un avviso). Dopo tre riavvii per errore di fila parte in *modalità sicura*: Bluetooth spento e niente app all'avvio. Il comando `P` mostra il log di quello che è successo prima del riavvio.
 
-Se il touch smette di rispondere (bus I2C bloccato, per esempio dopo un riavvio software a metà di una lettura), il firmware lo sblocca e ricrea il bus da solo entro mezzo secondo. `I` dice quante volte è successo, e il log riporta il motivo.
+Se il touch smette di rispondere (bus I2C bloccato, per esempio dopo un riavvio software a metà di una lettura), il firmware lo sblocca e ricrea il bus da solo entro mezzo secondo. `I` dice quante volte è successo e quante letture del touch sono andate a buon fine, senza dito, non valide o in errore (con gli ultimi byte strani ricevuti); il log riporta il motivo.
 
 ## Struttura
 - `main/board.*` riconoscimento della scheda, pin, alimentazione (3.49: latch TCA9554 EXIO6 e batteria sull'ADC; AMOLED: AXP2101), RTC PCF85063, IMU QMI8658, pulsanti

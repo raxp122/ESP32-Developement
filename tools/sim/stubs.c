@@ -62,6 +62,7 @@ void ota_auto_start(void) {}
 void ota_check(void) {}
 const char *ota_current(void) { return "0.14.69"; }
 const char *ota_error(void) { return ""; }
+const char *ota_error_detail(void) { return ""; }
 void ota_install(void) {}
 const char *ota_latest(void) { return "0.15.0"; }
 int ota_progress(void) { return 42; }

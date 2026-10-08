@@ -38,18 +38,20 @@ static const char *TAG = "ota";
 static volatile ota_state_t state = OTA_IDLE;
 static volatile int progress;
 static bool busy;   // un controllo o un'installazione in corso (accesso atomico)
-static char latest[32], err_msg[64];
+static char latest[32], err_msg[64], err_detail[96];
 static volatile bool auto_on, auto_done;   // controllo automatico in attesa / già fatto
 
 ota_state_t ota_state(void) { return state; }
 int ota_progress(void) { return progress; }
 const char *ota_latest(void) { return latest; }
 const char *ota_error(void) { return err_msg; }
+const char *ota_error_detail(void) { return err_detail; }
 const char *ota_current(void) { return esp_app_get_description()->version; }
 
 static void fail(const char *msg)
 {
     snprintf(err_msg, sizeof(err_msg), "%s", msg);
+    err_detail[0] = 0;
     state = OTA_ERROR;
     ESP_LOGW(TAG, "%s", msg);
 }
@@ -118,14 +120,14 @@ static bool dns_ok(void)
 
 static bool fetch_latest(void)
 {
-    if (!dns_ok()) { fail("GitHub non raggiungibile (DNS)"); return false; }
+    if (!dns_ok()) { fail("GitHub non raggiungibile"); snprintf(err_detail, sizeof(err_detail), "il nome github.com non si risolve (DNS)"); return false; }
     body_t body = {0};
     esp_http_client_config_t c = {
         .url = URL_VERSION,
         .crt_bundle_attach = esp_crt_bundle_attach,
         .timeout_ms = 15000,
-        .buffer_size = 4096,      // gli URL di redirect di GitHub sono lunghi
-        .buffer_size_tx = 2048,
+        .buffer_size = 4096,      // gli URL di redirect di GitHub sono lunghi (firme di oltre 1 KB)
+        .buffer_size_tx = 4096,
         .event_handler = on_http,
         .user_data = &body,
     };
@@ -141,9 +143,14 @@ static bool fetch_latest(void)
         ESP_LOGW(TAG, "version.json: %s, TLS -0x%04x, flag 0x%x, heap interno %u (blocco %u)", esp_err_to_name(r),
                  -tls_code, tls_flags, (unsigned)heap_caps_get_free_size(MALLOC_CAP_INTERNAL),
                  (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL));
-        if (r == ESP_ERR_HTTP_CONNECT && tls_code) snprintf(err_msg, sizeof(err_msg), "GitHub non raggiungibile (TLS -0x%04x)", -tls_code);
-        else if (r == ESP_ERR_HTTP_CONNECT) snprintf(err_msg, sizeof(err_msg), "GitHub non raggiungibile (connessione)");
-        else snprintf(err_msg, sizeof(err_msg), "GitHub non raggiungibile (%s)", esp_err_to_name(r));
+        // il titolo resta corto (sta su una riga); il motivo va nella riga sotto
+        snprintf(err_msg, sizeof(err_msg), "GitHub non raggiungibile");
+        const char *n = esp_err_to_name(r);
+        if (!strncmp(n, "ESP_ERR_HTTP_", 13)) n += 13;
+        const char *why = r == ESP_ERR_HTTP_CONNECT ? "connessione rifiutata" : r == ESP_ERR_HTTP_FETCH_HEADER ? "nessuna risposta"
+                        : r == ESP_ERR_HTTP_EAGAIN ? "tempo scaduto" : r == ESP_ERR_HTTP_MAX_REDIRECT ? "troppi rimandi" : "errore";
+        if (tls_code) snprintf(err_detail, sizeof(err_detail), "%s (%s, TLS -0x%04x)", why, n, -tls_code);
+        else snprintf(err_detail, sizeof(err_detail), "%s (%s)", why, n);
         state = OTA_ERROR;
         return false;
     }
@@ -209,7 +216,7 @@ static void do_install(void)
         .crt_bundle_attach = esp_crt_bundle_attach,
         .timeout_ms = 20000,
         .buffer_size = 4096,
-        .buffer_size_tx = 2048,
+        .buffer_size_tx = 4096,
         .keep_alive_enable = true,
     };
     esp_https_ota_config_t cfg = {.http_config = &http};

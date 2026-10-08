@@ -1,6 +1,7 @@
 // logcon.c — log in memoria (PSRAM) + comandi dalla seriale USB
 #include "board.h"
 #include "logcon.h"
+#include "input.h"
 #include <stdio.h>
 #include <stdarg.h>
 #include <string.h>
@@ -120,6 +121,9 @@ static void info(void)
            (unsigned)(heap_caps_get_minimum_free_size(MALLOC_CAP_INTERNAL) / 1024),
            (unsigned)(heap_caps_get_free_size(MALLOC_CAP_SPIRAM) / 1024));
     printf("Motivo dell'ultimo reset: %s (%d) · recuperi del touch: %d\n", reason_name(esp_reset_reason()), esp_reset_reason(), board_touch_recoveries());
+    char ts[200];
+    input_touch_stats(ts, sizeof(ts));
+    printf("%s\n", ts);
     fflush(stdout);
 }
 
