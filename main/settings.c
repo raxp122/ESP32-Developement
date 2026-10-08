@@ -6,7 +6,7 @@
 #include "nvs.h"
 #include "esp_log.h"
 
-#define SETTINGS_VERSION 13
+#define SETTINGS_VERSION 14
 settings_t g_set;
 
 static void defaults(void)
@@ -32,6 +32,8 @@ static void defaults(void)
     g_set.pwn_pcap = 1;
     g_set.pwn_ai = 1;
     g_set.boot_app = 0;
+    strcpy(g_set.quick_name, "Torcia");
+    strcpy(g_set.boot_name, "Nessuna");
     g_set.pet_time = PET_TIME_REAL;
     g_set.pet_sound = 1;
     g_set.pet_steps = 1;
@@ -166,6 +168,19 @@ void settings_load(void)
         if (old < 12) g_set.backup_before_ota = 1;
         if (old < 13) g_set.kb_layout = KB_LAYOUT_IT;
         if (g_set.kb_layout >= KB_LAYOUT_COUNT) g_set.kb_layout = KB_LAYOUT_IT;
+        if (old < 14) {
+            // le scelte di prima erano numeri: diventano nomi
+            static const char *const QUICK[] = {"Nessuna", "Torcia", "Spegni schermo", "Dadi", "Scanner Wi-Fi",
+                                                "Scanner Bluetooth", "Orologio"};
+            static const char *const BOOT[] = {"Nessuna", "Polipetto", "Orologio", "Torcia", "Scanner Wi-Fi",
+                "Scanner Bluetooth", "Radar", "Berciometro", "Accordatore", "Dadi", "Spada laser", "Cerca", "Livella",
+                "Appunti", "8-Ball veggente", "Q-20", "Theremin", "Sismografo", "Orologio scacchi", "Tester Wi-Fi",
+                "Snake", "Scacchi", "Morse"};
+            strcpy(g_set.quick_name, g_set.quick_action < 7 ? QUICK[g_set.quick_action] : "Torcia");
+            strcpy(g_set.boot_name, g_set.boot_app < sizeof(BOOT) / sizeof(BOOT[0]) ? BOOT[g_set.boot_app] : "Nessuna");
+        }
+        g_set.quick_name[sizeof(g_set.quick_name) - 1] = 0;
+        g_set.boot_name[sizeof(g_set.boot_name) - 1] = 0;
         if (g_set.pet_time >= PET_TIME_COUNT) g_set.pet_time = PET_TIME_REAL;
         if (g_set.pet_sleep_h > 23) g_set.pet_sleep_h = 22;
         if (g_set.pet_wake_h > 23) g_set.pet_wake_h = 8;
@@ -173,7 +188,6 @@ void settings_load(void)
         if (g_set.wifi_on && g_set.ble_on) g_set.ble_on = false;
         // un blob da un backup rovinato non deve lasciare lo schermo spento o stringhe aperte
         if (g_set.brightness < 5 || g_set.brightness > 100) g_set.brightness = 70;
-        if (g_set.quick_action >= QUICK_COUNT) g_set.quick_action = QUICK_TORCH;
         g_set.wifi_ssid[sizeof(g_set.wifi_ssid) - 1] = 0;
         g_set.wifi_pass[sizeof(g_set.wifi_pass) - 1] = 0;
         g_set.pwn_name[sizeof(g_set.pwn_name) - 1] = 0;
@@ -215,10 +229,3 @@ void settings_reset(void)
 
 const char *g_set_pwn_name(void) { return g_set.pwn_name; }
 
-const char *settings_quick_name(int q)
-{
-    static const char *n[QUICK_COUNT] = {
-        "Nessuna", "Torcia", "Spegni schermo", "Dadi", "Scanner Wi-Fi", "Scanner BLE", "Orologio",
-    };
-    return (q >= 0 && q < QUICK_COUNT) ? n[q] : "?";
-}

@@ -328,15 +328,8 @@ void ui_power_off(void)
 
 static void quick_action(void)
 {
-    switch (g_set.quick_action) {
-    case QUICK_TORCH:      ui_push(&app_torch, NULL); break;
-    case QUICK_SCREEN_OFF: ui_screen_off(); break;
-    case QUICK_DICE:       ui_push(&app_menu, &dice_menu); break;
-    case QUICK_WIFI_SCAN:  ui_push(&app_wifiscan, NULL); break;
-    case QUICK_BLE_SCAN:   ui_push(&app_blescan, NULL); break;
-    case QUICK_CLOCK:      ui_push(&app_clock, NULL); break;
-    default:               ui_toast("Nessuna azione rapida: sceglila in Impostazioni"); break;
-    }
+    // una qualsiasi app o voce interna (Impostazioni » Azione rapida); vedi shortcuts.c
+    if (!shortcut_run(g_set.quick_name)) ui_toast("Nessuna azione rapida: sceglila in Impostazioni");
 }
 
 /* ---------------- dispatch eventi ---------------- */

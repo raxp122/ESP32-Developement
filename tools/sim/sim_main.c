@@ -249,5 +249,11 @@ int main(int argc, char **argv)
         shot("45_morse_tabella");
         ui_pop(); run(300); ui_pop(); run(300);
     }
+    // Azione rapida: l'elenco di tutte le app e delle voci interne
+    ui_home(); run(300);
+    shortcut_pick(false); run(300);
+    for (int i = 0; i < 6; i++) nav(NAV_NEXT);
+    shot("46_azione_rapida");
+    ui_pop(); run(300);
     return 0;
 }

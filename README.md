@@ -243,7 +243,7 @@ Dal launcher: **Impostazioni**.
 - **Wi-Fi** e **Bluetooth**: vedi sotto. Wi-Fi e Bluetooth non sono mai accesi insieme.
 - **Schermo**: luminosità, spegnimento automatico, ruota di 180°, inverti lo scorrimento (su/giù), colore d'accento.
 - **Audio**: prova audio e volume (vedi [Audio](#audio)).
-- **Azione rapida**: cosa fa il dito tenuto (o BOOT tenuto) fuori dalle app che lo usano: niente, Torcia, Spegni schermo, Dadi, Scanner Wi-Fi, Scanner BLE, Orologio.
+- **Azione rapida**: cosa fa il dito tenuto (o BOOT tenuto) fuori dalle app che lo usano: niente, Spegni schermo, una qualsiasi app del launcher oppure una sua schermata interna (es. "Accordatore » Cromatico", "Morse » Telegrafo"). L'elenco si costruisce da solo dal launcher, quindi ogni app nuova compare senza modifiche; la scelta si salva per nome.
 - **App all'avvio**: vedi sotto.
 - **Polipetto**: vedi [Polipetto](#polipetto).
 - **Backup e ripristino**, **Data e ora**: vedi sotto.
@@ -285,7 +285,7 @@ Il ripristino riscrive i file contenuti nel backup e non cancella niente sulla m
 Il file è di testo con un controllo CRC: un backup rovinato o incompleto viene rifiutato senza toccare niente. Contiene anche la password del Wi-Fi in chiaro, quindi tienilo al sicuro.
 
 ### App all'avvio
-Impostazioni › App all'avvio: se scegli un'app, all'accensione si apre quella; swipe indietro torna al menu. "Nessuna" lascia tutto com'era.
+Impostazioni › App all'avvio: se scegli un'app (o una sua schermata interna, stesso elenco automatico dell'Azione rapida), all'accensione si apre quella; swipe indietro torna al menu. "Nessuna" lascia tutto com'era. Le scelte fatte con i firmware precedenti vengono convertite da sole.
 
 ## Aggiornamenti
 - **Dalla scheda (OTA):** Impostazioni › Sistema › Aggiornamento firmware. Ogni merge su `main` pubblica una release su GitHub con il firmware; la scheda la scarica via Wi-Fi e si riavvia. Se il nuovo firmware non riesce ad avviarsi, al riavvio torna da solo quello precedente. Mentre sei nella schermata di aggiornamento il Bluetooth va in pausa (la radio è condivisa col Wi-Fi) e si riaccende uscendo. Con "Cerca aggiornamenti da solo" avvisa quando ne esce uno nuovo.

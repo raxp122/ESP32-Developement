@@ -351,28 +351,18 @@ static void v_wifi_sum(char *b, int n)
     default: snprintf(b, n, "Spento");
     }
 }
-static void v_quick(char *b, int n) { snprintf(b, n, "Tieni premuto: %s", settings_quick_name(g_set.quick_action)); }
-static void j_quick(int d)
-{
-    g_set.quick_action = (g_set.quick_action + d + QUICK_COUNT) % QUICK_COUNT;
-    settings_save();
-}
-
-static void v_boot(char *b, int n) { snprintf(b, n, "%s", boot_app_name(g_set.boot_app)); }
-static void j_boot(int d)
-{
-    int c = boot_app_count();
-    g_set.boot_app = (g_set.boot_app + d + c) % c;
-    settings_save();
-}
+static void v_quick(char *b, int n) { snprintf(b, n, "Tieni premuto: %s", g_set.quick_name); }
+static void a_quick(void) { shortcut_pick(false); }
+static void v_boot(char *b, int n) { snprintf(b, n, "%s", g_set.boot_name); }
+static void a_boot(void) { shortcut_pick(true); }
 
 static const menu_item_t settings_items[] = {
     {.icon = LV_SYMBOL_WIFI, .label = "Wi-Fi", .value = v_wifi_sum, .app = &app_menu, .arg = &wifi_menu},
     {.icon = LV_SYMBOL_BLUETOOTH, .label = "Bluetooth", .value = v_ble, .app = &app_menu, .arg = &ble_menu},
     {.icon = ICON_SUN, .label = "Schermo", .app = &app_menu, .arg = &screen_menu},
     {.icon = LV_SYMBOL_VOLUME_MAX, .label = "Audio", .value = v_volume, .app = &app_menu, .arg = &audio_menu},
-    {.icon = ICON_BOLT, .label = "Azione rapida", .value = v_quick, .on_adjust = j_quick},
-    {.icon = LV_SYMBOL_HOME, .label = "App all'avvio", .value = v_boot, .on_adjust = j_boot},
+    {.icon = ICON_BOLT, .label = "Azione rapida", .value = v_quick, .on_select = a_quick},
+    {.icon = LV_SYMBOL_HOME, .label = "App all'avvio", .value = v_boot, .on_select = a_boot},
     {.icon = ICON_GAMEPAD, .label = "Polipetto", .app = &app_menu, .arg = &pet_settings_menu},
     {.icon = LV_SYMBOL_SD_CARD, .label = "Backup e ripristino", .app = &app_menu, .arg = &backup_menu},
     {.icon = ICON_CLOCK, .label = "Data e ora", .value = v_time, .app = &app_menu, .arg = &time_menu},

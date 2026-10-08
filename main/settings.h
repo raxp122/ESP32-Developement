@@ -62,6 +62,9 @@ typedef struct {
     uint8_t  backup_before_ota;   // backup automatico sulla microSD prima di ogni aggiornamento
     // v13 - Appunti (testo dal PC → tastiera USB)
     uint8_t  kb_layout;           // layout della tastiera USB (kb_layout_t)
+    // v14 - Azione rapida e App all'avvio per nome (l'elenco si costruisce dal launcher)
+    char     quick_name[48];      // "Torcia", "Accordatore » Cromatico", "Spegni schermo", "Nessuna"
+    char     boot_name[48];
 } settings_t;
 
 // layout della tastiera USB. L'ordine è salvato: le voci nuove vanno in fondo.
@@ -81,4 +84,3 @@ void settings_save(void);
 void settings_defer(bool on);   // true: i salvataggi si rimandano; false: salva se serve
 void settings_reset(void);
 int  settings_version(void);   // versione del formato delle impostazioni (per i backup)
-const char *settings_quick_name(int q);
