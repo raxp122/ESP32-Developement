@@ -14,13 +14,141 @@ static const rates_t rates[] = {
     [PET_ADULT] = {3600, 3000, 4200, 9000, 8 * 3600},
 };
 
-static uint32_t rnd(pet_t *p)
+uint32_t pet_rand(uint32_t *rng)
 {
-    p->rng ^= p->rng << 13;
-    p->rng ^= p->rng >> 17;
-    p->rng ^= p->rng << 5;
-    return p->rng;
+    if (!*rng) *rng = 0x9E3779B9u;
+    *rng ^= *rng << 13;
+    *rng ^= *rng >> 17;
+    *rng ^= *rng << 5;
+    return *rng;
 }
+
+static uint32_t rnd(pet_t *p) { return pet_rand(&p->rng); }
+
+/* ---------------- genetica ---------------- */
+
+static const uint8_t n_alleles[GENE_COUNT] = {COL_COUNT, PAT_COUNT, TENT_COUNT, TEMP_COUNT};
+// dominanza: più alto = si vede di più. L'oro è recessivo (serve da entrambi i genitori)
+static const uint8_t dom_color[COL_COUNT] = {3, 2, 2, 1, 1, 1, 0};
+static const uint8_t dom_pat[PAT_COUNT] = {1, 2, 0};
+static const uint8_t dom_tent[TENT_COUNT] = {1, 1, 0};
+static const uint8_t dom_temp[TEMP_COUNT] = {1, 1, 1};
+static const uint8_t *const dom[GENE_COUNT] = {dom_color, dom_pat, dom_tent, dom_temp};
+
+static const char *const allele_names[GENE_COUNT][7] = {
+    {"Arancione", "Corallo", "Viola", "Azzurro", "Verde", "Rosa", "Oro"},
+    {"Tinta unita", "A puntini", "A strisce"},
+    {"Tentacoli normali", "Tentacoli lunghi", "Tentacoli corti"},
+    {"Calmo", "Vivace", "Goloso"},
+};
+static const char *const gene_names[GENE_COUNT] = {"Colore", "Motivo", "Tentacoli", "Carattere"};
+
+int pet_gene_count(int gene) { return gene >= 0 && gene < GENE_COUNT ? n_alleles[gene] : 0; }
+const char *pet_gene_name(int gene) { return gene >= 0 && gene < GENE_COUNT ? gene_names[gene] : ""; }
+const char *pet_allele_name(int gene, int a)
+{
+    if (gene < 0 || gene >= GENE_COUNT || a < 0 || a >= n_alleles[gene]) return "?";
+    return allele_names[gene][a];
+}
+
+static uint8_t fix(int gene, uint8_t a) { return a < n_alleles[gene] ? a : 0; }
+
+int pet_gene_show(const uint8_t g[2], int gene)
+{
+    uint8_t a = fix(gene, g[0]), b = fix(gene, g[1]);
+    return dom[gene][b] > dom[gene][a] ? b : a;
+}
+
+// allele di un uovo selvatico: per lo più i più comuni, l'oro quasi mai
+static uint8_t wild(int gene, uint32_t *rng)
+{
+    uint32_t r = pet_rand(rng) % 100;
+    switch (gene) {
+    case GENE_COLOR:
+        if (r < 40) return COL_ORANGE;
+        if (r < 52) return COL_CORAL;
+        if (r < 64) return COL_PURPLE;
+        if (r < 76) return COL_BLUE;
+        if (r < 88) return COL_GREEN;
+        if (r < 98) return COL_PINK;
+        return COL_GOLD;
+    case GENE_PATTERN: return r < 60 ? PAT_NONE : r < 85 ? PAT_SPOTS : PAT_STRIPES;
+    case GENE_TENT:    return r < 55 ? TENT_NORMAL : r < 80 ? TENT_LONG : TENT_SHORT;
+    default:           return (uint8_t)(r % TEMP_COUNT);
+    }
+}
+
+void pet_genes_random(uint8_t g[GENE_COUNT][2], uint32_t *rng)
+{
+    for (int i = 0; i < GENE_COUNT; i++) { g[i][0] = wild(i, rng); g[i][1] = wild(i, rng); }
+}
+
+void pet_genes_child(uint8_t out[GENE_COUNT][2], const uint8_t a[GENE_COUNT][2], const uint8_t b[GENE_COUNT][2], uint32_t *rng)
+{
+    for (int i = 0; i < GENE_COUNT; i++) {
+        out[i][0] = fix(i, a[i][pet_rand(rng) & 1]);
+        out[i][1] = fix(i, b[i][pet_rand(rng) & 1]);
+        for (int k = 0; k < 2; k++)   // mutazione: 1 allele su 40
+            if (pet_rand(rng) % 40 == 0) out[i][k] = (uint8_t)(i == GENE_COLOR && pet_rand(rng) % 4 == 0 ? COL_GOLD : pet_rand(rng) % n_alleles[i]);
+    }
+}
+
+/* ---------------- nomi ---------------- */
+
+static const char *const names_m[] = {
+    "Tentacolo", "Bolla", "Inchiostrino", "Ottavio", "Polpino", "Guizzo", "Corallo", "Spruzzo",
+    "Nettuno", "Ricciolo", "Ventosa", "Pinolo", "Salsedine", "Gamberone", "Scoglio", "Marino",
+};
+static const char *const names_f[] = {
+    "Bollicina", "Perla", "Ottavia", "Polpetta", "Spugna", "Medusina", "Marina", "Onda",
+    "Conchiglia", "Ancora", "Stellina", "Alga", "Nereide", "Schiuma", "Laguna", "Ventosina",
+};
+static const char *const families[] = {
+    "Abissi", "Scogliera", "Corallini", "Maree", "Fondali", "Lagunari", "Spumanti", "Inchiostri",
+    "Polposi", "Salmastri", "Marosi", "Ventose", "Calamari", "Risacca", "Golfo", "Fari",
+};
+#define NN(a) (sizeof(a) / sizeof(a[0]))
+
+const char *pet_random_name(int sex, uint32_t *rng)
+{
+    return sex == SEX_F ? names_f[pet_rand(rng) % NN(names_f)] : names_m[pet_rand(rng) % NN(names_m)];
+}
+const char *pet_random_family(uint32_t *rng) { return families[pet_rand(rng) % NN(families)]; }
+
+static void copy_name(char *d, const char *s)
+{
+    int i = 0;
+    for (; s && s[i] && i < PET_NAME_LEN - 1; i++) d[i] = s[i];
+    d[i] = 0;
+}
+
+static void give_identity(pet_t *p)
+{
+    if (!p->sex) p->sex = (rnd(p) & 1) ? SEX_F : SEX_M;
+    if (!p->name[0]) copy_name(p->name, pet_random_name(p->sex, &p->rng));
+    if (!p->family[0]) copy_name(p->family, pet_random_family(&p->rng));
+    if (!p->uid) p->uid = rnd(p) | 1;
+}
+
+void pet_core_upgrade(pet_t *p, uint32_t seed)
+{
+    if (p->magic != PET_MAGIC) return;
+    if (!p->rng) p->rng = seed ? seed : 0x9E3779B9u;
+    if (p->version < 2) {
+        // il polipetto di prima resta com'era: arancione, tinta unita
+        for (int i = 0; i < GENE_COUNT; i++) p->genes[i][0] = p->genes[i][1] = 0;
+        p->genes[GENE_TEMPER][0] = p->genes[GENE_TEMPER][1] = (uint8_t)(rnd(p) % TEMP_COUNT);
+        if (p->stage != PET_EGG) give_identity(p);
+        else if (!p->family[0]) copy_name(p->family, pet_random_family(&p->rng));
+    }
+    for (int i = 0; i < GENE_COUNT; i++) { p->genes[i][0] = fix(i, p->genes[i][0]); p->genes[i][1] = fix(i, p->genes[i][1]); }
+    p->name[PET_NAME_LEN - 1] = p->family[PET_NAME_LEN - 1] = 0;
+    p->parent[0][PET_NAME_LEN - 1] = p->parent[1][PET_NAME_LEN - 1] = 0;
+    if (p->sex > SEX_F) p->sex = SEX_NONE;
+    p->version = PET_VERSION;
+}
+
+static int temper(const pet_t *p) { return pet_gene_show(p->genes[GENE_TEMPER], GENE_TEMPER); }
 
 uint8_t pet_core_base_weight(int stage)
 {
@@ -68,10 +196,12 @@ static void set_stage(pet_t *p, pet_stage_t s)
     reset_timers(p);
 }
 
-void pet_core_new_egg(pet_t *p, uint32_t seed)
+void pet_core_new_egg_from(pet_t *p, uint32_t seed, const pet_egg_t *egg)
 {
     uint16_t gen = p->magic == PET_MAGIC ? p->generation : 0;
     uint32_t best = p->magic == PET_MAGIC ? p->best_age_s : 0;
+    char fam[PET_NAME_LEN];
+    copy_name(fam, p->magic == PET_MAGIC ? p->family : "");
     memset(p, 0, sizeof(*p));
     p->magic = PET_MAGIC;
     p->version = PET_VERSION;
@@ -80,7 +210,21 @@ void pet_core_new_egg(pet_t *p, uint32_t seed)
     p->rng = seed ? seed : 0x9E3779B9u;
     p->stage = PET_EGG;
     p->hunger = p->thirst = p->happy = 2;
+    if (egg) {
+        memcpy(p->genes, egg->genes, sizeof(p->genes));
+        for (int i = 0; i < GENE_COUNT; i++) { p->genes[i][0] = fix(i, p->genes[i][0]); p->genes[i][1] = fix(i, p->genes[i][1]); }
+        copy_name(p->parent[0], egg->parent[0]);
+        copy_name(p->parent[1], egg->parent[1]);
+        copy_name(p->family, egg->family[0] ? egg->family : fam);
+        if (egg->generation) p->generation = egg->generation;
+    } else {
+        pet_genes_random(p->genes, &p->rng);
+        // la famiglia continua (stesso cognome) finché non si ricomincia da zero
+        copy_name(p->family, fam[0] ? fam : pet_random_family(&p->rng));
+    }
 }
+
+void pet_core_new_egg(pet_t *p, uint32_t seed) { pet_core_new_egg_from(p, seed, NULL); }
 
 static bool sleep_now(int stage, const pet_clock_t *c)
 {
@@ -172,6 +316,7 @@ uint32_t pet_core_step(pet_t *p, uint32_t dt, const pet_clock_t *c)
         if (p->stage_s >= PET_EGG_S) {
             set_stage(p, PET_BABY);
             p->hunger = p->thirst = p->happy = 2;
+            give_identity(p);
             ev |= EV_HATCH;
         }
         return ev;
@@ -180,6 +325,8 @@ uint32_t pet_core_step(pet_t *p, uint32_t dt, const pet_clock_t *c)
     p->age_s += dt;
     p->t_pet_cd = p->t_pet_cd > dt ? p->t_pet_cd - dt : 0;
     p->t_shake_cd = p->t_shake_cd > dt ? p->t_shake_cd - dt : 0;
+    p->t_play_cd = p->t_play_cd > dt ? p->t_play_cd - dt : 0;
+    p->t_reward = p->t_reward > dt ? p->t_reward - dt : 0;
 
     // nanna: a orari fissi; al risveglio la luce si riaccende da sola
     bool night = sleep_now(p->stage, c);
@@ -194,7 +341,14 @@ uint32_t pet_core_step(pet_t *p, uint32_t dt, const pet_clock_t *c)
     }
 
     if (!p->asleep) {
-        const rates_t *r = &rates[p->stage];
+        rates_t rr = rates[p->stage];
+        const rates_t *r = &rr;
+        // il carattere cambia un po' i ritmi
+        switch (temper(p)) {
+        case TEMP_CALM:   rr.happy = rr.happy * 5 / 4; rr.tantrum = rr.tantrum * 3 / 2; break;
+        case TEMP_LIVELY: rr.happy = rr.happy * 4 / 5; break;
+        case TEMP_GREEDY: rr.hunger = rr.hunger * 4 / 5; break;
+        }
         decay(&p->t_hunger, dt, r->hunger, &p->hunger);
         decay(&p->t_thirst, dt, r->thirst, &p->thirst);
         decay(&p->t_happy, dt, r->happy, &p->happy);
@@ -320,12 +474,23 @@ uint32_t pet_core_action(pet_t *p, pet_action_t a, pet_result_t *res)
         else { inc(&p->hunger, 1); if (p->weight < 99) p->weight++; }
         break;
     case ACT_SNACK:
+        // lo spuntino non sazia: rende felici. Come premio subito dopo una sgridata fissa
+        // la lezione (disciplina) e non conta come golosità; dal quarto del giorno ingrassa
         if (p->asleep) r = RES_ASLEEP;
-        else if (tantrum_refuse) r = RES_REFUSE;
+        else if (p->t_reward) {
+            p->t_reward = 0;
+            inc(&p->happy, 2);
+            inc(&p->discipline, 1);
+            r = RES_REWARD;
+        } else if (tantrum_refuse) r = RES_REFUSE;
         else {
-            inc(&p->happy, 1);
-            p->weight = p->weight > 97 ? 99 : p->weight + 2;
-            if (p->snacks_stage < 255) p->snacks_stage++;
+            inc(&p->happy, temper(p) == TEMP_GREEDY ? 2 : 1);
+            if (p->snacks_today < 255) p->snacks_today++;
+            if (p->snacks_today > PET_SNACKS_FREE) {
+                p->weight = p->weight > 97 ? 99 : p->weight + 2;
+                if (p->snacks_stage < 255) p->snacks_stage++;
+                r = RES_GREEDY;
+            }
         }
         break;
     case ACT_WATER:
@@ -347,7 +512,7 @@ uint32_t pet_core_action(pet_t *p, pet_action_t a, pet_result_t *res)
         break;
     case ACT_SCOLD:
         if (p->asleep) r = RES_ASLEEP;
-        else if (p->tantrum) { p->tantrum = 0; inc(&p->discipline, 1); }
+        else if (p->tantrum) { p->tantrum = 0; inc(&p->discipline, 1); p->t_reward = PET_REWARD_S; }
         else { inc(&p->happy, -1); r = RES_SAD; }
         break;
     case ACT_PET:
@@ -363,12 +528,22 @@ uint32_t pet_core_action(pet_t *p, pet_action_t a, pet_result_t *res)
         } else if (p->t_shake_cd) r = RES_COOLDOWN;
         else { inc(&p->happy, 1); p->t_shake_cd = 1200; }
         break;
-    case ACT_GAME_WIN:     inc(&p->happy, 1); lose_weight(p, 1); break;
+    case ACT_GAME_WIN:     inc(&p->happy, temper(p) == TEMP_LIVELY ? 2 : 1); lose_weight(p, 1); break;
     case ACT_GAME_BIG_WIN: inc(&p->happy, 2); lose_weight(p, 1); break;
     case ACT_GAME_LOSE:    lose_weight(p, 1); break;
+    case ACT_PLAY:
+        if (p->asleep) r = RES_ASLEEP;
+        else if (tantrum_refuse) r = RES_REFUSE;
+        else if (p->t_play_cd) r = RES_COOLDOWN;
+        else { inc(&p->happy, 1); p->t_play_cd = PET_PLAY_CD_S; }
+        break;
+    case ACT_VISIT:
+        if (p->asleep) r = RES_ASLEEP;
+        else { inc(&p->happy, 2); lose_weight(p, 1); }
+        break;
     }
     // un bisogno soddisfatto spegne subito la sua chiamata
-    if (r == RES_OK) {
+    if (r == RES_OK || r == RES_REWARD || r == RES_GREEDY) {
         uint8_t needs = p->needs;
         if (p->hunger) needs &= ~NEED_HUNGER;
         if (p->thirst) needs &= ~NEED_THIRST;
@@ -405,9 +580,9 @@ uint32_t pet_core_steps(pet_t *p, uint32_t n, bool walking)
     return ev;
 }
 
-uint32_t pet_core_release(pet_t *p)
+uint32_t pet_core_release(pet_t *p, bool early)
 {
-    if (!pet_core_can_release(p)) return 0;
+    if (!pet_core_can_release(p) && !(early && p->stage == PET_ADULT)) return 0;
     die(p, DEATH_OLD);
     return EV_DEATH;
 }

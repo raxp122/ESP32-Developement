@@ -65,6 +65,8 @@ typedef struct {
     // v14 - Azione rapida e App all'avvio per nome (l'elenco si costruisce dal launcher)
     char     quick_name[48];      // "Torcia", "Accordatore » Cromatico", "Spegni schermo", "Nessuna"
     char     boot_name[48];
+    // v15
+    uint8_t  pet_clock;           // il polipetto compare nell'Orologio
 } settings_t;
 
 // layout della tastiera USB. L'ordine è salvato: le voci nuove vanno in fondo.

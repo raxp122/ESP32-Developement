@@ -11,9 +11,12 @@
 #include "board.h"
 #include "lvgl.h"
 #include <math.h>
+#include <stdarg.h>
 #include <stddef.h>
+#include <stdio.h>
 #include <string.h>
 #include <time.h>
+#include "esp_attr.h"
 #include "esp_log.h"
 #include "esp_random.h"
 #include "esp_timer.h"
@@ -29,6 +32,13 @@ static const char *TAG = "pet";
                                       // in modalità reale/ibrida il recupero rifà comunque il resto)
 
 static pet_t P;
+static pet_world_t W;
+static EXT_RAM_BSS_ATTR struct { uint8_t n, pad[3]; pet_diary_t e[PET_DIARY_N]; } D;     // 0 = più recente
+static EXT_RAM_BSS_ATTR struct { uint8_t n, pad[3]; pet_album_t e[PET_ALBUM_N]; } A;
+static EXT_RAM_BSS_ATTR struct { uint8_t n, pad[3]; pet_friend_t e[PET_FRIENDS_N]; } F;
+#define W_MAGIC 0x50574C44u   // "PWLD"
+static void chronicle(uint32_t ev);
+static void calendar(void);
 static bool fg, walking, dirty;
 static bool caught;              // recupero del tempo a scheda spenta già fatto (serve un'ora valida)
 static uint32_t sim_unknown;     // secondi già simulati mentre l'ora non era nota
@@ -69,11 +79,39 @@ static void load(void)
     if (nvs_get_blob(h, "st", &tmp, &len) == ESP_OK && len >= offsetof(pet_t, last_epoch) &&
         tmp.magic == PET_MAGIC && tmp.version <= PET_VERSION &&
         tmp.stage <= PET_DEAD && tmp.form <= FORM_MESSY) {   // valori fuori misura indicizzerebbero tabelle
-        tmp.version = PET_VERSION;
         P = tmp;
+        pet_core_upgrade(&P, esp_random());   // dalla v1: nome, sesso e geni
     }
+    // il mondo: voci separate, ognuna può mancare (salvataggi vecchi) o essere più corta
+    len = sizeof(W);
+    if (nvs_get_blob(h, "w", &W, &len) != ESP_OK || W.magic != W_MAGIC) memset(&W, 0, sizeof(W));
+    len = sizeof(D);
+    if (nvs_get_blob(h, "dia", &D, &len) != ESP_OK || D.n > PET_DIARY_N) memset(&D, 0, sizeof(D));
+    len = sizeof(A);
+    if (nvs_get_blob(h, "alb", &A, &len) != ESP_OK || A.n > PET_ALBUM_N) memset(&A, 0, sizeof(A));
+    len = sizeof(F);
+    if (nvs_get_blob(h, "fri", &F, &len) != ESP_OK || F.n > PET_FRIENDS_N) memset(&F, 0, sizeof(F));
     nvs_close(h);
 }
+
+static void save_blob(const char *key, const void *v, size_t n)
+{
+    nvs_handle_t h;
+    if (nvs_open("pet", NVS_READWRITE, &h) != ESP_OK) return;
+    nvs_set_blob(h, key, v, n);
+    nvs_commit(h);
+    nvs_close(h);
+}
+
+void pet_world_save(void)
+{
+    W.magic = W_MAGIC;
+    W.version = 1;
+    save_blob("w", &W, sizeof(W));
+}
+static void diary_save(void) { save_blob("dia", &D, sizeof(D)); }
+static void album_save(void) { save_blob("alb", &A, sizeof(A)); }
+void pet_friends_save(void) { save_blob("fri", &F, sizeof(F)); }
 
 void pet_save(void)
 {
@@ -242,6 +280,7 @@ static void catch_up(void)
     // le novità importanti si vedono (e si sentono) quando si apre l'app
     events |= ev & (EV_HATCH | EV_EVOLVE | EV_DEATH | EV_ELDER);
     P.last_epoch = now;
+    chronicle(ev);
     ESP_LOGI(TAG, "recuperati %lld s di vita a scheda spenta", (long long)gap);
     pet_save();
 }
@@ -275,11 +314,23 @@ static void timer_cb(lv_timer_t *tm)
     if (n && g_set.pet_steps && pet_core_alive(&P)) {
         ev |= pet_core_steps(&P, n, walking);
         dirty = true;
+        // ogni 1000 passi una conchiglia trovata sulla spiaggia
+        W.steps_shells += n;
+        if (W.steps_shells >= 1000) {
+            pet_shells_add(W.steps_shells / 1000);
+            W.steps_shells %= 1000;
+            pet_world_save();
+            ev |= EV_SHELLS;
+        }
     }
-    if (known && P.steps_yday != lt.tm_yday + 1) {   // contapassi del giorno
+    if (known && P.steps_yday != lt.tm_yday + 1) {   // contapassi (e spuntini) del giorno
         P.steps_yday = lt.tm_yday + 1;
         P.steps_today = 0;
+        P.snacks_today = 0;
     }
+    if (ev) chronicle(ev);
+    static int cal_min = -1;   // feste e compleanni: un controllo al minuto
+    if (known && lt.tm_min != cal_min) { cal_min = lt.tm_min; calendar(); }
     // senza un'ora valida si tiene l'ultima nota: il recupero la userà quando l'ora arriva
     if (known) P.last_epoch = epoch;
 
@@ -287,7 +338,7 @@ static void timer_cb(lv_timer_t *tm)
         sound_for_events(ev);
         // ad app chiusa si tengono solo le novità importanti: aprendola ore dopo non deve
         // comparire "si è addormentato" di stamattina
-        events |= fg ? ev : ev & (EV_HATCH | EV_EVOLVE | EV_DEATH | EV_ELDER);
+        events |= fg ? ev : ev & (EV_HATCH | EV_EVOLVE | EV_DEATH | EV_ELDER | EV_FEST | EV_BDAY);
     }
     int64_t since = us - last_save_us;
     if (P.stage == PET_NONE) return;   // niente da salvare finché non c'è un uovo
@@ -351,17 +402,41 @@ void pet_init(void)
     load();
     last_us = last_save_us = esp_timer_get_time();
     catch_up();
+    calendar();
     lv_timer_create(timer_cb, 1000, NULL);
     xTaskCreatePinnedToCore(imu_task, "pet_imu", 3072, NULL, 2, NULL, 1);
 }
 
 pet_t *pet_get(void) { return &P; }
 
+static void album_add(void);
+
 void pet_new_egg(void)
 {
-    pet_core_new_egg(&P, esp_random());
+    // chi era ancora vivo (Ricomincia da un uovo) va nell'album
+    if (pet_core_alive(&P)) album_add();
+    pet_egg_t self;
+    const pet_egg_t *egg = NULL;
+    if (W.has_egg) {          // l'uovo nel nido, avuto incontrando un altro polipetto
+        egg = &W.nest;
+        W.has_egg = 0;
+    } else if (P.stage == PET_DEAD && P.death == DEATH_OLD) {
+        // partito per l'oceano: lascia un uovo suo (stessa famiglia, i suoi geni rimescolati)
+        memset(&self, 0, sizeof(self));
+        uint32_t r = esp_random();
+        pet_genes_child(self.genes, P.genes, P.genes, &r);
+        snprintf(self.parent[P.sex == SEX_M ? 1 : 0], PET_NAME_LEN, "%s", P.name);
+        snprintf(self.family, PET_NAME_LEN, "%s", P.family);
+        egg = &self;
+    }
+    pet_core_new_egg_from(&P, esp_random(), egg);
     events = 0;
     pet_save();
+    pet_world_save();
+    if (egg && egg->parent[0][0] && egg->parent[1][0])
+        pet_diary_add("Nuovo uovo: figlio di %s e %s", egg->parent[0], egg->parent[1]);
+    else if (egg) pet_diary_add("Nuovo uovo lasciato da %s", egg->parent[0][0] ? egg->parent[0] : egg->parent[1]);
+    else pet_diary_add("Un nuovo uovo della famiglia %s", P.family);
 }
 
 uint32_t pet_do(pet_action_t a, pet_result_t *res)
@@ -379,10 +454,14 @@ uint32_t pet_do(pet_action_t a, pet_result_t *res)
         case ACT_MEDICINE: snd = SND_MEDICINE; break;
         case ACT_LIGHT:    snd = SND_TICK; break;
         case ACT_SCOLD:    snd = SND_SCOLD; break;
-        case ACT_PET: case ACT_SHAKE: snd = SND_HAPPY; break;
+        case ACT_PET: case ACT_SHAKE: case ACT_PLAY: case ACT_VISIT: snd = SND_HAPPY; break;
         case ACT_GAME_WIN: case ACT_GAME_BIG_WIN: snd = SND_WIN; break;
         case ACT_GAME_LOSE: snd = SND_LOSE; break;
         }
+    } else if (r == RES_REWARD) {
+        snd = SND_HAPPY;
+    } else if (r == RES_GREEDY) {
+        snd = SND_EAT;
     } else if (r == RES_FULL || r == RES_REFUSE || r == RES_SAD || r == RES_WOKE) {
         snd = SND_NO;
     }
@@ -392,10 +471,11 @@ uint32_t pet_do(pet_action_t a, pet_result_t *res)
 
 uint32_t pet_release(void)
 {
-    uint32_t ev = pet_core_release(&P);
+    uint32_t ev = pet_core_release(&P, W.has_egg);
     if (ev) {
         events |= ev;
         pet_play(SND_EVOLVE);
+        chronicle(ev);
         pet_save();
     }
     return ev;
@@ -417,3 +497,231 @@ void pet_set_foreground(bool on)
 }
 
 void pet_set_walking(bool on) { walking = on; }
+
+/* ---------------- il mondo del giocatore ---------------- */
+
+pet_world_t *pet_world(void) { return &W; }
+
+void pet_shells_add(int n)
+{
+    int v = W.shells + n;
+    W.shells = v < 0 ? 0 : v > 9999 ? 9999 : v;
+    if (n > 0) W.shells_total = W.shells_total + n > 65535 ? 65535 : W.shells_total + n;
+}
+
+bool pet_now(int64_t *epoch)
+{
+    struct tm lt;
+    return local_now(&lt, epoch);
+}
+
+void pet_diary_add(const char *fmt, ...)
+{
+    memmove(&D.e[1], &D.e[0], sizeof(D.e[0]) * (PET_DIARY_N - 1));
+    pet_diary_t *d = &D.e[0];
+    memset(d, 0, sizeof(*d));
+    int64_t ep = 0;
+    if (pet_now(&ep)) d->epoch = (uint32_t)ep;
+    d->age_s = P.age_s;
+    d->gen = P.generation;
+    va_list ap;
+    va_start(ap, fmt);
+    vsnprintf(d->text, sizeof(d->text), fmt, ap);
+    va_end(ap);
+    if (D.n < PET_DIARY_N) D.n++;
+    diary_save();
+}
+
+int pet_diary_count(void) { return D.n; }
+const pet_diary_t *pet_diary_get(int i) { return i >= 0 && i < D.n ? &D.e[i] : NULL; }
+int pet_album_count(void) { return A.n; }
+const pet_album_t *pet_album_get(int i) { return i >= 0 && i < A.n ? &A.e[i] : NULL; }
+int pet_friend_count(void) { return F.n; }
+pet_friend_t *pet_friend_get(int i) { return i >= 0 && i < F.n ? &F.e[i] : NULL; }
+
+pet_friend_t *pet_friend_meet(uint32_t uid, const char *name, const char *family, int sex, int stage, int form)
+{
+    int i = 0;
+    while (i < F.n && F.e[i].uid != uid) i++;
+    pet_friend_t f;
+    if (i < F.n) f = F.e[i];
+    else { memset(&f, 0, sizeof(f)); f.uid = uid; i = F.n < PET_FRIENDS_N ? F.n++ : PET_FRIENDS_N - 1; }
+    snprintf(f.name, sizeof(f.name), "%s", name);
+    snprintf(f.family, sizeof(f.family), "%s", family);
+    f.sex = sex;
+    f.stage = stage;
+    f.form = form;
+    // il più recente in cima
+    memmove(&F.e[1], &F.e[0], sizeof(F.e[0]) * i);
+    F.e[0] = f;
+    return &F.e[0];
+}
+
+void pet_set_name(const char *name)
+{
+    if (!name || !name[0]) return;
+    char old[PET_NAME_LEN];
+    snprintf(old, sizeof(old), "%s", P.name);
+    snprintf(P.name, sizeof(P.name), "%s", name);
+    pet_save();
+    if (strcmp(old, P.name)) pet_diary_add("Ora si chiama %s", P.name);
+}
+
+void pet_record(int rec, int score)
+{
+    static const char *const games[REC_COUNT] = {"Pesca", "Da che parte?", "1, 2, 3 stella", "Memoria", "Ritmo"};
+    if (rec < 0 || rec >= REC_COUNT || score <= W.best[rec]) return;
+    W.best[rec] = score > 65535 ? 65535 : score;
+    pet_world_save();
+    pet_diary_add("Nuovo record a %s: %d", games[rec], score);
+}
+
+static void album_add(void)
+{
+    memmove(&A.e[1], &A.e[0], sizeof(A.e[0]) * (PET_ALBUM_N - 1));
+    pet_album_t *a = &A.e[0];
+    memset(a, 0, sizeof(*a));
+    snprintf(a->name, sizeof(a->name), "%s", P.name);
+    snprintf(a->family, sizeof(a->family), "%s", P.family);
+    memcpy(a->parent, P.parent, sizeof(a->parent));
+    a->sex = P.sex;
+    a->stage = pet_core_alive(&P) ? P.stage : P.form >= FORM_SAGE ? PET_ADULT : P.form >= FORM_TEEN_GOOD ? PET_TEEN : PET_CHILD;
+    a->form = P.form;
+    a->death = P.stage == PET_DEAD ? P.death : DEATH_NONE;
+    memcpy(a->genes, P.genes, sizeof(a->genes));
+    a->generation = P.generation;
+    a->age_s = P.age_s;
+    int64_t ep = 0;
+    if (pet_now(&ep)) a->epoch = (uint32_t)ep;
+    if (A.n < PET_ALBUM_N) A.n++;
+    album_save();
+}
+
+static const char *const form_names[] = {
+    [FORM_BASE] = "Polpo", [FORM_TEEN_GOOD] = "Polipetto ragazzo", [FORM_TEEN_BAD] = "Polipetto ribelle",
+    [FORM_SAGE] = "Polpo saggio", [FORM_EXPLORER] = "Polpo esploratore", [FORM_NORMAL] = "Polpo",
+    [FORM_GLUTTON] = "Polpo goloso", [FORM_MESSY] = "Polpo pasticcione",
+};
+
+const char *pet_form_name(int stage, int form)
+{
+    switch (stage) {
+    case PET_EGG:   return "Uovo";
+    case PET_BABY:  return "Polipetto neonato";
+    case PET_CHILD: return "Polipetto bimbo";
+    case PET_TEEN:  return form == FORM_TEEN_BAD ? "Polipetto ribelle" : "Polipetto ragazzo";
+    case PET_ADULT: return form <= FORM_MESSY ? form_names[form] : "Polpo";
+    default:        return "Polipetto";
+    }
+}
+
+const char *pet_stage_name(const pet_t *p)
+{
+    if (p->stage == PET_DEAD) return "Addio, polipetto…";
+    return pet_form_name(p->stage, p->form);
+}
+
+// le novità della vita finiscono nel diario (e nell'album quando se ne va)
+static void chronicle(uint32_t ev)
+{
+    if (ev & EV_HATCH) {
+        if (P.parent[0][0] && P.parent[1][0]) pet_diary_add("È nat%c %s, figli%c di %s e %s", P.sex == SEX_F ? 'a' : 'o', P.name, P.sex == SEX_F ? 'a' : 'o', P.parent[0], P.parent[1]);
+        else pet_diary_add("È nat%c %s %s!", P.sex == SEX_F ? 'a' : 'o', P.name, P.family);
+        W.colors_seen |= 1u << pet_gene_show(P.genes[GENE_COLOR], GENE_COLOR);
+        pet_world_save();
+    }
+    if (ev & EV_EVOLVE) {
+        pet_diary_add("%s ora è: %s", P.name, pet_stage_name(&P));
+        if (P.stage == PET_ADULT) { W.forms_seen |= 1u << P.form; pet_world_save(); }
+    }
+    if (ev & EV_SICK) pet_diary_add("%s si è ammalat%c", P.name, P.sex == SEX_F ? 'a' : 'o');
+    if (ev & EV_ELDER) pet_diary_add("%s ha compiuto 25 giorni!", P.name);
+    if (ev & EV_DEATH) {
+        if (P.death == DEATH_OLD) pet_diary_add("%s è tornat%c nel grande oceano", P.name, P.sex == SEX_F ? 'a' : 'o');
+        else pet_diary_add("%s è diventat%c un angioletto", P.name, P.sex == SEX_F ? 'a' : 'o');
+        album_add();
+    }
+}
+
+/* ---------------- calendario ---------------- */
+
+// domenica di Pasqua (algoritmo di Meeus/Jones/Butcher): giorno dell'anno, 0 = 1 gennaio
+static int easter_yday(int y)
+{
+    int a = y % 19, b = y / 100, c = y % 100, d = b / 4, e = b % 4, f = (b + 8) / 25, g = (b - f + 1) / 3;
+    int h = (19 * a + b - d - g + 15) % 30, i = c / 4, k = c % 4, l = (32 + 2 * e + 2 * i - h - k) % 7;
+    int m = (a + 11 * h + 22 * l) / 451, month = (h + l - 7 * m + 114) / 31, day = (h + l - 7 * m + 114) % 31 + 1;
+    struct tm t = {.tm_year = y - 1900, .tm_mon = month - 1, .tm_mday = day, .tm_hour = 12};
+    mktime(&t);
+    return t.tm_yday;
+}
+
+int pet_holiday(void)
+{
+    struct tm t;
+    if (!local_now(&t, NULL)) return HOL_NONE;
+    int m = t.tm_mon + 1, d = t.tm_mday;
+    if (m == 1 && d == 1) return HOL_NEWYEAR;
+    if (m == 1 && d == 6) return HOL_BEFANA;
+    if (m == 2 && d == 14) return HOL_VALENTINE;
+    int e = easter_yday(t.tm_year + 1900);
+    if (t.tm_yday == e || t.tm_yday == e + 1) return HOL_EASTER;   // Pasqua e Pasquetta
+    if (m == 8 && d == 15) return HOL_FERRAGOSTO;
+    if (m == 10 && d == 8) return HOL_OCTOPUS;                      // giornata mondiale del polpo
+    if (m == 10 && d == 31) return HOL_HALLOWEEN;
+    if (m == 12 && d >= 24 && d <= 26) return HOL_CHRISTMAS;
+    if (m == 12 && d == 31) return HOL_NYE;
+    return HOL_NONE;
+}
+
+const char *pet_holiday_name(int h)
+{
+    static const char *const n[HOL_COUNT] = {
+        "", "Capodanno", "Befana", "San Valentino", "Pasqua", "Ferragosto",
+        "Giornata del polpo", "Halloween", "Natale", "San Silvestro",
+    };
+    return h > 0 && h < HOL_COUNT ? n[h] : "";
+}
+
+int pet_season(void)
+{
+    struct tm t;
+    if (!local_now(&t, NULL)) return 0xFF;
+    int m = t.tm_mon + 1;
+    return m == 12 || m <= 2 ? SEASON_WINTER : m <= 5 ? SEASON_SPRING : m <= 8 ? SEASON_SUMMER : SEASON_AUTUMN;
+}
+
+int pet_daypart(void)
+{
+    struct tm t;
+    if (!local_now(&t, NULL)) return DAY_DAY;
+    int h = t.tm_hour;
+    return h >= 6 && h < 8 ? DAY_DAWN : h >= 8 && h < 18 ? DAY_DAY : h >= 18 && h < 21 ? DAY_DUSK : DAY_NIGHT;
+}
+
+// feste (un regalo una volta l'anno) e compleanni (ogni settimana di età)
+static void calendar(void)
+{
+    struct tm t;
+    if (!local_now(&t, NULL) || !pet_core_alive(&P)) return;
+    bool changed = false;
+    int h = pet_holiday();
+    if (W.fest_year != t.tm_year + 1900) { W.fest_year = t.tm_year + 1900; W.fest_done = 0; changed = true; }
+    if (h && !(W.fest_done >> h & 1)) {
+        W.fest_done |= 1u << h;
+        pet_shells_add(10);
+        events |= EV_FEST;
+        changed = true;
+        pet_diary_add("Festa: %s! Regalo di 10 conchiglie", pet_holiday_name(h));
+    }
+    int weeks = P.age_s / (7 * 86400);
+    if (W.bday_uid != P.uid) { W.bday_uid = P.uid; W.bday_weeks = weeks; changed = true; }   // si parte da adesso
+    if (weeks > W.bday_weeks) {
+        W.bday_weeks = weeks;
+        pet_shells_add(5);
+        events |= EV_BDAY;
+        changed = true;
+        pet_diary_add("%s compie %d settiman%c! Torta e 5 conchiglie", P.name, weeks, weeks == 1 ? 'a' : 'e');
+    }
+    if (changed) pet_world_save();
+}

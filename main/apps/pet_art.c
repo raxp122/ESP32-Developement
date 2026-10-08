@@ -3,6 +3,7 @@
 // fondale marino e icone. Gli sprite sono stringhe: un carattere = un pixel.
 #include "pet_art.h"
 #include "pet_core.h"
+#include <string.h>
 
 #define TR 0xFFFFFFFFu   // trasparente
 
@@ -91,6 +92,10 @@ static uint32_t pal(char c)
     case 'Q': return 0xEFD3FF;
     case 'z': return 0xEDEDED;
     case 'u': return 0xB07A45;   // biscotto
+    case 'v': return 0x7A4A22;   // legno scuro
+    case 'a': return 0xFF9F1C;   // zucca
+    case 'd': return 0x2E7D32;   // abete
+    case 'j': return 0x1B2A4A;   // blu notte
     default:  return TR;
     }
 }
@@ -141,6 +146,12 @@ SPR(SPR_BANG, 1, 5, "r", "r", "r", ".", "r");
 SPR(SPR_QUESTION, 3, 5, "zz.", "..z", ".z.", "...", ".z.");
 SPR(SPR_ANGER, 3, 3, "r.r", ".r.", "r.r");
 SPR(SPR_HALO, 6, 2, ".tttt.", "t....t");
+SPR(SPR_BALL, 5, 5, ".rrw.", "rrwww", "wwwrr", "wwrrr", ".rrr.");
+SPR(SPR_BOOK, 9, 7, "BbbbBbbbB", "BwwwBwwwB", "BwkwBwkwB", "BwwwBwwwB", "BwkwBwkwB", "BwwwBwwwB", "BbbbBbbbB");
+SPR(SPR_SHELL, 5, 4, ".ppp.", "pwpwp", "ppppp", ".ppp.");
+SPR(SPR_CAKE, 9, 8, "..y.y.y..", "..r.r.r..", ".wwwwwww.", ".wpwpwpw.", "uuuuuuuuu", "uppppppuu", "uuuuuuuuu", ".........");
+SPR(SPR_NEST_EGG, 6, 7, "..ee..", ".eEee.", "eeeeEe", "eEeeee", "eeeEee", ".eeee.", "vvvvvv");
+SPR(SPR_GIFT, 7, 7, "..y.y..", "...y...", "rrryrrr", "rrryrrr", "yyyyyyy", "rrryrrr", "rrryrrr");
 
 /* ---------------- icone ---------------- */
 
@@ -157,6 +168,31 @@ const sprite_t PET_ICONS[PICON_COUNT] = {
     {8, 8, ic_food}, {8, 8, ic_play}, {8, 8, ic_clean}, {8, 8, ic_med},
     {8, 8, ic_light}, {8, 8, ic_scold}, {8, 8, ic_stats}, {8, 8, ic_call},
 };
+
+/* ---------------- aspetto ---------------- */
+
+static art_look_t L;   // tutto zero = arancione classico
+
+// corpo, ombra, riflesso per ogni colore dei geni (stesso ordine di COL_*)
+static const uint32_t body_rgb[][3] = {
+    {0xD97757, 0xA9503A, 0xF4B19A},   // arancione
+    {0xE8606A, 0xB03A48, 0xF8A8AE},   // corallo
+    {0x9B6BD6, 0x6A4499, 0xCDB2F0},   // viola
+    {0x4FA8E0, 0x2C6E9E, 0xA8D8F5},   // azzurro
+    {0x5CBF7A, 0x357A4C, 0xA9E6BB},   // verde
+    {0xF28BB8, 0xB55A85, 0xFAC3DB},   // rosa
+    {0xE8C547, 0xA8862A, 0xF8E79A},   // oro
+};
+#define N_COL (int)(sizeof(body_rgb) / sizeof(body_rgb[0]))
+
+void art_look(const art_look_t *l)
+{
+    if (l) L = *l;
+    else memset(&L, 0, sizeof(L));
+    if (L.color >= N_COL) L.color = 0;
+}
+
+uint32_t art_body_rgb(int color) { return body_rgb[color >= 0 && color < N_COL ? color : 0][0]; }
 
 /* ---------------- polipetto ---------------- */
 
@@ -245,11 +281,18 @@ static const body_t *body_for(int stage, int form)
     }
 }
 
+// lunghezza dei tentacoli secondo i geni
+static int tent_len(const body_t *b)
+{
+    int tl = b->tl + (L.tent == TENT_LONG ? 1 : L.tent == TENT_SHORT ? -1 : 0);
+    return tl < 2 ? 2 : tl;
+}
+
 void art_pet_size(int stage, int form, int *w, int *h)
 {
     const body_t *b = body_for(stage, form);
     *w = b->w;
-    *h = b->h + b->tl;
+    *h = b->h + tent_len(b);
 }
 
 static struct { int x, y, w, tint; bool flip; } B;
@@ -271,6 +314,9 @@ static uint32_t tinted(char c)
         if (c == 'p') return TR;
         break;
     }
+    if (c == 'O') return body_rgb[L.color][0];
+    if (c == 'o') return body_rgb[L.color][1];
+    if (c == 'h') return body_rgb[L.color][2];
     return pal(c);
 }
 
@@ -352,6 +398,7 @@ static void overlays(const body_t *b, int form, expr_t e)
 {
     switch (form) {
     case FORM_TEEN_GOOD: {   // fiocco
+        if (L.hat) break;
         int x = b->w - 5;
         bpx(x, 0, 'p'); bpx(x + 2, 0, 'p');
         bpx(x, 1, 'p'); bpx(x + 1, 1, 'r'); bpx(x + 2, 1, 'p');
@@ -372,6 +419,7 @@ static void overlays(const body_t *b, int form, expr_t e)
         break;
     }
     case FORM_EXPLORER: {    // cappello da esploratore
+        if (L.hat) break;
         int cx = b->w / 2;
         for (int i = cx - 3; i < cx + 3; i++) { bpx(i, -2, 'b'); bpx(i, -1, 'b'); bpx(i, 0, 'B'); }
         for (int i = 1; i < b->w - 1; i++) bpx(i, 1, 'b');
@@ -385,6 +433,107 @@ static void overlays(const body_t *b, int form, expr_t e)
         bpx(b->w / 2 - 1, -1, 'o'); bpx(b->w / 2, -2, 'o'); bpx(b->w / 2 + 1, -1, 'o');
         break;
     default:
+        break;
+    }
+}
+
+/* ---------------- negozio ---------------- */
+
+const art_item_t ART_ITEMS[] = {
+    {"", 0, 0},
+    {"Cappellino", ITEM_HAT, 15},
+    {"Fiocco", ITEM_HAT, 10},
+    {"Cuffia di lana", ITEM_HAT, 20},
+    {"Cappello da festa", ITEM_HAT, 20},
+    {"Cilindro", ITEM_HAT, 35},
+    {"Cappello da pirata", ITEM_HAT, 40},
+    {"Corona", ITEM_HAT, 60},
+    {"Fiore", ITEM_ACC, 10},
+    {"Papillon", ITEM_ACC, 15},
+    {"Sciarpa", ITEM_ACC, 20},
+    {"Occhiali da sole", ITEM_ACC, 25},
+    {"Monocolo", ITEM_ACC, 30},
+    {"Stella marina", ITEM_DECO, 15},
+    {"Corallo", ITEM_DECO, 25},
+    {"Anfora", ITEM_DECO, 30},
+    {"Conchiglia gigante", ITEM_DECO, 35},
+    {"Forziere", ITEM_DECO, 40},
+    {"Castello", ITEM_DECO, 50},
+    {"Sottomarino", ITEM_DECO, 80},
+};
+const int ART_ITEM_COUNT = sizeof(ART_ITEMS) / sizeof(ART_ITEMS[0]);
+
+// cappelli: l'ultima riga poggia sulla cima della testa
+static const char *const hat_cap[] = {"..rrrr...", ".rwrrrr..", ".rrrrrrrr"};
+static const char *const hat_bow[] = {"pp.pp", "pprpp", "pp.pp"};
+static const char *const hat_wool[] = {"...ww...", "..CCCC..", ".CcCCcC.", "wwwwwwww"};
+static const char *const hat_party[] = {"..y..", "..q..", ".qrq.", ".rqr.", "qrqrq"};
+static const char *const hat_top[] = {"..kkkk..", "..kkkk..", "..kkkk..", "..rrrr..", "kkkkkkkk"};
+static const char *const hat_pirate[] = {"...kkkk...", "..kkwkkk..", ".kkkkkkkk.", "kyyyyyyyyk"};
+static const char *const hat_crown[] = {"y..y..y", "yy.y.yy", "yyyyyyy", "yryyyry"};
+static const char *const hat_santa[] = {"...rrrr..", "..rrrrrrw", ".rrrrrr..", "wwwwwwww."};
+static const char *const hat_witch[] = {"....k...", "...kk...", "...kqk..", "..kkkk..", "kkkkkkkk"};
+
+static const sprite_t HATS[] = {
+    {0, 0, NULL}, {9, 3, hat_cap}, {5, 3, hat_bow}, {8, 4, hat_wool}, {5, 5, hat_party},
+    {8, 5, hat_top}, {10, 4, hat_pirate}, {7, 4, hat_crown},
+};
+static const sprite_t HAT_SANTA = {9, 4, hat_santa}, HAT_WITCH = {8, 5, hat_witch};
+
+static void bspr(const sprite_t *s, int x, int y)
+{
+    for (int r = 0; r < s->h; r++)
+        for (int c = 0; c < s->w; c++)
+            if (s->rows[r][c] != '.') bpx(x + c, y + r, s->rows[r][c]);
+}
+
+static int holiday_now;   // dall'ambiente: a Natale e Halloween il cappello è della festa
+
+static void draw_hat(const body_t *b)
+{
+    const sprite_t *s = NULL;
+    if (holiday_now == HOL_CHRISTMAS) s = &HAT_SANTA;
+    else if (holiday_now == HOL_HALLOWEEN) s = &HAT_WITCH;
+    else if (holiday_now == HOL_OCTOPUS || holiday_now == HOL_NYE || holiday_now == HOL_NEWYEAR) s = &HATS[4];
+    if (!s) {
+        if (!L.hat || L.hat >= (int)(sizeof(HATS) / sizeof(HATS[0]))) return;
+        s = &HATS[L.hat];
+    }
+    if (s == &HATS[2]) { bspr(s, b->w - 5, 0); return; }   // il fiocco va di lato
+    bspr(s, (b->w - s->w + 1) / 2, 1 - s->h);
+}
+
+static void draw_acc(const body_t *b, expr_t e)
+{
+    int y = b->ey;
+    switch (L.acc) {
+    case 8:    // fiore di lato
+        bpx(1, 1, 'p'); bpx(0, 2, 'p'); bpx(2, 2, 'p'); bpx(1, 3, 'p'); bpx(1, 2, 'y');
+        break;
+    case 9: {  // papillon sotto la bocca
+        int x = b->w / 2 - 2, yy = b->h - 2;
+        bpx(x, yy - 1, 'r'); bpx(x, yy, 'r'); bpx(x, yy + 1, 'r'); bpx(x + 1, yy, 'r');
+        bpx(x + 2, yy, 'k');
+        bpx(x + 3, yy, 'r'); bpx(x + 4, yy - 1, 'r'); bpx(x + 4, yy, 'r'); bpx(x + 4, yy + 1, 'r');
+        break;
+    }
+    case 10:   // sciarpa a righe con un capo che pende
+        for (int i = 0; i < b->w; i++) bpx(i, b->h - 1, (i / 2) & 1 ? 'w' : 'r');
+        bpx(2, b->h, 'r'); bpx(2, b->h + 1, 'w'); bpx(3, b->h, 'w');
+        break;
+    case 11:   // occhiali da sole
+        if (e == EXPR_BACK) break;
+        if (b->esz == 1) { bpx(b->ex - 1, y, 'k'); bpx(b->ex, y, 'k'); bpx(b->erx, y, 'k'); bpx(b->erx + 1, y, 'k'); break; }
+        for (int i = -1; i <= 2; i++) { bpx(b->ex + i, y, 'k'); bpx(b->erx + i, y, 'k'); }
+        for (int i = 0; i <= 1; i++) { bpx(b->ex + i, y + 1, 'k'); bpx(b->erx + i, y + 1, 'k'); }
+        for (int i = b->ex + 3; i < b->erx - 1; i++) bpx(i, y, 'k');
+        bpx(b->ex, y, 'X'); bpx(b->erx, y, 'X');
+        break;
+    case 12:   // monocolo sull'occhio destro, con la catenella
+        if (e == EXPR_BACK) break;
+        bpx(b->erx - 1, y - 1, 'y'); bpx(b->erx + 2, y - 1, 'y'); bpx(b->erx - 1, y + 2, 'y'); bpx(b->erx + 2, y + 2, 'y');
+        bpx(b->erx, y - 1, 'y'); bpx(b->erx + 1, y - 1, 'y'); bpx(b->erx, y + 2, 'y'); bpx(b->erx + 1, y + 2, 'y');
+        bpx(b->erx + 2, y + 3, 'y'); bpx(b->erx + 2, y + 4, 'y');
         break;
     }
 }
@@ -405,32 +554,41 @@ void art_pet(int stage, int form, int x, int y, expr_t e, int frame, bool flip, 
             if (ch == '.') continue;
             if (ch == 'O' && (c + 1 >= b->w || b->rows[r][c + 1] == '.' || r + 1 >= b->h || b->rows[r + 1][c] == '.'))
                 ch = 'o';
+            // motivo dei geni: puntini o strisce color ombra
+            if (ch == 'O' && tint != TINT_GHOST) {
+                if (L.pattern == PAT_SPOTS && r >= 1 && (c * 5 + r * 3) % 7 == 0) ch = 'o';
+                if (L.pattern == PAT_STRIPES && r >= 2 && r % 3 == 0 && c % 4 != 3) ch = 'o';
+            }
             bpx(c, r, ch);
         }
 
     // tentacoli: la metà bassa ondeggia, la punta fa il ricciolo
-    int half = b->tn / 2;
+    int half = b->tn / 2, tl = tent_len(b);
     for (int i = 0; i < b->tn; i++) {
         int dir = i < half ? -1 : 1;
         if ((b->tn & 1) && i == half) dir = (frame & 1) ? 1 : -1;
-        for (int k = 0; k < b->tl; k++) {
-            int off = (k >= b->tl / 2 && (frame & 1)) ? dir : 0;
-            bool tip = k == b->tl - 1;
+        for (int k = 0; k < tl; k++) {
+            int off = (k >= tl / 2 && (frame & 1)) ? dir : 0;
+            bool tip = k == tl - 1;
             bpx(b->tx[i] + off, b->h + k, tip ? 'o' : 'O');
             if (tip) bpx(b->tx[i] + off + ((frame & 1) ? -dir : dir), b->h + k, 'o');
         }
     }
 
     if (tint == TINT_WHITE) return;
-    int lk = flip ? -look : look;
-    eye(b->ex + lk, b->ey, b->esz, e, false);
-    eye(b->erx + lk, b->ey, b->esz, e, true);
-    mouth(b, e, frame);
-    if (b->cy && tint == TINT_NONE && (e == EXPR_NORMAL || e == EXPR_HAPPY || e == EXPR_EAT || e == EXPR_BLINK)) {
-        bpx(b->clx, b->cy, 'p');
-        bpx(b->crx, b->cy, 'p');
+    if (e != EXPR_BACK) {
+        int lk = flip ? -look : look;
+        eye(b->ex + lk, b->ey, b->esz, e, false);
+        eye(b->erx + lk, b->ey, b->esz, e, true);
+        mouth(b, e, frame);
+        if (b->cy && tint == TINT_NONE && (e == EXPR_NORMAL || e == EXPR_HAPPY || e == EXPR_EAT || e == EXPR_BLINK)) {
+            bpx(b->clx, b->cy, 'p');
+            bpx(b->crx, b->cy, 'p');
+        }
     }
-    if (tint != TINT_GHOST) overlays(b, stage == PET_DEAD ? FORM_BASE : form, e);
+    if (tint == TINT_GHOST) return;
+    if (e != EXPR_BACK) overlays(b, stage == PET_DEAD ? FORM_BASE : form, e);
+    if (stage != PET_DEAD) { draw_acc(b, e); draw_hat(b); }
 }
 
 /* ---------------- uovo ---------------- */
@@ -484,9 +642,78 @@ static void weed(int x, int h, int frame)
     }
 }
 
+/* ---------------- decorazioni ---------------- */
+
+SPR(D_STAR, 5, 5, "..a..", ".aaa.", "aaaaa", ".a.a.", "a...a");
+SPR(D_CORAL, 6, 7, "r..r.r", "r.rr.r", ".rr.rr", "..rrr.", "..rr..", "..r...", "..r...");
+SPR(D_AMPHORA, 5, 7, ".uuu.", "..u..", ".uuu.", "uuuuu", "uBuBu", "uuuuu", ".uuu.");
+SPR(D_SHELL, 7, 5, "..ppp..", ".pwpwp.", "pwpwpwp", "ppppppp", ".ppppp.");
+SPR(D_CHEST, 7, 5, ".bbbbb.", "bBBBBBb", "bbbybbb", "bbbbbbb", "BBBBBBB");
+SPR(D_CASTLE, 9, 8, "x.x...x.x", "xxx...xxx", "xxx.x.xxx", "xxxxxxxxx", "xxxxXxxxx", "xxxXXXxxx", "xxxXXXxxx", "xxxXXXxxx");
+SPR(D_SUB, 12, 5, "....yy......", "....yy......", ".yyyyyyyyyy.", "yycyycyycyyy", ".yyyyyyyyyy.");
+SPR(D_TREE, 7, 9, "...y...", "...d...", "..ddd..", "..drd..", ".ddddd.", ".dyddd.", "ddddrdd", "...v...", "...v...");
+SPR(D_PUMPKIN, 7, 5, "...g...", ".aaaaa.", "aakakaa", "aaaaaaa", ".akkka.");
+SPR(D_EASTER, 5, 6, ".qqq.", "qyyyq", "qqqqq", "rrrrr", "qqqqq", ".qqq.");
+SPR(D_SOCK, 5, 7, "wwww.", "rrrr.", "rwrr.", "rrrr.", "rrrrr", "rrrrr", ".rrr.");
+
+void art_deco(int item, int frame)
+{
+    switch (item) {
+    case 13: art_sprite(&D_STAR, 31, 26, false); break;
+    case 14: art_sprite(&D_CORAL, 13, 22, false); break;
+    case 15: art_sprite(&D_AMPHORA, 22, 22, false); break;
+    case 16: art_sprite(&D_SHELL, 36, 24, false); break;
+    case 17: art_sprite(&D_CHEST, 26, 24, false); break;
+    case 18: art_sprite(&D_CASTLE, 5, 21, false); break;
+    case 19: {   // passa piano in alto
+        int x = (frame / 3) % (S.lw + 24) - 12;
+        art_sprite(&D_SUB, x, 3, false);
+        if ((frame / 4) & 1) art_px(x - 2, 6, 0xA8E6FF);
+        break;
+    }
+    }
+}
+
+static art_env_t E = {.daypart = DAY_DAY, .season = 0xFF};   // 0xFF: nessuna stagione
+
+void art_env(const art_env_t *e)
+{
+    if (e) E = *e;
+    else { memset(&E, 0, sizeof(E)); E.daypart = DAY_DAY; E.season = 0xFF; }
+    holiday_now = E.holiday;
+}
+
+// particelle che scendono o salgono (neve marina, petali, foglie, coriandoli)
+static void drift(int frame, int n, int speed, bool up, const uint32_t *cols, int ncol)
+{
+    for (int i = 0; i < n; i++) {
+        int x = (i * 23 + 7) % S.lw;
+        int y = (i * 11 + frame * speed / 4) % 30;
+        if (up) y = 29 - y;
+        x += ((frame / 6 + i) & 2) ? 1 : 0;
+        art_px(x, y, cols[i % ncol]);
+    }
+}
+
 void art_background(int frame)
 {
-    for (int y = 0; y < 29; y++) art_rect(0, y, S.lw, 1, lerp(0x0B1C2C, 0x174560, y * 255 / 28));
+    // acqua: colori del momento del giorno
+    static const uint32_t top[] = {0x3A2E4A, 0x0B1C2C, 0x3A2416, 0x03080F};
+    static const uint32_t bot[] = {0x2E5A70, 0x174560, 0x2C4A58, 0x0A1E2C};
+    int dp = E.daypart <= DAY_NIGHT ? E.daypart : DAY_DAY;
+    uint32_t t = top[dp], b = bot[dp];
+    if (dp == DAY_DAY && E.season == SEASON_SUMMER) { t = 0x0E2638; b = 0x1C5470; }   // estate: più luce
+    if (dp == DAY_DAY && E.season == SEASON_WINTER) { t = 0x0B1824; b = 0x153A50; }
+    for (int y = 0; y < 29; y++) art_rect(0, y, S.lw, 1, lerp(t, b, y * 255 / 28));
+    if (dp == DAY_DAY && E.season == SEASON_SUMMER)   // raggi di sole
+        for (int k = 0; k < 3; k++)
+            for (int y = 0; y < 20; y++) art_px(10 + k * 18 + y / 3 + ((frame / 10 + k) & 1), y, lerp(t, 0xFFFFFF, 40));
+    if (dp == DAY_NIGHT)   // plancton luminoso
+        for (int i = 0; i < 7; i++)
+            if (((frame / 5) + i * 3) % 7 < 5) art_px((i * 19 + 5) % S.lw, (i * 7 + 3) % 22, 0x4FD8C8);
+    if (dp == DAY_DUSK || dp == DAY_DAWN)   // riflesso del sole in superficie
+        art_rect(S.lw / 2 - 6 + (frame / 8) % 3, 0, 12, 1, dp == DAY_DUSK ? 0xFF9F55 : 0xF2A6C0);
+
     for (int y = 29; y < S.lh; y++)
         for (int x = 0; x < S.lw; x++)
             art_px(x, y, ((x * 7 + y * 3) % 11 == 0) ? pal('S') : pal('s'));
@@ -495,4 +722,45 @@ void art_background(int frame)
     weed(S.lw - 4, 6, frame + 5);
     art_rect(S.lw - 9, 27, 3, 2, pal('x'));
     art_px(S.lw - 7, 28, pal('X'));
+
+    // stagione
+    static const uint32_t snow[] = {0xEDEDED, 0xC8D6E2}, petals[] = {0xF28BB8, 0xFAC3DB, 0xFFFFFF},
+                          leaves[] = {0xD9822B, 0xB5531E, 0xE8B23A};
+    switch (E.season) {
+    case SEASON_WINTER: drift(frame, 9, 2, false, snow, 2); break;
+    case SEASON_SPRING: drift(frame, 6, 1, false, petals, 3); break;
+    case SEASON_AUTUMN:   // foglie che galleggiano in superficie
+        for (int i = 0; i < 4; i++) art_rect((i * 17 + frame / 7) % (S.lw + 2) - 1, (i & 1), 2, 1, leaves[i % 3]);
+        break;
+    }
+
+    // decorazioni comprate
+    for (int it = 1; it < ART_ITEM_COUNT; it++)
+        if (ART_ITEMS[it].kind == ITEM_DECO && (E.deco >> it & 1)) art_deco(it, frame);
+
+    // feste
+    static const uint32_t confetti[] = {0xFFD23C, 0xE5484D, 0x3F9FE0, 0x3DBA5A, 0xC77DFF};
+    switch (E.holiday) {
+    case HOL_CHRISTMAS: art_sprite(&D_TREE, S.lw - 17, 20, false); drift(frame, 9, 2, false, snow, 2); break;
+    case HOL_HALLOWEEN: art_sprite(&D_PUMPKIN, S.lw - 17, 24, false); break;
+    case HOL_EASTER:    art_sprite(&D_EASTER, S.lw - 15, 23, false); break;
+    case HOL_BEFANA:    art_sprite(&D_SOCK, S.lw - 15, 21, false); break;
+    case HOL_VALENTINE:
+        for (int i = 0; i < 3; i++) art_sprite(&SPR_HEART, (i * 21 + 6) % S.lw, 20 - (frame / 2 + i * 9) % 22, false);
+        break;
+    case HOL_NYE: case HOL_NEWYEAR:   // fuochi d'artificio in superficie
+        for (int k = 0; k < 2; k++) {
+            int ph = (frame / 2 + k * 7) % 14, cx = 14 + k * 30, cy = 5 + k * 2;
+            if (ph < 8) for (int a = 0; a < 8; a++) {
+                static const int8_t dx[] = {1, 1, 0, -1, -1, -1, 0, 1}, dy[] = {0, 1, 1, 1, 0, -1, -1, -1};
+                art_px(cx + dx[a] * ph / 2, cy + dy[a] * ph / 2, confetti[(a + k) % 5]);
+            }
+        }
+        break;
+    case HOL_OCTOPUS: drift(frame, 12, 2, false, confetti, 5); break;
+    case HOL_FERRAGOSTO:
+        art_rect(S.lw - 12, 0, 6, 2, 0xFFD23C);   // il sole tremolante in superficie
+        drift(frame, 5, 1, true, confetti, 1);
+        break;
+    }
 }
