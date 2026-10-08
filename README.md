@@ -117,6 +117,7 @@ Dal launcher: **Scacchi**. Un motore scritto apposta per il Gadget gira sulla sc
 - **Comandi sulla scacchiera**:
   - muovi il cursore blu con gli swipe e conferma con BOOT: la prima volta sceglie il pezzo, la seconda la casa. Sul tondo si possono anche toccare il pezzo e la casa; sul 3,49" no, perché il touch a volte registra tocchi fantasma al centro;
   - nella partita a due sul 3,49" a destra c'è il pulsante **Conferma**, che fa come BOOT: entrambi i giocatori muovono senza il tasto fisico;
+  - l'ultima mossa è una freccia arancione (pallino sulla casa di partenza, cornice su quella d'arrivo) ed è scritta anche a parole, senza notazione: "Gadget: Cavallo da g8 a f6, scacco". Il suggerimento e la mossa migliore dell'analisi sono frecce blu;
   - i puntini mostrano dove può andare il pezzo scelto; in una promozione scegli il pezzo;
   - il **dito tenuto** apre il menu della partita: suggerimento, annulla mossa, gira la scacchiera, proponi patta (il Gadget accetta solo se sta peggio), abbandona, esci.
 - **Riprendi la partita**: una partita interrotta si salva a ogni mossa e si riprende anche dopo aver spento.

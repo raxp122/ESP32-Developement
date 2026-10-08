@@ -331,6 +331,30 @@ static void rebuild_pos(void)
     else B.last_from = B.last_to = -1;
 }
 
+// l'ultima mossa a parole, per chi non conosce la notazione: "Gadget: Cavallo da g8 a f6, scacco"
+static void last_move_text(char *o, int n)
+{
+    static const char *const NAME[7] = {"", "Pedone", "Cavallo", "Alfiere", "Torre", "Donna", "Re"};
+    o[0] = 0;
+    if (!G->n) return;
+    cpos_t p;
+    cg_position(G, G->n - 1, &p, NULL);
+    cmove_t m = G->mv[G->n - 1];
+    const char *who = G->info.mode == CG_MODE_BOT ? (p.side == G->info.color ? "Tu" : "Gadget") : (p.side ? "Nero" : "Bianco");
+    char fr[3] = {(char)('a' + CP_FILE(m.from)), (char)('1' + CP_RANK(m.from)), 0};
+    char to[3] = {(char)('a' + CP_FILE(m.to)), (char)('1' + CP_RANK(m.to)), 0};
+    int k;
+    if (m.flags & CM_CASTLE) k = snprintf(o, n, "%s: arrocco %s", who, CP_FILE(m.to) == 6 ? "corto" : "lungo");
+    else if (m.flags & CM_CAPTURE)
+        k = snprintf(o, n, "%s: %s da %s prende in %s%s", who, NAME[CP_TYPE(p.sq[m.from])], fr, to, (m.flags & CM_EP) ? " (en passant)" : "");
+    else k = snprintf(o, n, "%s: %s da %s a %s", who, NAME[CP_TYPE(p.sq[m.from])], fr, to);
+    if (m.promo && k < n) k += snprintf(o + k, n - k, ", diventa %s", NAME[m.promo]);
+    if (cp_in_check(&P) && k < n) {
+        cmove_t l[CP_MAXMOVES];
+        snprintf(o + k, n - k, cp_legal(&P, l) ? ", scacco" : ", scacco matto");
+    }
+}
+
 static void moves_text(char *b, int n, int max_plies)
 {
     int k0 = G->n - max_plies;
@@ -416,8 +440,11 @@ static void g_render(void)
         snprintf(b, sizeof(b), "%s", cg_end_str(G->info.end));
         b[0] = (char)toupper((unsigned char)b[0]);
     }
-    ui_set_text(l_b, G->n || g_over ? b : "Prima mossa");
-    ui_set_text(l_c, g_info);
+    char lm[96];
+    last_move_text(lm, sizeof(lm));
+    if (SCR_ROUND && !g_over && G->n) ui_set_text(l_b, lm);   // sul tondo al posto della notazione
+    else ui_set_text(l_b, G->n || g_over ? b : "Prima mossa");
+    ui_set_text(l_c, g_info[0] || SCR_ROUND || g_over ? g_info : lm);
     ui_set_text(l_h, g_over ? "Destra: analizza · BOOT: nuova partita · sinistra: esci"
                             : TAP_BOARD ? "Tocca o swipe+BOOT: muovi · dito tenuto: menu"
                             : b_ok ? "Swipe: cursore · Conferma · dito tenuto: menu"
@@ -587,6 +614,8 @@ static void g_enter(lv_obj_t *root, void *arg)
     else B.flip = G->info.mode == CG_MODE_BOT && G->info.color == 1;
     B.flip ^= g_flip_user;
     if (!SCR_ROUND && G->info.mode == CG_MODE_TWO) ok_button(root);
+    // la scacchiera si ricostruisce a ogni ritorno (dal menu, dalla promozione): l'ultima mossa resta segnata
+    if (G->n) { B.last_from = G->mv[G->n - 1].from; B.last_to = G->mv[G->n - 1].to; }
     // ritorno dalla scelta della promozione o dal menu della partita
     if (g_promo_pick) {
         cmove_t m = g_promo_move;
