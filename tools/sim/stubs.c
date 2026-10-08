@@ -37,6 +37,9 @@ uint32_t input_idle_ms(void) { return 0; }
 void input_init(nav_handler_t h) { sim_nav = h; }
 void input_mark_activity(void) {}
 bool input_touch(int *x, int *y) { return false; }
+static bool sim_locked;
+void input_set_locked(bool l) { sim_locked = l; }
+bool input_locked(void) { return sim_locked; }
 bool board_btn_boot(void) { return false; }
 bool wifi_mgr_espnow_start(int ch, wifi_espnow_cb_t cb) { return true; }
 void wifi_mgr_espnow_stop(void) {}

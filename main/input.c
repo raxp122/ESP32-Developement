@@ -66,8 +66,13 @@ static bool touch_read_round(int *x, int *y)
     return true;
 }
 
+static volatile bool locked;
+void input_set_locked(bool l) { locked = l; }
+bool input_locked(void) { return locked; }
+
 bool input_touch(int *x, int *y)
 {
+    if (locked) return false;
     if (BOARD_IS_ROUND()) return touch_read_round(x, y);
     int px, py;
     if (!touch_read_raw(&px, &py)) return false;

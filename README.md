@@ -26,8 +26,8 @@ Sullo schermo tondo è tutto più grande (caratteri circa 1,4 volte, generati co
 | Swipe a destra | avanti / conferma; sulle voci regolabili entra in modifica (poi su/giù cambia, destra o sinistra esce) |
 | Swipe a sinistra · BOOT | indietro / annulla |
 | Dito fermo ~1 s · BOOT tenuto | azione rapida (Impostazioni › Azione rapida) |
-| Tocco breve | nessuna azione (risveglia lo schermo se spento) |
-| PWR | spegne / riaccende lo schermo |
+| Tocco breve | nessuna azione (risveglia lo schermo se si è spento per inattività) |
+| PWR | spegne / riaccende lo schermo. Spento così resta **bloccato**: tocchi e BOOT non fanno nulla (in tasca) finché non ripremi PWR. Spento per inattività, invece, si riaccende toccandolo |
 | PWR tenuto 2 s | spegne la scheda (solo a batteria) |
 
 Gli swipe lenti sono supportati: il dito si considera sollevato solo dopo ~85 ms senza contatto.
