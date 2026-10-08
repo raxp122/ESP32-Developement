@@ -9,6 +9,7 @@
 #include "lvgl.h"
 #include "esp_timer.h"
 #include "esp_log.h"
+#include "esp_system.h"
 
 static const char *TAG = "input";
 
@@ -181,6 +182,12 @@ static void poll_cb(lv_timer_t *t)
     }
     process_touch(now);
     process_btn(board_btn_boot(), now, &btn_boot, NAV_BTN, NAV_QUICK, 800);
+    // BOOT tenuto 15 s: riavvio software (nessuna app lo tiene così a lungo). Serve quando il touch non risponde: il log di
+    // questa sessione resta e dopo il riavvio si manda da Impostazioni » Diagnostica
+    if (btn_boot.down && now - btn_boot.t0 > 15000000) {
+        ESP_LOGW(TAG, "BOOT tenuto 15 s: riavvio");
+        esp_restart();
+    }
     process_btn(board_btn_pwr(), now, &btn_pwr, NAV_PWR_CLICK, NAV_PWR_LONG, 2000);
 }
 
@@ -202,3 +209,5 @@ void input_touch_stats(char *b, int n)
              st_raw[0], st_raw[1], st_raw[2], st_raw[3], st_raw[4], st_raw[5], st_raw[6], st_raw[7],
              locked ? " · BLOCCATO (schermo spento col tasto)" : "");
 }
+
+void input_touch_counts(uint32_t c[4]) { c[0] = st_touch; c[1] = st_none; c[2] = st_bad; c[3] = st_err; }

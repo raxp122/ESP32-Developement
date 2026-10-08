@@ -9,6 +9,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "esp_log.h"
+#include "esp_app_desc.h"
 #include "esp_attr.h"
 #include "esp_system.h"
 #include "esp_heap_caps.h"
@@ -112,19 +113,63 @@ static void dump(void)
     free(copy);
 }
 
-static void info(void)
+const char *logcon_reset_reason(void) { return reason_name(esp_reset_reason()); }
+bool logcon_has_prev(void) { return prev != NULL; }
+
+void logcon_info(char *b, int n)
 {
     int s = (int)(esp_timer_get_time() / 1000000);
-    printf("\nGadget · ESP-IDF %s · acceso da %dh%02dm%02ds\n", esp_get_idf_version(), s / 3600, (s / 60) % 60, s % 60);
-    printf("RAM libera %u KB (minimo %u KB) · PSRAM libera %u KB\n",
-           (unsigned)(heap_caps_get_free_size(MALLOC_CAP_INTERNAL) / 1024),
-           (unsigned)(heap_caps_get_minimum_free_size(MALLOC_CAP_INTERNAL) / 1024),
-           (unsigned)(heap_caps_get_free_size(MALLOC_CAP_SPIRAM) / 1024));
-    printf("Motivo dell'ultimo reset: %s (%d) · recuperi del touch: %d\n", reason_name(esp_reset_reason()), esp_reset_reason(), board_touch_recoveries());
     char ts[200];
     input_touch_stats(ts, sizeof(ts));
-    printf("%s\n", ts);
+    snprintf(b, n,
+             "Gadget %s · ESP-IDF %s · acceso da %dh%02dm%02ds\n"
+             "RAM libera %u KB (minimo %u KB, blocco %u KB) · PSRAM libera %u KB\n"
+             "Motivo dell'ultimo reset: %s (%d) · recuperi del touch: %d\n%s\n",
+             esp_app_get_description()->version, esp_get_idf_version(), s / 3600, (s / 60) % 60, s % 60,
+             (unsigned)(heap_caps_get_free_size(MALLOC_CAP_INTERNAL) / 1024),
+             (unsigned)(heap_caps_get_minimum_free_size(MALLOC_CAP_INTERNAL) / 1024),
+             (unsigned)(heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL) / 1024),
+             (unsigned)(heap_caps_get_free_size(MALLOC_CAP_SPIRAM) / 1024),
+             reason_name(esp_reset_reason()), esp_reset_reason(), board_touch_recoveries(), ts);
+}
+
+static void info(void)
+{
+    char b[600];
+    logcon_info(b, sizeof(b));
+    printf("\n%s", b);
     fflush(stdout);
+}
+
+// rapporto completo in un file (per mandarlo al telefono senza monitor seriale)
+bool logcon_write_report(const char *path)
+{
+    FILE *f = fopen(path, "w");
+    if (!f) return false;
+    char b[600];
+    logcon_info(b, sizeof(b));
+    fprintf(f, "%s\n", b);
+    if (prev) {
+        fprintf(f, "===== log della sessione precedente · finita per: %s (%d) =====\n", reason_name(prev_reason), prev_reason);
+        fwrite(prev, 1, prev_n, f);
+        fprintf(f, "\n===== fine log precedente =====\n\n");
+    } else fprintf(f, "(nessun log della sessione precedente: era spenta)\n\n");
+    char *copy = heap_caps_malloc(RING, MALLOC_CAP_SPIRAM);
+    if (copy) {
+        size_t n, start;
+        portENTER_CRITICAL(&mux);
+        n = L.used;
+        start = (L.head + RING - L.used) % RING;
+        for (size_t i = 0; i < n; i++) copy[i] = ring[(start + i) % RING];
+        portEXIT_CRITICAL(&mux);
+        fprintf(f, "===== log dall'accensione (%u byte) =====\n", (unsigned)n);
+        fwrite(copy, 1, n, f);
+        fprintf(f, "\n===== fine log =====\n");
+        free(copy);
+    }
+    bool ok = !ferror(f);
+    fclose(f);
+    return ok;
 }
 
 static void task(void *arg)

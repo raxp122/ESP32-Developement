@@ -1,5 +1,8 @@
 // app_settings.c — menu Impostazioni e sottomenu
 #include "apps.h"
+#include "sd.h"
+#include "input.h"
+#include "logcon.h"
 #include "settings.h"
 #include "wifi_mgr.h"
 #include "ble_mgr.h"
@@ -288,6 +291,42 @@ static const menu_item_t sys_items[] = {
 };
 static menu_t sys_menu = {"Impostazioni » Sistema", sys_items, sizeof(sys_items) / sizeof(sys_items[0]), 0, NULL};
 
+/* ---------------- Diagnostica ----------------
+ * Le stesse informazioni del monitor seriale (comandi I, L, P), senza cavo: sullo schermo
+ * e in un file da mandare al telefono con l'hotspot (Copia tutto / Scarica).
+ */
+
+static void v_dg_reset(char *b, int n) { snprintf(b, n, "%s%s", logcon_reset_reason(), logcon_has_prev() ? " · log di prima salvato" : ""); }
+static void v_dg_touch(char *b, int n)
+{
+    uint32_t c[4];
+    input_touch_counts(c);
+    snprintf(b, n, "dito %lu · vuote %lu · non valide %lu · errori %lu · recuperi %d", (unsigned long)c[0], (unsigned long)c[1],
+             (unsigned long)c[2], (unsigned long)c[3], board_touch_recoveries());
+}
+static void v_dg_mem(char *b, int n)
+{
+    snprintf(b, n, "interna %u KB (minimo %u, blocco %u) · PSRAM %u KB", (unsigned)(heap_caps_get_free_size(MALLOC_CAP_INTERNAL) / 1024),
+             (unsigned)(heap_caps_get_minimum_free_size(MALLOC_CAP_INTERNAL) / 1024),
+             (unsigned)(heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL) / 1024),
+             (unsigned)(heap_caps_get_free_size(MALLOC_CAP_SPIRAM) / 1024));
+}
+static void a_dg_send(void)
+{
+    if (!sd_ok()) { ui_toast("Serve la microSD per preparare il rapporto"); return; }
+    if (!logcon_write_report(SD_MOUNT "/diagnostica.txt")) { ui_toast("Non riesco a scrivere sulla microSD"); return; }
+    static const share_req_t sr = {SD_MOUNT "/diagnostica.txt", "gadget-diagnostica.txt", "Diagnostica del Gadget"};
+    ui_push(&app_share, (void *)&sr);
+}
+
+static const menu_item_t diag_items[] = {
+    {.icon = LV_SYMBOL_UPLOAD, .label = "Manda il rapporto al telefono", .hint = "Informazioni e log, anche di prima del riavvio", .on_select = a_dg_send},
+    {.icon = LV_SYMBOL_REFRESH, .label = "Ultimo riavvio", .value = v_dg_reset},
+    {.icon = ICON_EYE, .label = "Touch (letture)", .value = v_dg_touch},
+    {.icon = ICON_CHIP, .label = "Memoria", .value = v_dg_mem},
+};
+static menu_t diag_menu = {"Impostazioni » Diagnostica", diag_items, sizeof(diag_items) / sizeof(diag_items[0]), 0, NULL};
+
 /* ---------------- Audio ---------------- */
 
 // prova: tre note che salgono (do-mi-sol, 1,2 s), poi l'uscita si libera da sola
@@ -384,5 +423,6 @@ static const menu_item_t settings_items[] = {
     {.icon = LV_SYMBOL_SD_CARD, .label = "Backup e ripristino", .app = &app_menu, .arg = &backup_menu},
     {.icon = ICON_CLOCK, .label = "Data e ora", .value = v_time, .app = &app_menu, .arg = &time_menu},
     {.icon = ICON_CHIP, .label = "Sistema", .value = v_fw, .app = &app_menu, .arg = &sys_menu},
+    {.icon = ICON_INFO, .label = "Diagnostica", .value = v_dg_reset, .app = &app_menu, .arg = &diag_menu},
 };
 menu_t settings_menu = {"Impostazioni", settings_items, sizeof(settings_items) / sizeof(settings_items[0]), 0, NULL};

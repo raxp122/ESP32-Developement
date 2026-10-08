@@ -281,6 +281,14 @@ int main(int argc, char **argv)
     for (int i = 0; i < 6; i++) nav(NAV_NEXT);
     shot("46_azione_rapida");
     ui_pop(); run(300);
+    // Diagnostica senza monitor seriale
+    ui_home(); run(300);
+    ui_push(&app_menu, &settings_menu); run(200);
+    settings_menu.sel = settings_menu.count - 1;
+    ui_pop(); run(100); ui_push(&app_menu, &settings_menu); run(200);
+    nav(NAV_SELECT);
+    shot("48_diagnostica");
+    ui_home(); run(300);
 pet:
     // Polipetto: una polpa saggia viola a puntini, con corona e una decorazione
     ui_home(); run(300);

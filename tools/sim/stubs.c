@@ -140,3 +140,8 @@ menu_t backup_menu = {"Backup", none, 1, 0, NULL}, chess_menu = {"Scacchi", none
 void chess_menu_init(void) {}
 bool sd_ok(void) { return true; }
 void tuner_menu_init(void) {}
+const char *logcon_reset_reason(void) { return "errore (panic)"; }
+bool logcon_has_prev(void) { return true; }
+bool logcon_write_report(const char *p) { return true; }
+void input_touch_counts(uint32_t c[4]) { c[0] = 812; c[1] = 40210; c[2] = 0; c[3] = 3; }
+int board_touch_recoveries(void) { return 1; }
