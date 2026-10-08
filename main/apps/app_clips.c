@@ -5,6 +5,7 @@
 //   Codici salvati       → la lista; swipe a destra su una voce la digita via USB
 //   Layout tastiera, Cancella tutti
 #include "apps.h"
+#include "radio.h"
 #include "clips.h"
 #include "usbhid.h"
 #include "ble_mgr.h"
@@ -277,6 +278,9 @@ static void detail_open(void) { ui_push(&app_clip_detail, NULL); }
 /* ================= Ricevi dal PC (Bluetooth) ================= */
 
 static lv_obj_t *r_state, *r_info;
+// la radio è una sola: per ricevere si passa al Bluetooth (spegnendo il Wi-Fi). Se prima
+// c'era il Wi-Fi, uscendo si torna al Wi-Fi.
+static bool r_was_wifi;
 
 static void listen_render(void)
 {
@@ -318,11 +322,21 @@ static void listen_enter(lv_obj_t *root, void *arg)
              ble_mgr_name());
     lv_label_set_text(r_info, info);
 
+    if (!r_was_wifi) r_was_wifi = g_set.wifi_on && !g_set.ble_on;   // al ritorno da un'altra schermata resta com'era
     ble_mgr_pair_start(180);   // connettibile via Bluetooth per 3 minuti
     listen_render();
 }
 
-static void listen_leave(void) { ble_mgr_pair_stop(); }
+static void listen_leave(void)
+{
+    ble_mgr_pair_stop();
+    if (!r_was_wifi || !ui_closing()) return;
+    r_was_wifi = false;
+    radio_only_wifi();   // spegne il Bluetooth (e lo dice)
+    g_set.wifi_on = true;
+    settings_save();
+    wifi_mgr_apply();
+}
 
 static bool listen_nav(nav_t ev)
 {
