@@ -6,6 +6,7 @@
 #include "esp_adc/adc_cali.h"
 #include "esp_adc/adc_cali_scheme.h"
 #include "esp_log.h"
+#include "esp_rom_sys.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 
@@ -82,6 +83,78 @@ static i2c_master_bus_handle_t new_bus(int port, int sda, int scl)
     i2c_master_bus_handle_t b = NULL;
     if (i2c_new_master_bus(&bc, &b) != ESP_OK) return NULL;
     return b;
+}
+
+// Bus bloccato: se la scheda si è riavviata (aggiornamento, riavvio software) a metà di una
+// lettura, il dispositivo può essere rimasto a tenere SDA bassa aspettando altri colpi di
+// clock, e nessuna transazione passa più finché non si toglie la corrente. Qualche impulso
+// su SCL (al massimo 9) gli fa finire il byte; poi uno STOP libera il bus.
+static void bus_unstick(int sda, int scl)
+{
+    gpio_config_t io = {
+        .pin_bit_mask = (1ULL << sda) | (1ULL << scl),
+        .mode = GPIO_MODE_INPUT_OUTPUT_OD,
+        .pull_up_en = GPIO_PULLUP_ENABLE,
+    };
+    gpio_config(&io);
+    gpio_set_level(sda, 1);
+    gpio_set_level(scl, 1);
+    esp_rom_delay_us(10);
+    if (gpio_get_level(sda)) return;   // libero
+    int n = 0;
+    while (!gpio_get_level(sda) && n < 9) {
+        gpio_set_level(scl, 0);
+        esp_rom_delay_us(10);
+        gpio_set_level(scl, 1);
+        esp_rom_delay_us(10);
+        n++;
+    }
+    // STOP: SDA sale mentre SCL è alta
+    gpio_set_level(scl, 0);
+    esp_rom_delay_us(10);
+    gpio_set_level(sda, 0);
+    esp_rom_delay_us(10);
+    gpio_set_level(scl, 1);
+    esp_rom_delay_us(10);
+    gpio_set_level(sda, 1);
+    esp_rom_delay_us(10);
+    ESP_LOGW(TAG, "bus I2C (SDA %d) bloccato: liberato con %d impulsi%s", sda, n, gpio_get_level(sda) ? "" : ", ma SDA resta bassa");
+}
+
+static i2c_master_bus_handle_t touch_bus_new(void)
+{
+    bus_unstick(PIN_I2C1_SDA, PIN_I2C1_SCL);
+    i2c_master_bus_handle_t b = new_bus(I2C_NUM_1, PIN_I2C1_SDA, PIN_I2C1_SCL);
+    if (!b) ESP_LOGE(TAG, "bus del touch non creato");
+    return b;
+}
+
+static int touch_recoveries;
+int board_touch_recoveries(void) { return touch_recoveries; }
+
+bool board_touch_recover(void)
+{
+    touch_recoveries++;
+    if (kind == BOARD_AMOLED175) {
+        // il touch condivide il bus con gli altri: si azzera il bus e si resetta il CST9217
+        i2c_master_bus_reset(bus0);
+        gpio_set_level(R_PIN_TP_RST, 0);
+        vTaskDelay(pdMS_TO_TICKS(10));
+        gpio_set_level(R_PIN_TP_RST, 1);
+        vTaskDelay(pdMS_TO_TICKS(50));
+        ESP_LOGW(TAG, "touch: bus azzerato e controller resettato (%d)", touch_recoveries);
+        return true;
+    }
+    // 3.49: il touch ha un bus tutto suo, si ricrea da capo (dopo averlo sbloccato)
+    if (dev_touch) i2c_master_bus_rm_device(dev_touch);
+    dev_touch = NULL;
+    if (bus1) i2c_del_master_bus(bus1);
+    bus1 = touch_bus_new();
+    if (!bus1) return false;
+    i2c_device_config_t cfg = {.dev_addr_length = I2C_ADDR_BIT_LEN_7, .device_address = ADDR_TOUCH, .scl_speed_hz = 300000};
+    if (i2c_master_bus_add_device(bus1, &cfg, &dev_touch) != ESP_OK) { dev_touch = NULL; return false; }
+    ESP_LOGW(TAG, "touch: bus ricreato (%d)", touch_recoveries);
+    return true;
 }
 
 /* ---------------- AMOLED 1.75: AXP2101 ---------------- */
@@ -161,20 +234,12 @@ void board_init(void)
     ESP_LOGI(TAG, "scheda: %s", board_name());
     if (kind == BOARD_AMOLED175) { amoled_init(); return; }
 
-    i2c_master_bus_config_t bc = {
-        .clk_source = I2C_CLK_SRC_DEFAULT,
-        .i2c_port = I2C_NUM_1,
-        .scl_io_num = PIN_I2C1_SCL,
-        .sda_io_num = PIN_I2C1_SDA,
-        .glitch_ignore_cnt = 7,
-        .flags.enable_internal_pullup = true,
-    };
-    ESP_ERROR_CHECK(i2c_new_master_bus(&bc, &bus1));
+    bus1 = touch_bus_new();
 
     dev_tca = add_dev(bus0, ADDR_TCA9554);
     dev_rtc = add_dev(bus0, ADDR_RTC);
     dev_imu = add_dev(bus0, ADDR_IMU);
-    dev_touch = add_dev(bus1, ADDR_TOUCH);
+    if (bus1) dev_touch = add_dev(bus1, ADDR_TOUCH);
 
     tca_init();
     imu_init();

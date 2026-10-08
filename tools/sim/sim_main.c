@@ -174,6 +174,16 @@ int main(int argc, char **argv)
         sim_nav(NAV_BTN); run(300);
         shot("23_snake_pausa");
         ui_pop(); run(300);
+        // inversione a U con un solo gesto a "L": giù e poi a sinistra, il dito sempre giù
+        extern int sim_touch, sim_tx, sim_ty;
+        ui_push(&app_snake, NULL); run(300);
+        sim_nav(NAV_SELECT); run(200);   // parte verso destra
+        sim_tx = 300; sim_ty = 70; sim_touch = 1; run(40);
+        sim_ty = 100; run(40);           // giù di 30 px: prima svolta
+        sim_tx = 270; run(40);           // a sinistra di 30 px: seconda svolta
+        sim_touch = 0; run(500);
+        shot("24_snake_inversione");
+        ui_pop(); run(300);
     }
     // Scacchi: una partita col cursore (BOOT sceglie), suggerimento, abbandono, analisi,
     // allenamento, Elo ed elenco delle partite (l'archivio va nella "microSD" del PC)

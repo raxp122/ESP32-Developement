@@ -36,8 +36,8 @@ void esp_restart(void) {}
 uint32_t input_idle_ms(void) { return 0; }
 void input_init(nav_handler_t h) { sim_nav = h; }
 void input_mark_activity(void) {}
-int sim_touch;
-bool input_touch(int *x, int *y) { if (x) *x = 100; if (y) *y = 80; return sim_touch; }
+int sim_touch, sim_tx = 100, sim_ty = 80;
+bool input_touch(int *x, int *y) { if (x) *x = sim_tx; if (y) *y = sim_ty; return sim_touch; }
 bool display_is_dark(void) { return false; }
 bool board_imu_ok(void) { return true; }
 bool board_imu_accel(vec3_t *g) { g->x = 0; g->y = 0; g->z = 1; return true; }

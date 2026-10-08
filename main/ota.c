@@ -19,6 +19,7 @@
 #include <string.h>
 #include "esp_app_desc.h"
 #include "esp_crt_bundle.h"
+#include "esp_heap_caps.h"
 #include "esp_http_client.h"
 #include "esp_https_ota.h"
 #include "esp_log.h"
@@ -26,6 +27,7 @@
 #include "esp_system.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "lwip/netdb.h"
 
 static const char *TAG = "ota";
 
@@ -104,8 +106,19 @@ static esp_err_t on_http(esp_http_client_event_t *e)
     return ESP_OK;
 }
 
+// il nome di github.com si risolve? (separa "niente DNS" da "server irraggiungibile")
+static bool dns_ok(void)
+{
+    struct addrinfo hints = {.ai_family = AF_INET, .ai_socktype = SOCK_STREAM}, *res = NULL;
+    int r = getaddrinfo("github.com", "443", &hints, &res);
+    if (res) freeaddrinfo(res);
+    if (r) ESP_LOGW(TAG, "DNS: github.com non risolto (%d)", r);
+    return r == 0;
+}
+
 static bool fetch_latest(void)
 {
+    if (!dns_ok()) { fail("GitHub non raggiungibile (DNS)"); return false; }
     body_t body = {0};
     esp_http_client_config_t c = {
         .url = URL_VERSION,
@@ -120,8 +133,20 @@ static bool fetch_latest(void)
     if (!h) { fail("Memoria insufficiente"); return false; }
     esp_err_t r = esp_http_client_perform(h);
     int status = esp_http_client_get_status_code(h);
+    int tls_code = 0, tls_flags = 0;
+    if (r != ESP_OK) esp_http_client_get_and_clear_last_tls_error(h, &tls_code, &tls_flags);
     esp_http_client_cleanup(h);
-    if (r != ESP_OK) { fail("GitHub non raggiungibile"); return false; }
+    if (r != ESP_OK) {
+        // il motivo preciso va nel log e, in breve, sullo schermo
+        ESP_LOGW(TAG, "version.json: %s, TLS -0x%04x, flag 0x%x, heap interno %u (blocco %u)", esp_err_to_name(r),
+                 -tls_code, tls_flags, (unsigned)heap_caps_get_free_size(MALLOC_CAP_INTERNAL),
+                 (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL));
+        if (r == ESP_ERR_HTTP_CONNECT && tls_code) snprintf(err_msg, sizeof(err_msg), "GitHub non raggiungibile (TLS -0x%04x)", -tls_code);
+        else if (r == ESP_ERR_HTTP_CONNECT) snprintf(err_msg, sizeof(err_msg), "GitHub non raggiungibile (connessione)");
+        else snprintf(err_msg, sizeof(err_msg), "GitHub non raggiungibile (%s)", esp_err_to_name(r));
+        state = OTA_ERROR;
+        return false;
+    }
     if (status == 404) { fail("Nessuna versione pubblicata"); return false; }
     if (status != 200) { snprintf(err_msg, sizeof(err_msg), "Risposta inattesa (%d)", status); state = OTA_ERROR; return false; }
 
@@ -148,7 +173,18 @@ static void do_check(void)
     if (!fetch_latest()) {
         vTaskDelay(pdMS_TO_TICKS(3000));
         state = OTA_CHECKING;
-        if (!fetch_latest()) return;
+        if (!fetch_latest()) {
+            // Ancora niente: si rifà la connessione Wi-Fi da capo (indirizzo e DNS nuovi),
+            // come succedeva spegnendo e riaccendendo, e si riprova un'ultima volta
+            ESP_LOGW(TAG, "controllo non riuscito due volte: ricollego il Wi-Fi");
+            wifi_mgr_reconnect();
+            vTaskDelay(pdMS_TO_TICKS(1500));
+            state = OTA_CHECKING;
+            for (int i = 0; i < 40 && wifi_mgr_state() != WIFI_CONNECTED; i++) vTaskDelay(pdMS_TO_TICKS(500));
+            if (wifi_mgr_state() != WIFI_CONNECTED) { fail("Il Wi-Fi non si ricollega"); return; }
+            vTaskDelay(pdMS_TO_TICKS(1500));
+            if (!fetch_latest()) return;
+        }
     }
     state = newer(latest, ota_current()) ? OTA_AVAILABLE : OTA_UP_TO_DATE;
     ESP_LOGI(TAG, "in uso %s, disponibile %s", ota_current(), latest);

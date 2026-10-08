@@ -216,6 +216,12 @@ static void on_event(void *arg, esp_event_base_t base, int32_t id, void *data)
         retry_ms = 1000;
         conn_fail = false;
         conn_try = 0;
+        // DNS di riserva: se quello del router non risponde (capita dopo un riavvio veloce,
+        // quando il router ricorda ancora la connessione di prima) si chiede a un altro
+        esp_netif_dns_info_t dns = {0};
+        dns.ip.type = ESP_IPADDR_TYPE_V4;
+        dns.ip.u_addr.ip4.addr = ESP_IP4TOADDR(1, 1, 1, 1);
+        esp_netif_set_dns_info(sta_netif, ESP_NETIF_DNS_FALLBACK, &dns);
         sntp_kick();
     }
 }
@@ -461,6 +467,20 @@ int wifi_mgr_conn_reason(void) { return conn_reason; }
 const char *wifi_mgr_band(int ch)
 {
     return ch >= 32 ? "5 GHz" : "2.4 GHz";
+}
+
+void wifi_mgr_reconnect(void)
+{
+    // rifà da capo connessione, indirizzo e DNS (come spegnere e riaccendere il Wi-Fi)
+    if (!started || !want_sta() || scanning) return;
+    ESP_LOGW(TAG, "ricollegamento chiesto");
+    own_disconnect();
+    retry_ms = 1000;
+    conn_fail = false;
+    conn_try = 0;
+    ip_str[0] = 0;
+    state = WIFI_CONNECTING;
+    sta_connect();
 }
 
 bool wifi_mgr_connect(const char *ssid, const char *pass)

@@ -292,7 +292,7 @@ Dal launcher: **Sismografo** → *Avvia*. Appoggia il Gadget su una superficie f
 - **Registra sulla microSD**: ogni evento, con 5 s prima e 5 s dopo, va in `sismo/AAAAMMGG-hhmmss.csv` (100 campioni al secondo, x/y/z in mg: si apre con Excel); il registro di tutti è `sismo/eventi.csv`. Dal menu si consultano gli ultimi 50 e si cancellano.
 
 ## Snake
-Dal launcher: **Snake**, in pixel art con i colori del Polipetto: un serpente di quadratini arancioni (la testa ha gli occhi) che mangia i pesci gialli. Con gli swipe nelle quattro direzioni si gira; muri e coda fanno perdere, e ogni pesce lo rende un po' più veloce. Lo schermo resta tutto per il gioco: sul 3,49" una griglia 53×12, sul tondo 20×20 con quadratini più grandi.
+Dal launcher: **Snake**, in pixel art con i colori del Polipetto: un serpente di quadratini arancioni (la testa ha gli occhi) che mangia i pesci gialli. Con gli swipe nelle quattro direzioni si gira: la svolta parte appena il dito si sposta, senza aspettare che si stacchi, e un solo gesto a "L" (per esempio giù e poi a sinistra, senza alzare il dito) fa l'inversione a U su due quadratini di fila. Fino a tre svolte restano in coda; muri e coda fanno perdere, e ogni pesce lo rende un po' più veloce. Lo schermo resta tutto per il gioco: sul 3,49" una griglia 53×12, sul tondo 20×20 con quadratini più grandi.
 
 - **Partenza**: uno swipe qualsiasi (sinistra esce).
 - **Pausa**: BOOT o dito tenuto. In pausa e a fine partita: destra riprende o ricomincia, sinistra esce.
@@ -376,7 +376,7 @@ Il file è di testo con un controllo CRC: un backup rovinato o incompleto viene 
 Impostazioni › App all'avvio: se scegli un'app (o una sua schermata interna, stesso elenco automatico dell'Azione rapida), all'accensione si apre quella; swipe indietro torna al menu. "Nessuna" lascia tutto com'era. Le scelte fatte con i firmware precedenti vengono convertite da sole.
 
 ## Aggiornamenti
-- **Dalla scheda (OTA):** Impostazioni › Sistema › Aggiornamento firmware. Ogni merge su `main` pubblica una release su GitHub con il firmware; la scheda la scarica via Wi-Fi e si riavvia. Se il nuovo firmware non riesce ad avviarsi, al riavvio torna da solo quello precedente. Mentre sei nella schermata di aggiornamento il Bluetooth va in pausa (la radio è condivisa col Wi-Fi) e si riaccende uscendo. Con "Cerca aggiornamenti da solo" avvisa quando ne esce uno nuovo.
+- **Dalla scheda (OTA):** Impostazioni › Sistema › Aggiornamento firmware. Ogni merge su `main` pubblica una release su GitHub con il firmware; la scheda la scarica via Wi-Fi e si riavvia. Se il nuovo firmware non riesce ad avviarsi, al riavvio torna da solo quello precedente. Mentre sei nella schermata di aggiornamento il Bluetooth va in pausa (la radio è condivisa col Wi-Fi) e si riaccende uscendo. Con "Cerca aggiornamenti da solo" avvisa quando ne esce uno nuovo. Se il controllo fallisce due volte, il Gadget ricollega da capo il Wi-Fi (indirizzo e DNS nuovi, con un DNS di riserva) e riprova. L'errore dice anche il motivo: *(DNS)* se il nome di GitHub non si risolve, *(connessione)* o *(TLS …)* se il server non risponde; nel log seriale c'è il dettaglio.
 - **Via USB:** `gadget.bin` a `0x0` (immagine unica) oppure solo `gadget-app.bin` a `0x20000`.
 
 Dalla 0.14 le impostazioni (NVS) stanno in fondo alla flash (`0xFF0000`): né l'OTA né i file qui sopra le toccano più.
@@ -401,6 +401,8 @@ Senza la scheda si possono provare parecchie cose sul PC:
 ## Monitor seriale
 Il firmware conserva in RAM gli ultimi 16 KB di log dall'accensione. Dal monitor seriale (115200) invia:
 `L` ristampa il log dall'accensione · `I` info di sistema · `R` riavvio software · `H` aiuto.
+
+Se il touch smette di rispondere (bus I2C bloccato, per esempio dopo un riavvio software a metà di una lettura), il firmware lo sblocca e ricrea il bus da solo entro mezzo secondo. `I` dice quante volte è successo, e il log riporta il motivo.
 
 ## Struttura
 - `main/board.*` riconoscimento della scheda, pin, alimentazione (3.49: latch TCA9554 EXIO6 e batteria sull'ADC; AMOLED: AXP2101), RTC PCF85063, IMU QMI8658, pulsanti

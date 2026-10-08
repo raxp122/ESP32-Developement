@@ -33,6 +33,7 @@ void wifi_mgr_espnow_stop(void);
 bool wifi_mgr_espnow_send(const void *data, int len);   // a tutti (max 250 byte)
 bool wifi_mgr_espnow_on(void);
 bool wifi_mgr_connect(const char *ssid, const char *pass);  // salva e si collega
+void wifi_mgr_reconnect(void);             // si scollega e si ricollega alla stessa rete (indirizzo e DNS nuovi)
 
 void wifi_mgr_init(void);
 void wifi_mgr_apply(void);                 // applica g_set.wifi_on / credenziali
