@@ -61,7 +61,7 @@ Dal launcher: **Dadi**. Si compone un "pool" di dadi misti, con la somma automat
 - **d4, d6, d8, d10, d12, d20, d100**: quanti di ciascuno (destra per regolare, su/giù cambia); **Modificatore** da aggiungere; **Svuota il pool**.
 - **Tira**: risultato di ogni dado e totale. Swipe a destra o una scossa ritira, sinistra torna al pool.
 - **Salva come preferito**: i dadi impostati (con il modificatore) si salvano con un nome scritto con la tastiera, per esempio *Palla di fuoco* (8d6) o *Dardo incantato* (3d4 + 3). Con lo stesso nome il preferito si aggiorna. Fino a 24, anche nei backup.
-- **Preferiti**: l'elenco con il nome e i dadi di ognuno; destra lo carica e lo tira subito. Mentre tiri un preferito **su/giù passa al preferito successivo/precedente** (in alto il nome, sotto "preferito 2 di 5"), destra o una scossa tira. In fondo all'elenco *Elimina un preferito* (con conferma).
+- **Preferiti**: l'elenco con il nome e i dadi di ognuno; destra lo carica e lo tira subito. Mentre tiri un preferito **su/giù passa al preferito successivo/precedente** (in alto il nome, sotto "preferito 2 di 5"), destra o una scossa tira. In fondo all'elenco **Modifica un preferito**: scelto quale, si cambiano il nome (la tastiera parte da quello attuale), i dadi e il modificatore come nel menu Dadi; da lì anche *Tira questo preferito* ed *Elimina* (con conferma). Le modifiche si salvano uscendo.
 - **Daggerheart**: i due dadi Speranza e Paura con modificatore e vantaggio/svantaggio; il risultato dice se è *con Speranza* o *con Paura*.
 
 ## Doom

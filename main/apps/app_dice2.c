@@ -431,6 +431,8 @@ static void a_clear(void)
 /* ---------------- preferiti: salva, elenco, elimina ---------------- */
 
 static char fav_name_buf[FAV_NAME];
+static int edit_idx = -1;
+static void ed_retitle(void);   // preferito in modifica (-1: la tastiera salva un preferito nuovo)
 
 static void fav_name_done(const char *t, void *arg)
 {
@@ -438,6 +440,16 @@ static void fav_name_done(const char *t, void *arg)
     ui_pop();
     if (!t || !t[0]) return;
     fav_load();
+    if (arg) {   // rinomina il preferito in modifica (se il nome non è già di un altro)
+        for (int i = 0; i < n_fav; i++)
+            if (i != edit_idx && !strcasecmp(favs[i].name, t)) { ui_toast("C'è già un preferito con questo nome"); return; }
+        if (edit_idx >= 0 && edit_idx < n_fav) {
+            snprintf(favs[edit_idx].name, sizeof(favs[edit_idx].name), "%s", t);
+            fav_save();
+            ed_retitle();
+        }
+        return;
+    }
     int i = 0;
     while (i < n_fav && strcasecmp(favs[i].name, t)) i++;   // stesso nome: si aggiorna
     if (i == n_fav) {
@@ -455,8 +467,11 @@ static void fav_name_done(const char *t, void *arg)
 }
 static void fav_name_enter(lv_obj_t *root, void *arg)
 {
-    fav_name_buf[0] = 0;
-    keyboard_open(root, "Nome del preferito (es. Palla di fuoco)", fav_name_buf, false, FAV_NAME - 1, fav_name_done, NULL);
+    // arg != NULL: si rinomina il preferito in modifica (la tastiera parte dal nome attuale)
+    if (arg && edit_idx >= 0 && edit_idx < n_fav) snprintf(fav_name_buf, sizeof(fav_name_buf), "%s", favs[edit_idx].name);
+    else fav_name_buf[0] = 0;
+    keyboard_open(root, arg ? "Nuovo nome del preferito" : "Nome del preferito (es. Palla di fuoco)", fav_name_buf, false,
+                  FAV_NAME - 1, fav_name_done, arg);
 }
 static void fav_name_leave(void) { keyboard_close(); }
 static bool fav_name_nav(nav_t ev) { return keyboard_nav(ev); }
@@ -472,10 +487,19 @@ static void a_fav_save(void)
 }
 
 // elenchi costruiti all'apertura (i preferiti cambiano)
-static menu_item_t fav_items[FAV_MAX + 1], del_items[FAV_MAX];
+static menu_item_t fav_items[FAV_MAX + 1], pick_items[FAV_MAX];
 static char fav_hint[FAV_MAX][96];
 static menu_t fav_menu = {"Dadi » Preferiti", fav_items, 0, 0, NULL};
-static menu_t del_menu = {"Dadi » Elimina un preferito", del_items, 0, 0, NULL};
+static menu_t pick_menu = {"Dadi » Modifica un preferito", pick_items, 0, 0, NULL};
+
+static void fav_hints(void)
+{
+    for (int i = 0; i < n_fav; i++) {
+        int c[NT];
+        for (int j = 0; j < NT; j++) c[j] = favs[i].counts[j];
+        pool_text_of(c, favs[i].mod, fav_hint[i], sizeof(fav_hint[i]));
+    }
+}
 
 static void fav_open(void *arg)
 {
@@ -485,43 +509,120 @@ static void fav_open(void *arg)
     ui_push(&app_roll, (void *)(intptr_t)(i + 1));
 }
 
-static void fav_delete(void *arg)
+/* modifica: nome, dadi e modificatore del preferito edit_idx */
+
+static fav_t *ed(void) { return edit_idx >= 0 && edit_idx < n_fav ? &favs[edit_idx] : NULL; }
+static void v_ed_name(char *b, int n) { snprintf(b, n, "%s", ed() ? ed()->name : ""); }
+static void a_ed_name(void) { if (ed()) ui_push(&app_fav_name, (void *)1); }
+static void v_ed_count(int k, char *b, int n)
 {
-    int i = (int)(intptr_t)arg;
-    if (i < 0 || i >= n_fav) return;
-    char b[64];
-    snprintf(b, sizeof(b), "Eliminato: %.24s", favs[i].name);
-    memmove(&favs[i], &favs[i + 1], (n_fav - i - 1) * sizeof(fav_t));
-    n_fav--;
+    int c = ed() ? ed()->counts[k] : 0;
+    snprintf(b, n, c ? "× %d" : "nessuno", c);
+}
+static void j_ed_count(int k, int d)
+{
+    if (!ed()) return;
+    int c = ed()->counts[k] + d;
+    ed()->counts[k] = c < 0 ? 0 : c > 10 ? 10 : c;
+}
+#define ED_FUNCS(i) \
+    static void v_e##i(char *b, int n) { v_ed_count(i, b, n); } \
+    static void j_e##i(int d) { j_ed_count(i, d); }
+ED_FUNCS(0) ED_FUNCS(1) ED_FUNCS(2) ED_FUNCS(3) ED_FUNCS(4) ED_FUNCS(5) ED_FUNCS(6)
+static void v_ed_mod(char *b, int n) { snprintf(b, n, "%+d", ed() ? ed()->mod : 0); }
+static void j_ed_mod(int d)
+{
+    if (!ed()) return;
+    int m = ed()->mod + d;
+    ed()->mod = m < -50 ? -50 : m > 50 ? 50 : m;
+}
+static void v_ed_pool(char *b, int n)
+{
+    if (!ed()) { b[0] = 0; return; }
+    int c[NT];
+    for (int j = 0; j < NT; j++) c[j] = ed()->counts[j];
+    pool_text_of(c, ed()->mod, b, n);
+}
+static void a_ed_roll(void)
+{
+    if (!ed()) return;
+    bool any = false;
+    for (int k = 0; k < NT; k++) if (ed()->counts[k]) any = true;
+    if (!any) { ui_toast("Aggiungi almeno un dado"); return; }
     fav_save();
-    ui_pop();   // elimina → torna ai Preferiti, che vanno ricostruiti
+    fav_open((void *)(intptr_t)edit_idx);
+}
+static void a_ed_delete(void)
+{
+    if (!ed()) return;
+    char b[64];
+    snprintf(b, sizeof(b), "Eliminato: %.24s", ed()->name);
+    memmove(&favs[edit_idx], &favs[edit_idx + 1], (n_fav - edit_idx - 1) * sizeof(fav_t));
+    n_fav--;
+    edit_idx = -1;
+    fav_save();
+    ui_pop();   // modifica, scelta del preferito, elenco: si torna al menu Dadi
+    ui_pop();
     ui_pop();
     ui_toast(b);
 }
-
-static void a_fav_delete_menu(void)
+// uscendo dalla modifica: si salva e gli elenchi aperti si aggiornano
+static void ed_close(void)
 {
+    if (ed()) fav_save();
+    fav_hints();
+}
+
+static const menu_item_t ed_items[] = {
+    {.icon = LV_SYMBOL_EDIT, .label = "Nome", .value = v_ed_name, .on_select = a_ed_name},
+    {.icon = ICON_DICE, .label = "d4",   .value = v_e0, .on_adjust = j_e0},
+    {.icon = ICON_DICE, .label = "d6",   .value = v_e1, .on_adjust = j_e1},
+    {.icon = ICON_DICE, .label = "d8",   .value = v_e2, .on_adjust = j_e2},
+    {.icon = ICON_DICE, .label = "d10",  .value = v_e3, .on_adjust = j_e3},
+    {.icon = ICON_DICE, .label = "d12",  .value = v_e4, .on_adjust = j_e4},
+    {.icon = ICON_D20,  .label = "d20",  .value = v_e5, .on_adjust = j_e5},
+    {.icon = ICON_DICE, .label = "d100", .value = v_e6, .on_adjust = j_e6},
+    {.icon = ICON_SLIDERS, .label = "Modificatore", .value = v_ed_mod, .on_adjust = j_ed_mod},
+    {.icon = ICON_D20, .label = "Tira questo preferito", .value = v_ed_pool, .on_select = a_ed_roll},
+    {.icon = LV_SYMBOL_TRASH, .label = "Elimina", .hint = "Destra due volte per eliminarlo", .on_select = a_ed_delete, .confirm = true},
+};
+static menu_t ed_menu = {"Dadi » Preferito", ed_items, sizeof(ed_items) / sizeof(ed_items[0]), 0, ed_close};
+
+static char ed_title[48];
+static void ed_retitle(void) { if (ed()) snprintf(ed_title, sizeof(ed_title), "Preferiti » %.24s", ed()->name); }
+
+static void fav_edit(void *arg)
+{
+    edit_idx = (int)(intptr_t)arg;
+    if (!ed()) return;
+    ed_retitle();
+    ed_menu.title = ed_title;
+    ed_menu.sel = 0;
+    ui_push(&app_menu, &ed_menu);
+}
+
+static void a_fav_pick_menu(void)
+{
+    fav_hints();
     for (int i = 0; i < n_fav; i++)
-        del_items[i] = (menu_item_t){.icon = LV_SYMBOL_TRASH, .label = favs[i].name, .hint = fav_hint[i],
-                                     .on_pick = fav_delete, .arg = (void *)(intptr_t)i, .confirm = true};
-    del_menu.count = n_fav;
-    del_menu.sel = 0;
-    ui_push(&app_menu, &del_menu);
+        pick_items[i] = (menu_item_t){.icon = LV_SYMBOL_EDIT, .label = favs[i].name, .hint = fav_hint[i],
+                                      .on_pick = fav_edit, .arg = (void *)(intptr_t)i};
+    pick_menu.count = n_fav;
+    pick_menu.sel = 0;
+    ui_push(&app_menu, &pick_menu);
 }
 
 static void a_favs(void)
 {
     fav_load();
     if (!n_fav) { ui_toast("Nessun preferito: imposta i dadi e usa \"Salva come preferito\""); return; }
+    fav_hints();
     int k = 0;
-    for (int i = 0; i < n_fav; i++) {
-        int c[NT];
-        for (int j = 0; j < NT; j++) c[j] = favs[i].counts[j];
-        pool_text_of(c, favs[i].mod, fav_hint[i], sizeof(fav_hint[i]));
+    for (int i = 0; i < n_fav; i++)
         fav_items[k++] = (menu_item_t){.icon = ICON_D20, .label = favs[i].name, .hint = fav_hint[i],
                                        .on_pick = fav_open, .arg = (void *)(intptr_t)i};
-    }
-    fav_items[k++] = (menu_item_t){.icon = LV_SYMBOL_TRASH, .label = "Elimina un preferito", .on_select = a_fav_delete_menu};
+    fav_items[k++] = (menu_item_t){.icon = LV_SYMBOL_EDIT, .label = "Modifica un preferito", .hint = "Nome, dadi, modificatore o elimina",
+                                   .on_select = a_fav_pick_menu};
     fav_menu.count = k;
     if (fav_menu.sel >= k) fav_menu.sel = 0;
     ui_push(&app_menu, &fav_menu);

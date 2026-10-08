@@ -318,6 +318,12 @@ int main(int argc, char **argv)
         shot("93_dadi_dardo");
         nav(NAV_SELECT); run(1200);
         shot("94_dadi_dardo_tiro");
+        ui_pop(); run(300);                           // all'elenco dei preferiti
+        for (int i = 0; i < 3; i++) nav(NAV_NEXT);   // Modifica un preferito
+        nav(NAV_SELECT);
+        nav(NAV_SELECT);                              // Palla di fuoco
+        nav(NAV_NEXT); nav(NAV_NEXT);                 // d6
+        shot("95_dadi_modifica");
         ui_home(); run(300);
     }
     // Diagnostica senza monitor seriale
