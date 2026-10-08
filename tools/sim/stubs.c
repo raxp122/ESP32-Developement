@@ -119,6 +119,7 @@ void audio_stop_if(audio_synth_t s) {}
 audio_synth_t audio_current(void) { return NULL; }
 bool audio_mic_active(void) { return false; }
 bool audio_mic_ok(void) { return true; }
+bool audio_mic_probe(int ms, int *pk, int *rms, int *z) { *pk = 9000; *rms = 800; *z = 0; return true; }
 const char *audio_status(void) { return "Pronto"; }
 void audio_set_volume(int p) {}
 wifi_state_t wifi_mgr_state(void) { return sim_wifi; }

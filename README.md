@@ -351,7 +351,7 @@ Il Bluetooth è predisposto per collegarsi nei due sensi (le funzioni vere arriv
 Limite dell'hardware: l'ESP32-S3 ha solo il Bluetooth Low Energy. Casse e cuffie riproducono l'audio col Bluetooth "classico" (A2DP), che questo chip non ha: per l'audio servirebbe un modulo esterno.
 
 ### Audio
-Impostazioni › **Audio**: *Prova audio* suona tre note (do-mi-sol) e accanto dice com'è andato l'avvio dell'audio: "Pronto" (con i microfoni ok o assenti), oppure "ES8311 non risponde" / "I2S occupato" se qualcosa non va, e se l'uscita è occupata da un'app. *Volume* è lo stesso della Spada laser e vale per tutte le app (Theremin, Polipetto, scacchi, Doom).
+Impostazioni › **Audio**: *Prova audio* suona tre note (do-mi-sol) e accanto dice com'è andato l'avvio dell'audio: "Pronto" (con i microfoni ok o assenti), oppure "ES8311 non risponde" / "I2S occupato" se qualcosa non va, e se l'uscita è occupata da un'app. *Prova microfono* ascolta per un secondo e dice il livello misurato, oppure "silenzio assoluto" se il convertitore dei microfoni non manda dati ("microfoni ok" vuol dire solo che il chip ha risposto). Il convertitore si riconfigura ogni volta che un'app accende i microfoni. *Volume* è lo stesso della Spada laser e vale per tutte le app (Theremin, Polipetto, scacchi, Doom).
 
 ### Data e ora
 Impostazioni › **Data e ora**: ora e data, *Sincronizza ora* (da Internet, NTP), fuso orario, e **Orologio della scheda**, che dice se l'orologio interno (RTC PCF85063) risponde, se ha l'ora e com'era all'accensione.

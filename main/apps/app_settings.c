@@ -325,6 +325,22 @@ static void a_audio_test(void)
     t_ph = 0;
     audio_start(test_synth);
 }
+// prova microfono: un secondo di ascolto e il livello misurato
+static char mic_res[80] = "Parla o batti le mani, poi destra";
+static void v_mic(char *b, int n) { snprintf(b, n, "%s", mic_res); }
+static void a_mic_test(void)
+{
+    int pk, rms, zeros;
+    if (!audio_mic_ok()) { audio_init(); }
+    if (!audio_mic_ok() || !audio_mic_probe(1000, &pk, &rms, &zeros)) {
+        snprintf(mic_res, sizeof(mic_res), "Microfoni non disponibili (%s)", audio_status());
+    } else if (zeros >= 99) {
+        snprintf(mic_res, sizeof(mic_res), "Silenzio assoluto: il convertitore non manda dati");
+    } else {
+        snprintf(mic_res, sizeof(mic_res), "Funziona · picco %d%% · livello medio %d", pk * 100 / 32767, rms);
+    }
+    ui_toast(mic_res);
+}
 static void v_volume(char *b, int n) { snprintf(b, n, "%d%%", g_set.volume); }
 static void j_volume(int d)
 {
@@ -336,6 +352,7 @@ static void j_volume(int d)
 
 static const menu_item_t audio_items[] = {
     {.icon = LV_SYMBOL_PLAY, .label = "Prova audio", .value = v_audio, .on_select = a_audio_test},
+    {.icon = ICON_MIC, .label = "Prova microfono", .value = v_mic, .on_select = a_mic_test},
     {.icon = LV_SYMBOL_VOLUME_MAX, .label = "Volume", .value = v_volume, .on_adjust = j_volume},
 };
 static menu_t audio_menu = {"Impostazioni » Audio", audio_items, sizeof(audio_items) / sizeof(audio_items[0]), 0, NULL};

@@ -22,3 +22,6 @@ bool audio_mic_ok(void);               // i microfoni (ES7210) hanno risposto
 bool audio_mic_start(void);
 void audio_mic_stop(void);
 int  audio_mic_read(int16_t *stereo, int frames, int timeout_ms);   // frame letti
+// prova (dal task dell'interfaccia, blocca per ms): livello di picco e medio dei campioni,
+// e quanti sono esattamente zero (100% = il convertitore non manda niente)
+bool audio_mic_probe(int ms, int *peak, int *rms, int *zeros_pct);
