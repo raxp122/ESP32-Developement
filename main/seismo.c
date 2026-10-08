@@ -26,6 +26,7 @@
 #define MAX_N      (130 * FS / REC_DIV)
 #define TRACE_N    512
 #define WARMUP_S   20                  // la media lunga deve assestarsi
+#define SETTLE_S   3                   // prima ancora: lo swipe che apre la schermata scuote la scheda
 #define DIR_PATH   SD_MOUNT "/sismo"
 #define LOG_PATH   DIR_PATH "/eventi.csv"
 #define CFG_MAGIC  0x31534953u         // "SIS1"
@@ -114,17 +115,23 @@ void seismo_feed(float x, float y, float z)
         have_base = true;
         vert = fabsf(z) >= fabsf(x) && fabsf(z) >= fabsf(y) ? 2 : fabsf(y) > fabsf(x) ? 1 : 0;
     }
+    n_samples++;
+    // attesa iniziale: si segue solo la gravità (in fretta) e non si misura niente, così
+    // lo scossone dello swipe non finisce né nel grafico né nella calibrazione
+    if (n_samples <= SETTLE_S * FS) {
+        for (int i = 0; i < 3; i++) base[i] += (in[i] - base[i]) * 0.05f;
+        return;
+    }
     float d[3];
     for (int i = 0; i < 3; i++) {
         base[i] += (in[i] - base[i]) * a;
         d[i] = in[i] - base[i];
     }
-    n_samples++;
     float e = (d[0] * d[0] + d[1] * d[1] + d[2] * d[2]) * 1e6f;   // mg²
     float mg = sqrtf(e);
     sta += (e - sta) * (1.0f / (0.5f * FS));
     now_rms = sqrtf(sta);
-    if (n_samples > 2 * FS && mg > peak) peak = mg;   // i primi istanti: il filtro si assesta
+    if (n_samples > (SETTLE_S + 2) * FS && mg > peak) peak = mg;   // i primi istanti: il filtro si assesta
 
     // grafico: asse verticale, il valore più lontano da zero ogni 100 ms
     int16_t v = to01(d[vert]);
@@ -154,7 +161,7 @@ void seismo_feed(float x, float y, float z)
     switch (state) {
     case SEISMO_WARMUP:
         lta += (e - lta) * (1.0f / (2.0f * FS));   // all'inizio si assesta in fretta
-        if (n_samples >= WARMUP_S * FS) state = SEISMO_LISTEN;
+        if (n_samples >= (SETTLE_S + WARMUP_S) * FS) state = SEISMO_LISTEN;
         break;
     case SEISMO_LISTEN:
         lta += (e - lta) * (1.0f / (20.0f * FS));
@@ -207,7 +214,8 @@ float seismo_now_mg(void) { return now_rms; }
 float seismo_peak_mg(void) { return peak; }
 void seismo_reset_peak(void) { peak = 0; }
 int seismo_state(void) { return state; }
-int seismo_warmup_left(void) { int s = WARMUP_S - (int)(n_samples / FS); return s < 0 ? 0 : s; }
+int seismo_warmup_left(void) { int s = SETTLE_S + WARMUP_S - (int)(n_samples / FS); return s < 0 ? 0 : s; }
+bool seismo_settling(void) { return n_samples <= SETTLE_S * FS; }
 int seismo_session_events(void) { return session_events; }
 bool seismo_writing(void) { return writing; }
 

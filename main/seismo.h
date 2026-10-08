@@ -34,7 +34,8 @@ float seismo_now_mg(void);          // vibrazione attuale (efficace, 0,5 s)
 float seismo_peak_mg(void);         // picco da quando si è aperta (o azzerato)
 void  seismo_reset_peak(void);
 int   seismo_state(void);
-int   seismo_warmup_left(void);     // secondi di calibrazione rimasti
+int   seismo_warmup_left(void);     // secondi di calibrazione rimasti (attesa iniziale compresa)
+bool  seismo_settling(void);        // primi secondi: si aspetta che la scheda smetta di muoversi
 int   seismo_session_events(void);  // eventi da quando si è aperta
 bool  seismo_writing(void);         // sta salvando un evento
 
