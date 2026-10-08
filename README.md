@@ -400,7 +400,9 @@ Senza la scheda si possono provare parecchie cose sul PC:
 
 ## Monitor seriale
 Il firmware conserva in RAM gli ultimi 16 KB di log dall'accensione. Dal monitor seriale (115200) invia:
-`L` ristampa il log dall'accensione · `I` info di sistema · `R` riavvio software · `H` aiuto.
+`L` ristampa il log dall'accensione · `P` log della sessione prima dell'ultimo riavvio (dopo un crash o un watchdog) · `I` info di sistema · `R` riavvio software · `H` aiuto.
+
+**Cicli di riavvii.** Se la scheda si riavvia per un errore mentre il Bluetooth è acceso, al riavvio il Bluetooth resta spento (con un avviso). Dopo tre riavvii per errore di fila parte in *modalità sicura*: Bluetooth spento e niente app all'avvio. Il comando `P` mostra il log di quello che è successo prima del riavvio.
 
 Se il touch smette di rispondere (bus I2C bloccato, per esempio dopo un riavvio software a metà di una lettura), il firmware lo sblocca e ricrea il bus da solo entro mezzo secondo. `I` dice quante volte è successo, e il log riporta il motivo.
 
