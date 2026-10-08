@@ -350,11 +350,29 @@ pet:
             uint8_t sex, stage, form, hat, acc, asleep, nest; uint8_t genes[GENE_COUNT][2]; uint16_t gen; uint8_t gift_seq, gift_n;
         } k = {{'G', 'P', 'E', 'T'}, 1, 0, 0xBEEF, 0, "Nettuno", "Scogliera", SEX_M, PET_ADULT, FORM_EXPLORER, 0, 11, 0, 0,
                {{COL_BLUE, COL_BLUE}, {PAT_STRIPES, PAT_STRIPES}, {0, 0}, {0, 0}}, 3, 0, 0};
-        for (int i = 0; i < 20; i++) { sim_espnow_cb(NULL, (const uint8_t *)&k, sizeof(k)); run(300); }
-        shot("68_amico_visita");
+        // e un'altra, una bimba corallo: con due vicini si sceglie dall'elenco
+        __typeof__(k) k2 = k;
+        k2.uid = 0xCAFE; snprintf(k2.name, PET_NAME_LEN, "Bollicina"); snprintf(k2.family, PET_NAME_LEN, "Maree");
+        k2.sex = SEX_F; k2.stage = PET_CHILD; k2.form = FORM_BASE; k2.acc = 9;
+        uint8_t g2[GENE_COUNT][2] = {{COL_CORAL, COL_CORAL}, {PAT_NONE, PAT_NONE}, {TENT_LONG, TENT_LONG}, {0, 0}};
+        memcpy(k2.genes, g2, sizeof(g2));
+        k.peer = p->uid;   // Nettuno ha scelto noi
+        for (int i = 0; i < 3; i++) {
+            sim_espnow_cb(NULL, (const uint8_t *)&k2, sizeof(k2)); sim_espnow_cb(NULL, (const uint8_t *)&k, sizeof(k)); run(300);
+        }
+        shot("68_amici_vicini");
+        nav(NAV_NEXT);
+        shot("68b_amici_vicini_2");
+        nav(NAV_SELECT);   // compare Nettuno
+        for (int i = 0; i < 20; i++) {
+            sim_espnow_cb(NULL, (const uint8_t *)&k2, sizeof(k2)); sim_espnow_cb(NULL, (const uint8_t *)&k, sizeof(k)); run(300);
+        }
+        shot("68c_amico_visita");
         nav(NAV_SELECT);
         k.flags = 1;
-        for (int i = 0; i < 4; i++) { sim_espnow_cb(NULL, (const uint8_t *)&k, sizeof(k)); run(300); }
+        for (int i = 0; i < 4; i++) {
+            sim_espnow_cb(NULL, (const uint8_t *)&k2, sizeof(k2)); sim_espnow_cb(NULL, (const uint8_t *)&k, sizeof(k)); run(300);
+        }
         shot("69_amico_uovo");
         sim_nav(NAV_BACK); run(300);
         sim_nav(NAV_BACK); run(300);

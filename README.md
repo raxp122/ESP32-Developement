@@ -169,7 +169,9 @@ I minigiochi danno **conchiglie** e tengono i record. Le conchiglie arrivano anc
 
 Si vede l'allele dominante (a pari dominanza quello della mamma). Ogni figlio prende a caso un allele per tratto da ciascun genitore, con una piccola probabilità di mutazione. I polipetti dei firmware precedenti restano arancioni a tinta unita.
 
-**Incontra un amico (ESP-NOW).** Due Gadget vicini con *Diario e altro › Incontra un amico* aperto si trovano via radio, senza rete. Ognuno vede l'altro polipetto con i suoi colori e vestiti.
+**Incontra un amico (ESP-NOW).** I Gadget vicini con *Diario e altro › Incontra un amico* aperto si trovano via radio, senza rete. Ognuno vede l'altro polipetto con i suoi colori e vestiti.
+- Se vicino ce n'è uno solo compare da sé. Se ce ne sono di più si sceglie da un elenco: su/giù li fa affacciare uno alla volta (nome, sesso, età), destra fa comparire quello scelto. Sinistra torna all'elenco.
+- Si gioca, ci si regala e si fanno uova solo fra due polipetti che **si sono scelti a vicenda**. Finché l'altro non ha scelto te, compare un punto di domanda.
 - Dopo 5 secondi insieme è una visita: +2 felicità e 3 conchiglie (una volta all'ora per amico). La visita finisce nel diario e l'amico resta nella lista.
 - *Su*: regala 5 conchiglie all'altro.
 - *Destra* (solo adulti di sesso diverso, con il nido vuoto): propone un uovo. Quando lo propongono tutti e due, **ognuno riceve un uovo** con un allele per tratto da ciascun genitore. L'uovo aspetta nel nido (si vede sul fondo).
@@ -184,6 +186,43 @@ Chi se ne va finisce nell'album.
 - Il fondale segue l'ora (alba, giorno, tramonto, notte con il plancton luminoso) e la stagione: neve marina d'inverno, petali in primavera, raggi di sole d'estate, foglie in superficie d'autunno.
 - Feste con decorazioni e un regalo di 10 conchiglie una volta l'anno: Capodanno, Befana, San Valentino, Pasqua e Pasquetta, Ferragosto, Giornata del polpo (8 ottobre), Halloween, Natale, San Silvestro.
 - Ogni settimana di età è un compleanno, con torta e 5 conchiglie.
+
+### Guida al Polipetto
+
+**I primi giorni**
+1. Apri *Polipetto*: c'è un uovo che si schiude in un minuto. Alla nascita il polipetto riceve nome, sesso, cognome e i geni. Il nome si cambia da *Diario e altro › Cambia nome*.
+2. Quando l'icona in fondo a destra lampeggia ti sta chiamando. La riga sotto dice cosa vuole: fame, sete, tristezza, malattia, luce da spegnere o un capriccio. Rispondere entro 15 minuti evita gli errori di cura, e meno errori fanno una forma adulta migliore.
+3. **Capricci**: quando fa i capricci sgridalo (*Sgrida*). Poi, entro 10 minuti, dagli uno *Spuntino*: è il premio che fissa la lezione e alza la disciplina. Con la disciplina al massimo i capricci finiscono. Sgridarlo senza motivo invece lo rattrista.
+4. Se hai poco tempo usa *Gioca › Gioca*: un cuore subito, una volta ogni 20 minuti. Con più tempo i minigiochi danno più cuori e anche conchiglie.
+
+**Guadagnare e spendere le conchiglie**
+- Minigiochi: più vai bene più ne prendi. Ogni gioco tiene il suo record, e un record nuovo finisce nel diario.
+- Ogni 1000 passi con il contapassi acceso ne trova una.
+- Ogni festa ne regala 10 (una volta l'anno), ogni compleanno settimanale 5, ogni visita a un amico 3 (una volta all'ora per amico).
+- Si spendono nel *Negozio*: sfoglia con su/giù, l'anteprima mostra il polipetto con l'oggetto o la decorazione al suo posto. Destra due volte per comprare, poi destra per indossare/togliere o esporre/ritirare. Gli oggetti restano tuoi anche per le generazioni successive.
+
+**Incontrare un amico, passo per passo**
+1. Su tutti e due i Gadget: *Polipetto › Diario e altro › Incontra un amico*. Il Wi-Fi resta sospeso finché si è lì.
+2. Se ci sono più polipetti vicini scegli dall'elenco quello con cui giocare. Anche l'altro padrone deve scegliere il tuo.
+3. Dopo 5 secondi insieme è una visita: i polipetti giocano a palla, prendono felicità e 3 conchiglie, e l'amico entra nel diario.
+4. *Su* regala 5 conchiglie all'amico scelto (fino a 5 regali per incontro).
+
+**Avere un uovo**
+1. Servono due polipetti **adulti** (dai 3 giorni circa) di **sesso diverso**, e tutti e due i nidi vuoti.
+2. Nell'incontro, *destra* propone l'uovo. Quando l'hanno proposto tutti e due, ognuno riceve un uovo nel proprio nido. Lo si vede in basso a sinistra nel fondale e in *Famiglia e geni*.
+3. L'uovo nasce quando il genitore parte: Impostazioni › Polipetto › *Lascialo tornare nell'oceano*. Con l'uovo nel nido si può già da adulto, senza aspettare i 25 giorni. Il genitore finisce nell'album, il figlio nasce un minuto dopo con la generazione successiva e il cognome della tua famiglia.
+
+**Leggere i geni** (*Famiglia e geni*)
+- Ogni pagina è un tratto: in grande quello che si vede, sotto i due alleli (mamma e papà). A sinistra due neonati mostrano com'è ciascun allele.
+- Esempio: un polipetto *Viola* con alleli *Viola + Oro* porta l'oro nascosto. Incontrando un altro che porta l'oro, ogni figlio ha 1 probabilità su 4 di nascere oro.
+- Lo stesso vale per le strisce e per i tentacoli corti, recessivi. I puntini invece si vedono anche con un solo allele.
+- Il carattere non si vede ma si sente: calmo, vivace o goloso cambia un po' come si comporta.
+
+**Generazioni senza amici.** Se parte per l'oceano senza un uovo nel nido, lascia un uovo suo: stessa famiglia, i suoi geni rimescolati (gli alleli nascosti possono venire fuori). Se invece muore per trascuratezza, l'uovo nuovo è selvatico ma tiene il cognome.
+
+**Diario, album e collezione.** Il diario annota tutto da solo. L'album parte dalla *Collezione*, con i colori scoperti (i fantasmini sono quelli che mancano) e le forme adulte raggiunte, poi mostra il polipetto di adesso e quelli passati, ognuno con i suoi colori. Dalla schermata d'addio, su/giù aprono diario e album.
+
+**Feste e stagioni.** Non c'è niente da fare: aprendo l'app nel giorno giusto il polipetto festeggia, con il cappello della festa e le decorazioni, e arriva il regalo. Il fondale cambia da solo con l'ora e la stagione (serve l'ora impostata, via Wi-Fi).
 
 Impostazioni › Polipetto: scorrere del tempo, orari di nanna e sveglia, versi, contapassi, verso dell'inclinazione, **Sull'orologio** (il polipetto passeggia accanto all'ora), partenza per l'oceano, nuovo uovo.
 - *Ibrida* (consigliata): tempo reale, anche a scheda spenta, ma negli orari di nanna scelti dorme protetto: nessuna chiamata, nessun errore, nessun pericolo. Senza ora impostata avanza solo a scheda accesa.
