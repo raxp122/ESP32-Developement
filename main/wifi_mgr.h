@@ -24,6 +24,14 @@ bool wifi_mgr_sniff_start(wifi_sniff_cb_t cb);
 void wifi_mgr_sniff_stop(void);
 void wifi_mgr_sniff_channel(int ch);      // 1–13
 bool wifi_mgr_sniffing(void);
+
+// ESP-NOW: pacchetti fra Gadget vicini senza rete né associazione (broadcast su un canale).
+// Mentre è acceso la connessione al router è sospesa (la radio fa una cosa per volta).
+typedef void (*wifi_espnow_cb_t)(const uint8_t *mac, const uint8_t *data, int len);   // dal task Wi-Fi
+bool wifi_mgr_espnow_start(int channel, wifi_espnow_cb_t cb);
+void wifi_mgr_espnow_stop(void);
+bool wifi_mgr_espnow_send(const void *data, int len);   // a tutti (max 250 byte)
+bool wifi_mgr_espnow_on(void);
 bool wifi_mgr_connect(const char *ssid, const char *pass);  // salva e si collega
 
 void wifi_mgr_init(void);

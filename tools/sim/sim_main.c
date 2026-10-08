@@ -228,5 +228,26 @@ int main(int argc, char **argv)
         ui_pop(); run(300); ui_pop(); run(300);
         #undef GOTO
     }
+    // Morse: menu, corso d'ascolto (risposta), corso di trasmissione, Telegrafo, tabella
+    ui_home(); run(300);
+    {
+        extern menu_t morse_menu;
+        ui_push(&app_menu, &morse_menu); run(300);
+        shot("40_morse_menu");
+        nav(NAV_SELECT); run(1500);
+        shot("41_morse_ascolta");
+        nav(NAV_SELECT); run(300);
+        shot("42_morse_risposta");
+        ui_pop(); run(300);
+        nav(NAV_NEXT); nav(NAV_SELECT); run(400);
+        shot("43_morse_batti");
+        ui_pop(); run(300);
+        nav(NAV_NEXT); nav(NAV_SELECT); run(400);
+        shot("44_morse_telegrafo");
+        ui_pop(); run(300);
+        nav(NAV_NEXT); nav(NAV_NEXT); nav(NAV_SELECT); run(300);
+        shot("45_morse_tabella");
+        ui_pop(); run(300); ui_pop(); run(300);
+    }
     return 0;
 }
