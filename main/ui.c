@@ -262,11 +262,16 @@ void ui_toast(const char *msg)
 
 /* ---------------- schermo e alimentazione ---------------- */
 
-void ui_screen_off(void)
+// Spento per inattività (o dall'azione rapida): un tocco lo riaccende. Spento col tasto di
+// accensione: bloccato, tocchi e BOOT non fanno nulla (in tasca) finché non si ripreme il tasto.
+static void screen_off(bool lock)
 {
     sleeping = true;
+    input_set_locked(lock);
     display_set_brightness(0);
 }
+
+void ui_screen_off(void) { screen_off(false); }
 
 static int bright_override = -1;   // es. la torcia: al risveglio torna a questa luminosità
 
@@ -275,6 +280,7 @@ void ui_set_brightness_override(int pct) { bright_override = pct; }
 static void screen_on(void)
 {
     sleeping = false;
+    input_set_locked(false);
     input_mark_activity();
     display_set_brightness(bright_override >= 0 ? bright_override : g_set.brightness);
 }
@@ -339,8 +345,9 @@ static void on_nav(nav_t ev)
 {
     if (powering_off) return;
     if (ev == NAV_PWR_LONG) { ui_power_off(); return; }
-    if (ev == NAV_PWR_CLICK) { if (sleeping) screen_on(); else ui_screen_off(); return; }
+    if (ev == NAV_PWR_CLICK) { if (sleeping) screen_on(); else screen_off(true); return; }
 
+    if (sleeping && input_locked()) return;   // bloccato col tasto: solo il tasto lo riaccende
     if (sleeping) {
         // qualunque contatto risveglia lo schermo e viene "consumato"
         if (ev == NAV_TOUCH_DOWN) swallow_touch = true;

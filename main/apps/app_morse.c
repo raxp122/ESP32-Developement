@@ -177,6 +177,7 @@ static morse_dec_t dk;       // decodifica di quello che batti
 
 static bool key_pressed(void)
 {
+    if (input_locked()) return false;   // schermo bloccato col tasto: in tasca non si trasmette
     if (board_btn_boot()) return true;
     int x, y;
     return SCR_ROUND && input_touch(&x, &y);
