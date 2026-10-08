@@ -37,6 +37,10 @@ uint32_t input_idle_ms(void) { return 0; }
 void input_init(nav_handler_t h) { sim_nav = h; }
 void input_mark_activity(void) {}
 bool input_touch(int *x, int *y) { return false; }
+bool board_btn_boot(void) { return false; }
+bool wifi_mgr_espnow_start(int ch, wifi_espnow_cb_t cb) { return true; }
+void wifi_mgr_espnow_stop(void) {}
+bool wifi_mgr_espnow_send(const void *d, int n) { return true; }
 void ble_mgr_addr(char *b, int n) { snprintf(b, n, "AA:BB:CC:DD:EE:FF"); }
 void ble_mgr_apply(void) {}
 int ble_mgr_bonds(ble_bond_t *o, int m) { return 0; }

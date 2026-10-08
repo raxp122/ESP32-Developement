@@ -123,6 +123,6 @@ static const menu_item_t items[] = {
     {.icon = LV_SYMBOL_REFRESH, .label = "Ripristina un backup", .hint = "Solo backup di questa versione o più vecchi", .app = &app_restore},
     {.icon = LV_SYMBOL_DOWNLOAD, .label = "Backup prima degli aggiornamenti", .value = v_auto, .on_select = a_auto},
     {.icon = ICON_INFO, .label = "Cosa contiene",
-     .hint = "Impostazioni, Wi-Fi, polipetto, Radar, livella. Il file è in chiaro: tienilo al sicuro"},
+     .hint = "Tutto quello che scegli o crei: impostazioni, Wi-Fi, app, partite, registrazioni. In chiaro: tienilo al sicuro"},
 };
 menu_t backup_menu = {"Impostazioni » Backup", items, sizeof(items) / sizeof(items[0]), 0, NULL};

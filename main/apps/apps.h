@@ -41,7 +41,8 @@ extern menu_t seismo_menu;
 typedef struct { const char *path, *download_name, *title; } share_req_t;
 extern const app_t app_share;          // arg = share_req_t* (copiato)
 extern const app_t app_snake;          // Snake
-extern menu_t chessplay_menu;          // Scacchi (partite, analisi, allenamento)
+extern menu_t chessplay_menu;
+extern menu_t morse_menu;              // Morse: corso, Telegrafo (ESP-NOW), ascolto          // Scacchi (partite, analisi, allenamento)
 extern const app_t app_wifitest;       // Tester Wi-Fi: elenco delle reti
 extern const app_t app_wifitest_meter; // Tester Wi-Fi: misura di una rete (arg = la rete)
 extern menu_t chess_menu;              // Orologio per scacchi

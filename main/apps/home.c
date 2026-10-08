@@ -28,6 +28,7 @@ static menu_item_t items[] = {
     {.icon = LV_SYMBOL_SHUFFLE, .label = "Sismografo",     .app = &app_menu, .arg = &seismo_menu},
     {.icon = LV_SYMBOL_WIFI, .label = "Tester Wi-Fi",      .app = &app_wifitest},
     {.icon = ICON_GAMEPAD,  .label = "Scacchi",           .app = &app_menu, .arg = &chessplay_menu},
+    {.icon = ICON_EYE,      .label = "Morse",             .app = &app_menu, .arg = &morse_menu},
     {.icon = ICON_CLOCK,    .label = "Orologio scacchi",  .app = &app_menu, .arg = &chess_menu},
     {.icon = LV_SYMBOL_SETTINGS, .label = "Impostazioni", .app = &app_menu, .arg = &settings_menu},
 };
@@ -82,6 +83,7 @@ static const boot_app_t boot_apps[] = {
     {"Tester Wi-Fi", &app_wifitest, NULL},   // al posto della Mappa Wi-Fi (stesso indice)
     {"Snake", &app_snake, NULL},
     {"Scacchi", &app_menu, &chessplay_menu},
+    {"Morse", &app_menu, &morse_menu},
 };
 #define N_BOOT (int)(sizeof(boot_apps) / sizeof(boot_apps[0]))
 

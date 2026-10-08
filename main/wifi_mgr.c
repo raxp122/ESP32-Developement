@@ -11,6 +11,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
 #include "esp_wifi.h"
+#include "esp_now.h"
 #include "esp_netif.h"
 #include "esp_netif_sntp.h"
 #include "esp_event.h"
@@ -24,7 +25,8 @@
 static const char *TAG = "wifi";
 
 static esp_netif_t *sta_netif, *ap_netif;
-static bool started, portal_on, sniff_on;
+static bool started, portal_on, sniff_on, now_on;   // now_on: ESP-NOW (Morse) con la radio tutta per sé
+static wifi_espnow_cb_t now_cb;
 static wifi_sniff_cb_t sniff_cb;
 static void update_mode(void);
 static int scan_users;
@@ -58,7 +60,7 @@ static char pend_ssid[33], pend_pass[65];   // credenziali dal portale, da appli
 static bool pend_creds;
 
 // mentre il Radar ascolta (modalità promiscua) la connessione resta sospesa
-static bool want_sta(void) { return g_set.wifi_on && g_set.wifi_ssid[0] && !sniff_on; }
+static bool want_sta(void) { return g_set.wifi_on && g_set.wifi_ssid[0] && !sniff_on && !now_on; }
 
 // disconnessione chiesta da noi subito prima di ricollegarci: il suo evento (che arriva
 // dopo) non deve essere preso per una caduta della rete, né azzerare il tentativo nuovo
@@ -261,9 +263,62 @@ void wifi_mgr_sniff_channel(int ch)
 
 bool wifi_mgr_sniffing(void) { return sniff_on; }
 
+/* ---------------- ESP-NOW ----------------
+ * Pacchetti brevi fra Gadget vicini, senza rete né associazione: tutti in broadcast sullo
+ * stesso canale. Come per il Radar, finché è acceso la connessione al router è sospesa. */
+
+static void now_recv(const esp_now_recv_info_t *info, const uint8_t *data, int len)
+{
+    if (now_cb) now_cb(info->src_addr, data, len);
+}
+
+bool wifi_mgr_espnow_start(int channel, wifi_espnow_cb_t cb)
+{
+    if (now_on) return true;
+    if (sniff_on) return false;
+    radio_only_wifi();
+    if (scanning) { esp_wifi_scan_stop(); scanning = false; }
+    now_cb = cb;
+    now_on = true;   // prima della disconnessione: l'evento non deve far ripartire la connessione
+    esp_timer_stop(reconnect_timer);
+    if (started && (state == WIFI_CONNECTED || state == WIFI_CONNECTING)) esp_wifi_disconnect();
+    if (cur_mode != WIFI_MODE_STA) { esp_wifi_set_mode(WIFI_MODE_STA); cur_mode = WIFI_MODE_STA; }
+    if (!started) { esp_wifi_start(); started = true; }
+    state = WIFI_OFF;
+    ip_str[0] = 0;
+    esp_wifi_set_ps(WIFI_PS_NONE);   // la radio sempre in ascolto: i pacchetti arrivano subito
+    esp_wifi_set_channel(channel >= 1 && channel <= 13 ? channel : 1, WIFI_SECOND_CHAN_NONE);
+    if (esp_now_init() != ESP_OK) { now_on = false; update_mode(); return false; }
+    esp_now_register_recv_cb(now_recv);
+    esp_now_peer_info_t peer = {.channel = 0, .ifidx = WIFI_IF_STA, .encrypt = false};
+    memset(peer.peer_addr, 0xFF, 6);
+    esp_now_add_peer(&peer);
+    return true;
+}
+
+void wifi_mgr_espnow_stop(void)
+{
+    if (!now_on) return;
+    esp_now_unregister_recv_cb();
+    esp_now_deinit();
+    now_cb = NULL;
+    now_on = false;
+    esp_wifi_set_ps(WIFI_PS_MIN_MODEM);
+    update_mode();   // ripristina il Wi-Fi normale
+    if (started && want_sta()) { state = WIFI_CONNECTING; sta_connect(); }
+}
+
+bool wifi_mgr_espnow_send(const void *data, int len)
+{
+    static const uint8_t bcast[6] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
+    return now_on && len > 0 && len <= ESP_NOW_MAX_DATA_LEN && esp_now_send(bcast, data, len) == ESP_OK;
+}
+
+bool wifi_mgr_espnow_on(void) { return now_on; }
+
 static void update_mode(void)
 {
-    if (sniff_on) return;   // la modalità promiscua gestisce la radio da sé
+    if (sniff_on || now_on) return;   // la modalità promiscua ed ESP-NOW gestiscono la radio da sé
     bool need = g_set.wifi_on || scan_users > 0 || portal_on;
     if (!need) {
         if (started) { esp_wifi_stop(); started = false; }
@@ -364,7 +419,7 @@ bool wifi_mgr_scan_start_ex(const char *ssid, uint16_t ch_mask)
 {
     // non scansionare durante un tentativo di connessione: i due usi della radio si
     // escludono a vicenda e lascerebbero il Wi-Fi bloccato
-    if (!started || scanning || attempt) return false;
+    if (!started || scanning || attempt || now_on) return false;
     static uint8_t want[33];   // il driver lo legge durante la scansione
     wifi_scan_config_t sc = {.show_hidden = false};
     if (ssid && ssid[0]) {

@@ -7,7 +7,7 @@ Firmware ESP-IDF 5.4 + LVGL 9.2 con menu a gesti e app modulari. Lo stesso firmw
 Si aggiorna via Wi-Fi: ogni modifica unita su `main` diventa una release che la scheda scarica e installa da Impostazioni › Sistema (vedi [Aggiornamenti](#aggiornamenti)).
 
 **Le app** (nel launcher in ordine alfabetico, con *Cerca* in cima):
-[8-Ball veggente](#8-ball-veggente) · [Accordatore](#accordatore) · [Appunti](#appunti-testo-dal-pc--tastiera-usb) · [Berciometro](#berciometro) · [Dadi](#dadi) · [Doom](#doom) · [Livella](#livella) · [Orologio](#orologio) · [Orologio scacchi](#orologio-scacchi) · [Polipetto](#polipetto) · [Q-20](#q-20) · [Radar](#radar) · [Scacchi](#scacchi) · [Scanner Wi-Fi e Bluetooth](#scanner-wi-fi-e-bluetooth) · [Sismografo](#sismografo) · [Snake](#snake) · [Spada laser](#spada-laser) · [Tester Wi-Fi](#tester-wi-fi) · [Theremin](#theremin) · [Torcia](#torcia) · [Impostazioni](#impostazioni)
+[8-Ball veggente](#8-ball-veggente) · [Accordatore](#accordatore) · [Appunti](#appunti-testo-dal-pc--tastiera-usb) · [Berciometro](#berciometro) · [Dadi](#dadi) · [Doom](#doom) · [Livella](#livella) · [Morse](#morse) · [Orologio](#orologio) · [Orologio scacchi](#orologio-scacchi) · [Polipetto](#polipetto) · [Q-20](#q-20) · [Radar](#radar) · [Scacchi](#scacchi) · [Scanner Wi-Fi e Bluetooth](#scanner-wi-fi-e-bluetooth) · [Sismografo](#sismografo) · [Snake](#snake) · [Spada laser](#spada-laser) · [Tester Wi-Fi](#tester-wi-fi) · [Theremin](#theremin) · [Torcia](#torcia) · [Impostazioni](#impostazioni)
 
 ## Scheda tonda (AMOLED 1.75)
 Il riconoscimento è automatico: se sul bus I2C dei pin 47/48 risponde il TCA9554 è la 3.49, se sui pin 15/14 risponde l'AXP2101 è l'AMOLED. Pin, display, touch, alimentazione, batteria, microSD e audio si configurano di conseguenza. Il primo flash si fa via USB (`gadget.bin` a `0x0`), poi gli aggiornamenti OTA sono gli stessi della 3.49.
@@ -17,7 +17,7 @@ Sullo schermo tondo è tutto più grande (caratteri circa 1,4 volte, generati co
 - le liste: voce precedente in alto, icona, voce corrente grande con il valore, la successiva in basso, e la posizione su un arco a destra;
 - gli stessi gesti di sempre (swipe, BOOT, PWR: clic = schermo, tenuto 2 s = spegnimento dall'AXP2101).
 
-**Già pronte per il tondo:** menu e impostazioni (con la tastiera tonda per le password Wi-Fi), Orologio, aggiornamento OTA, configurazione Wi-Fi dal telefono, Scanner Wi-Fi, Tester Wi-Fi, Sismografo, Snake, Scacchi e la schermata "Sul telefono" con i QR. Le altre app sul tondo non si aprono ancora (un avviso lo dice) e arriveranno adattate una alla volta; Doom resta solo sulla 3.49.
+**Già pronte per il tondo:** menu e impostazioni (con la tastiera tonda per le password Wi-Fi), Orologio, aggiornamento OTA, configurazione Wi-Fi dal telefono, Scanner Wi-Fi, Tester Wi-Fi, Sismografo, Snake, Scacchi, Morse e la schermata "Sul telefono" con i QR. Le altre app sul tondo non si aprono ancora (un avviso lo dice) e arriveranno adattate una alla volta; Doom resta solo sulla 3.49.
 
 ## Comandi
 | Gesto / tasto | Azione |
@@ -93,6 +93,20 @@ Dal launcher: Livella. La prima volta chiede una calibrazione in due passi (appo
 | BOOT | blocca / sblocca la lettura |
 | Dito tenuto premuto | rifà la calibrazione |
 | Swipe a sinistra | esce |
+
+## Morse
+Dal launcher: **Morse**. Per imparare il codice Morse e usarlo fra Gadget vicini.
+
+- **Impara ad ascoltare** (metodo Koch): il Gadget suona una lettera e tu scegli quale era fra quattro (su/giù, destra conferma, BOOT la fa risentire). Si parte da K e M. Quando nelle ultime 20 risposte arrivi al 90%, si apre una lettera nuova, fino a 40 (lettere, numeri e punteggiatura). Le lettere nuove e quelle che sbagli escono più spesso. Dopo ogni risposta vedi la lettera e i suoi segni (• —).
+- **Impara a trasmettere**: batti la lettera mostrata con BOOT (sul tondo anche col dito): tocco corto = punto, lungo = linea. Il Gadget riconosce cosa hai battuto, misura la tua velocità e passa alla lettera dopo.
+- **Telegrafo** (ESP-NOW): parla con altri Gadget vicini via radio, **senza rete, router né associazione**.
+  - Quello che batti con BOOT si sente in tempo reale su tutti i Gadget vicini, e ciascuno lo decodifica e lo scrive.
+  - Con *destra* scrivi un messaggio con la tastiera: gli altri lo ricevono, lo leggono e lo sentono in Morse.
+  - In alto il canale, il tuo nome (Gadget-XXXX) e quanti Gadget sono in ascolto; *su* pulisce il testo.
+  - Tutti devono stare sullo stesso **Canale del Telegrafo** (impostazione, 1-13). Finché il Telegrafo è aperto la radio serve solo a quello: la connessione Wi-Fi è sospesa e torna uscendo.
+- **Ascolta col microfono**: decodifica il Morse che sente (un altro Gadget, un'app, un fischio): un tono fra 400 e 1200 Hz, la velocità si adatta da sola. BOOT cancella il testo.
+- **Tabella**: tutti i caratteri con i loro segni; destra li fa sentire.
+- **Impostazioni**: velocità (5-35 parole al minuto), velocità effettiva (spaziatura di Farnsworth: lettere veloci e pause lunghe, il modo consigliato per imparare), tono (400-1200 Hz), canale del Telegrafo, ricomincia il corso. Progressi e impostazioni entrano nei backup.
 
 ## Orologio
 Dal launcher: **Orologio**. Ora grande con la data; swipe a destra mostra o nasconde i secondi. Sul tondo l'ora sta al centro del cerchio, secondi e data sotto. L'ora arriva da Internet (Wi-Fi) e si conserva nell'orologio della scheda: vedi [Data e ora](#data-e-ora).
@@ -258,9 +272,15 @@ Sulla scheda 3.49 V1 l'orologio interno non ha una batteria tampone: da spenta l
 
 ### Backup e ripristino
 Impostazioni › Backup e ripristino:
-- **Crea un backup ora**: salva impostazioni, Wi-Fi, Polipetto, livella e Radar (con il Pokédex) e quello che il Q-20 ha imparato in un file della cartella `backup` sulla microSD. Le cartelle delle app che stanno già sulla microSD (`scacchi/`, `sismo/`, `theremin/`) non entrano nel backup: restano dove sono.
+- **Crea un backup ora**: salva in un file della cartella `backup` sulla microSD tutto quello che scegli o crei:
+  - dalla memoria interna: impostazioni e Wi-Fi, Polipetto, livella, Radar, Theremin, Scacchi (impostazioni ed Elo), Sismografo, gli Appunti ricevuti, il record di Snake, il corso Morse;
+  - dalla microSD, cartelle intere: `pwn/` (Pokédex e catture del Radar), `q20/` (quello che ha imparato), `scacchi/` (partite, Elo, esercizi), `sismo/` (eventi), `theremin/` (registrazioni), `doom/` (salvataggi e configurazione; i WAD no, si ricopiano a parte).
+
+  Con molte registrazioni il backup diventa grande e ci mette un po'.
 - **Ripristina un backup**: elenca i backup; si possono usare solo quelli fatti con questa versione del firmware o con una più vecchia. Da un backup vecchio le impostazioni nuove prendono il valore predefinito e quelle che non esistono più si ignorano. Dopo il ripristino la scheda si riavvia.
 - **Backup prima degli aggiornamenti**: prima di ogni aggiornamento OTA ne crea uno da solo.
+
+Il ripristino riscrive i file contenuti nel backup e non cancella niente sulla microSD: una partita o una registrazione fatta dopo il backup resta.
 
 Il file è di testo con un controllo CRC: un backup rovinato o incompleto viene rifiutato senza toccare niente. Contiene anche la password del Wi-Fi in chiaro, quindi tienilo al sicuro.
 
@@ -286,6 +306,7 @@ Immagine unica per il flasher web (indirizzo 0x0), come fa la build su GitHub:
 ## Prove sul PC
 Senza la scheda si possono provare parecchie cose sul PC:
 - **Simulatore dell'interfaccia** (`tools/sim/run.sh`): compila LVGL e le schermate con gcc e salva le immagini in `tools/sim/png/`, sia per il 3,49" (`349_*`) sia per il tondo (`tondo_*`). Le scene (in `sim_main.c`) percorrono menu, Tester Wi-Fi, Sismografo, Snake e Scacchi; la "microSD" è la cartella `/sdcard` del PC. Serve prima un `idf.py build` (per `build/config/sdkconfig.h`) e Python con Pillow.
+- **Morse** (`tools/morse/morse_test.c`): il testo diventa audio con rumore a varie velocità, frequenze e volumi, e il rilevatore con la decodifica devono restituirlo; prova anche una battuta a mano irregolare.
 - **Motore degli Scacchi** (`tools/chess/chess_test.c`): perft su posizioni di riferimento, notazione, libro delle aperture, problemi tattici e partite fra livelli; `tools/chess/store_test.c` prova l'archivio (salvataggio, analisi, rilettura PGN, Elo, esportazione). I comandi sono in cima ai file.
 
 ## Monitor seriale
@@ -306,6 +327,7 @@ Il firmware conserva in RAM gli ultimi 16 KB di log dall'accensione. Dal monitor
 - `main/backup.*` backup e ripristino su microSD · `main/ota.*` aggiornamenti via internet · `main/settings.*` impostazioni (con migrazione dalla vecchia tabella)
 - `main/chess_engine.*` regole e motore degli Scacchi · `main/chess_game.*` partite, analisi, Elo, archivio PGN · `main/apps/chess_ui.c` scacchiera · `main/apps/app_chessplay.c` le schermate · `tools/chess/` prove sul PC (perft, notazione, livelli, archivio)
 - `main/apps/app_share.c` "Sul telefono": hotspot + QR per passare un file di testo al telefono (Copia tutto / Scarica)
+- `main/morse.*` codice Morse: tabella, tempi, decodifica, rilevatore del tono (prove in `tools/morse/`) · `main/apps/app_morse.c` corso, Telegrafo ESP-NOW (`wifi_mgr_espnow_*`), ascolto
 - `main/seismo.*` acquisizione e rilevamento degli eventi del Sismografo · `main/audio.*` codec ES8311 e microfoni ES7210 (con la diagnostica) · `main/theremin.*` sintesi e registrazione del Theremin
 - `main/apps/` le app (`app_pet.c` + `pet_art.c` per il Polipetto, `app_ota.c` per gli aggiornamenti, `app_backup.c`, `app_level.c` per la livella, `app_wifitest.c` il Tester Wi-Fi, `app_snake.c` lo Snake, `app_seismo.c` il Sismografo)
 - `components/axs15231b` driver Waveshare inclusi nel progetto

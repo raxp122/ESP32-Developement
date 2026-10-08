@@ -40,13 +40,19 @@ static const char *TAG = "backup";
 #define LINE_MAX    4700      // una voce da MAX_BLOB byte in esadecimale più l'intestazione
 #define MAX_BLOB    2048
 #define FILE_CHUNK  1024
-#define MAX_FILE    (256 * 1024)
+#define MAX_FILE    (64L * 1024 * 1024)   // anche le registrazioni del Theremin
 
-// Cosa finisce nel backup. Un namespace o un file nuovo va aggiunto qui.
-static const char *const NAMESPACES[] = {"gadget", "pet", "pwn", "level", "theremin", "chess", "sismo"};
-static const char *const FILES[] = {"pwn/pokedex.dat", "q20/kb.txt"};   // q20: quello che ha imparato
+// Cosa finisce nel backup: tutto quello che l'utente sceglie o crea. Un namespace o una
+// cartella nuova va aggiunta qui.
+//  - NVS: impostazioni, Polipetto, Radar, livella, Theremin, Scacchi, Sismografo, Appunti
+//    (i testi ricevuti), record di Snake, Morse;
+//  - microSD, cartelle intere: Radar (Pokédex e catture), Q-20 (quello che ha imparato),
+//    Scacchi (partite, Elo, esercizi), Sismografo (eventi), Theremin (registrazioni), Doom
+//    (salvataggi e configurazione, non i WAD).
+static const char *const NAMESPACES[] = {"gadget", "pet", "pwn", "level", "theremin", "chess", "sismo", "clips", "snake", "morse"};
+static const char *const DIRS[] = {"pwn", "q20", "scacchi", "sismo", "theremin", "doom"};
 #define N_NS    (int)(sizeof(NAMESPACES) / sizeof(NAMESPACES[0]))
-#define N_FILES (int)(sizeof(FILES) / sizeof(FILES[0]))
+#define N_DIRS  (int)(sizeof(DIRS) / sizeof(DIRS[0]))
 
 static char err[96];
 
@@ -78,10 +84,22 @@ static bool known_ns(const char *ns)
     return false;
 }
 
-static bool known_file(const char *rel)
+static bool ends_with(const char *s, const char *suf)
 {
-    for (int i = 0; i < N_FILES; i++)
-        if (!strcmp(rel, FILES[i])) return true;
+    size_t a = strlen(s), b = strlen(suf);
+    return a >= b && !strcasecmp(s + a - b, suf);
+}
+
+// file da salvare: dentro una delle cartelle, niente WAD di Doom (si ricopiano a parte),
+// niente file derivati o temporanei
+static bool wanted(const char *rel)
+{
+    if (strstr(rel, "..") || rel[0] == '/') return false;
+    if (ends_with(rel, ".wad") || ends_with(rel, ".tmp") || !strcmp(rel, "scacchi/per_IA.txt")) return false;
+    for (int i = 0; i < N_DIRS; i++) {
+        size_t l = strlen(DIRS[i]);
+        if (!strncmp(rel, DIRS[i], l) && rel[l] == '/') return true;
+    }
     return false;
 }
 
@@ -172,7 +190,7 @@ static int dump_ns(wr_t *w, const char *ns)
 
 static void dump_file(wr_t *w, const char *rel)
 {
-    char path[80];
+    char path[128];
     snprintf(path, sizeof(path), SD_MOUNT "/%s", rel);
     FILE *f = fopen(path, "rb");
     if (!f) return;
@@ -191,6 +209,28 @@ static void dump_file(wr_t *w, const char *rel)
     }
     free(b);
     fclose(f);
+}
+
+// una cartella della microSD, con le sottocartelle (fino a 3 livelli)
+static void dump_dir(wr_t *w, const char *rel, int depth)
+{
+    char path[128];
+    snprintf(path, sizeof(path), SD_MOUNT "/%s", rel);
+    DIR *d = opendir(path);
+    if (!d) return;
+    struct dirent *e;
+    while ((e = readdir(d))) {
+        if (e->d_name[0] == '.') continue;
+        char sub[112];
+        if (snprintf(sub, sizeof(sub), "%s/%s", rel, e->d_name) >= (int)sizeof(sub)) continue;
+        char full[128];
+        snprintf(full, sizeof(full), SD_MOUNT "/%s", sub);
+        struct stat st;
+        if (stat(full, &st) != 0) continue;
+        if (S_ISDIR(st.st_mode)) { if (depth < 3) dump_dir(w, sub, depth + 1); }
+        else if (wanted(sub)) dump_file(w, sub);
+    }
+    closedir(d);
 }
 
 bool backup_create(char *name, int n)
@@ -229,7 +269,7 @@ bool backup_create(char *name, int n)
     w_fmt(&w, "created %s\n", created[0] ? created : "-");
     int entries = 0;
     for (int i = 0; i < N_NS; i++) entries += dump_ns(&w, NAMESPACES[i]);
-    for (int i = 0; i < N_FILES; i++) dump_file(&w, FILES[i]);
+    for (int i = 0; i < N_DIRS; i++) dump_dir(&w, DIRS[i], 1);
 
     char tail[32];
     int tn = snprintf(tail, sizeof(tail), "crc %08lx\nend\n", (unsigned long)w.crc);
@@ -431,15 +471,19 @@ static bool process(FILE *f, char *line, uint8_t *buf, bool apply)
                 return fail("Backup danneggiato (riga %d)", lineno);
             if (!set_entry(ns, key, type, line + off, buf, apply)) { if (out) fclose(out); return false; }
         } else if (!strncmp(line, "file ", 5)) {
-            char rel[64];
+            char rel[112];
             if (out) { fclose(out); out = NULL; }
-            if (sscanf(line, "file %63s %ld", rel, &left) != 2 || left < 0 || left > MAX_FILE)
+            if (sscanf(line, "file %111s %ld", rel, &left) != 2 || left < 0 || left > MAX_FILE)
                 return fail("Backup danneggiato (riga %d)", lineno);
-            if (apply && known_file(rel)) {
-                char path[80];
+            if (apply && wanted(rel)) {
+                char path[128];
                 snprintf(path, sizeof(path), SD_MOUNT "/%s", rel);
-                char *slash = strrchr(path, '/');
-                if (slash) { *slash = 0; mkdir(path, 0777); *slash = '/'; }
+                // crea le cartelle che mancano (anche annidate, es. scacchi/partite)
+                for (char *s = path + strlen(SD_MOUNT) + 1; (s = strchr(s, '/')) != NULL; s++) {
+                    *s = 0;
+                    mkdir(path, 0777);
+                    *s = '/';
+                }
                 out = fopen(path, "wb");
                 if (!out) return fail("Non riesco a scrivere %s", rel);
             }
@@ -487,12 +531,8 @@ bool backup_restore(const char *name)
                 nvs_close(h);
             }
         }
-        // anche i file: quelli che il backup non contiene spariscono (tornano "nuovi")
-        for (int i = 0; i < N_FILES; i++) {
-            char p[80];
-            snprintf(p, sizeof(p), SD_MOUNT "/%s", FILES[i]);
-            remove(p);
-        }
+        // i file del backup si riscrivono; quelli creati dopo restano (non si cancella niente
+        // sulla microSD: una registrazione o una partita nuova non va persa)
         rewind(f);
         ok = process(f, line, buf, true);
     }
