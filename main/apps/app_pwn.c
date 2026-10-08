@@ -5,23 +5,35 @@
 #include "pwn.h"
 #include "sd.h"
 #include "settings.h"
+#include "pet_art.h"
+#include "display.h"
 #include <stdio.h>
 #include <string.h>
+#include "esp_heap_caps.h"
 
-/* ================= faccia (personaggio originale) ================= */
-// Espressioni in stile emoticon, disegnate da noi.
+/* ================= mascotte in pixel art =================
+ * Un pupazzetto a blocchi arancione con due occhi neri, le braccine ai lati e quattro
+ * zampette (nello stile della mascotte di Claude Code; diverso dal Polipetto). Le
+ * espressioni sono le stesse di prima: sveglio, guarda in giro, contento, entusiasta
+ * (handshake), annoiato, addormentato, "caccia" con gli occhiali da sole.
+ */
 enum { M_WAKE, M_LOOK, M_HAPPY, M_EXCITED, M_BORED, M_SLEEP, M_COOL, N_MOODS };
-// NB: gli occhi usano font_xl (solo codepoint 32–95: maiuscole, cifre, simboli)
-// e le bocche font_l (ASCII + pochi simboli). Qui si usano solo glifi presenti
-// in quei font, altrimenti il carattere non viene disegnato.
-static const char *eyes[N_MOODS]  = {"O   O", "'   '", "^   ^", "*   *", "-   -", "Z   Z", "=   ="};
-static const char *mouth[N_MOODS] = {"  ___  ", "   u   ", "  \\_/  ", "  \\O/  ", "   —   ", "  ...  ", "  ~~~  "};
 static const char *quip[N_MOODS]  = {
     "mi sveglio…", "guardo in giro", "che bella rete!", "handshake!!", "qui è tranquillo", "zzz… poca gente", "modalità caccia",
 };
 
-static lv_obj_t *f_eyes, *f_mouth, *f_name, *f_quip, *f_stat, *f_ch, *f_bar;
-static lv_timer_t *tmr;
+#define MW 26          // pixel logici della mascotte
+#define MH 18
+#define MS 7           // ingrandimento
+#define C_BODY  0xD97757
+#define C_SHADE 0xB5604A
+#define C_EYE   0x141414
+
+static lv_obj_t *f_canvas, *f_name, *f_quip, *f_stat, *f_ch, *f_bar;
+static lv_timer_t *tmr, *anim_tmr;
+static uint16_t *m_buf;
+static int m_stride;
+static uint32_t m_frame;
 static int mood = M_WAKE;
 static uint32_t last_hs, last_net_total;
 static uint32_t mood_until;
@@ -49,8 +61,6 @@ static void face_tick(void)
 
     // ogni mezzo secondo: le etichette si toccano solo se cambiano (meno ridisegni)
     char b[64];
-    ui_set_text(f_eyes, eyes[mood]);
-    ui_set_text(f_mouth, mouth[mood]);
     ui_set_text(f_quip, pwn_running() ? pwn_last_event() : quip[M_SLEEP]);
 
     snprintf(b, sizeof(b), "%s  Lv%d", s.name, s.level);
@@ -71,6 +81,110 @@ static void face_tick(void)
     lv_bar_set_value(f_bar, pct < 0 ? 0 : pct > 100 ? 100 : pct, LV_ANIM_OFF);
 }
 
+// occhi: (x, y) è l'angolo in alto dell'occhio sinistro; il destro è 6 pixel più in là
+static void eyes_px(int x, int y, int kind)
+{
+    for (int k = 0; k < 2; k++) {
+        int ex = x + k * 6;
+        switch (kind) {
+        case 0: art_rect(ex, y, 2, 3, C_EYE); break;                        // aperti
+        case 1: art_rect(ex, y + 2, 2, 1, C_EYE); break;                    // chiusi / annoiati
+        case 2: art_rect(ex, y + 1, 2, 2, C_EYE); break;                    // assonnati
+        case 3:                                                             // contenti: ^
+            art_px(ex - 1, y + 2, C_EYE); art_px(ex, y + 1, C_EYE);
+            art_px(ex + 1, y + 1, C_EYE); art_px(ex + 2, y + 2, C_EYE);
+            break;
+        case 4:                                                             // entusiasti: stelline
+            art_px(ex, y, C_EYE); art_px(ex - 1, y + 1, C_EYE); art_px(ex, y + 1, C_EYE);
+            art_px(ex + 1, y + 1, C_EYE); art_px(ex, y + 2, C_EYE);
+            break;
+        }
+    }
+}
+
+static void mascot_draw(void)
+{
+    if (!m_buf) return;
+    uint32_t f = m_frame;
+    art_begin(m_buf, MW, MH, MS, m_stride);
+    art_fill(0x000000);
+    int m = mood;
+    // movimento: saltella se contento o entusiasta, respira piano se annoiato o addormentato
+    int dy = 0;
+    if (m == M_EXCITED) dy = (f / 2) & 1 ? -2 : 0;
+    else if (m == M_HAPPY) dy = (f / 3) & 1 ? -1 : 0;
+    else if (m == M_SLEEP || m == M_BORED) dy = (f / 8) & 1;
+    int bx = 5, by = 3 + dy;
+    // zampette: camminano sul posto mentre guarda in giro (ma restano a terra)
+    bool walk = m == M_LOOK || m == M_EXCITED || m == M_WAKE;
+    static const int8_t lx[4] = {6, 9, 15, 18};
+    for (int i = 0; i < 4; i++) {
+        int lift = walk && (((f / 2) + i) & 1) ? 1 : 0;
+        // le zampe arrivano a terra (y = 13); nei salti si staccano con il corpo
+        int top = by + 8, len = 13 + 1 + (dy < 0 ? dy : 0) - top - lift;
+        if (len < 1) len = 1;
+        art_rect(lx[i], top, 2, len, C_BODY);
+    }
+    // corpo con l'ombra a destra e in basso
+    art_rect(bx, by, 16, 8, C_BODY);
+    art_rect(bx + 15, by + 1, 1, 7, C_SHADE);
+    art_rect(bx + 1, by + 7, 15, 1, C_SHADE);
+    // braccine: su se contento, si agitano se entusiasta, giù se annoiato o addormentato
+    int ay = by + 3;
+    if (m == M_HAPPY) ay = by + 1;
+    if (m == M_EXCITED) ay = (f & 1) ? by + 1 : by + 3;
+    if (m == M_BORED || m == M_SLEEP) ay = by + 5;
+    art_rect(bx - 3, ay, 3, 2, C_BODY);
+    art_rect(bx + 16, (m == M_EXCITED && (f & 1)) ? by + 3 : ay, 3, 2, C_BODY);
+    // occhi
+    int ex = bx + 4, ey = by + 2;
+    int look = 0;
+    if (m == M_LOOK) look = ((f / 10) % 4 == 1) ? -1 : ((f / 10) % 4 == 3) ? 1 : 0;
+    bool blink = (f % 30) == 0;
+    switch (m) {
+    case M_WAKE:    eyes_px(ex, ey, (f / 6) & 1 ? 2 : 0); break;
+    case M_LOOK:    eyes_px(ex + look, ey, blink ? 1 : 0); break;
+    case M_HAPPY:   eyes_px(ex, ey, 3); break;
+    case M_EXCITED: eyes_px(ex, ey, 4); break;
+    case M_BORED:   eyes_px(ex, ey, 1); break;
+    case M_SLEEP:   eyes_px(ex, ey, 1); break;
+    case M_COOL:    // occhiali da sole
+        art_rect(ex - 1, ey, 10, 1, C_EYE);
+        art_rect(ex - 1, ey + 1, 4, 2, C_EYE);
+        art_rect(ex + 5, ey + 1, 4, 2, C_EYE);
+        art_px(ex, ey + 1, 0x5A5A5A);
+        art_px(ex + 6, ey + 1, 0x5A5A5A);
+        break;
+    }
+    // dettagli: zzz che salgono, scintille, goccia di noia
+    if (m == M_SLEEP) {   // una "Z" che sale piano accanto alla testa
+        int z = (f / 6) % 3, zx = bx + 16, zy = by - 3 + 2 - z;   // angolo in alto a sinistra
+        if (zy < 0) zy = 0;
+        art_rect(zx, zy, 5, 1, 0xEDEDED);
+        art_px(zx + 3, zy + 1, 0xEDEDED);
+        art_px(zx + 2, zy + 2, 0xEDEDED);
+        art_px(zx + 1, zy + 3, 0xEDEDED);
+        art_rect(zx, zy + 4, 5, 1, 0xEDEDED);
+    }
+    if (m == M_EXCITED || m == M_HAPPY)
+        for (int i = 0; i < 3; i++)
+            if (((f / 2) + i) % 3 == 0) {
+                int sx = i == 0 ? 1 : i == 1 ? 23 : 12, sy = i == 2 ? 0 : 2 + i;
+                art_px(sx, sy, 0xFFD23C); art_px(sx - 1, sy + 1, 0xFFD23C); art_px(sx + 1, sy + 1, 0xFFD23C); art_px(sx, sy + 2, 0xFFD23C);
+            }
+    if (m == M_BORED && (f / 8) % 3 == 0) art_rect(bx + 14, by - 2, 1, 2, 0x7FC8EE);
+    // ombra a terra
+    art_rect(4, 14, 18, 1, 0x2A2A2A);
+    lv_obj_invalidate(f_canvas);
+}
+
+static void anim_cb(lv_timer_t *t)
+{
+    if (display_is_dark()) return;
+    m_frame++;
+    mascot_draw();
+}
+
 static lv_obj_t *mk(lv_obj_t *p, const lv_font_t *f, lv_color_t c, int x, int y)
 {
     lv_obj_t *l = lv_label_create(p);
@@ -83,9 +197,18 @@ static lv_obj_t *mk(lv_obj_t *p, const lv_font_t *f, lv_color_t c, int x, int y)
 
 static void face_enter(lv_obj_t *root, void *arg)
 {
-    // faccia a sinistra
-    f_eyes = mk(root, &font_xl, C_TEXT, 24, 14);
-    f_mouth = mk(root, &font_l, ui_accent(), 30, 86);
+    // mascotte a sinistra (buffer in PSRAM, tenuto fra un'apertura e l'altra)
+    if (!m_buf) {
+        uint32_t st = lv_draw_buf_width_to_stride(MW * MS, LV_COLOR_FORMAT_RGB565);
+        m_buf = heap_caps_aligned_alloc(64, st * MH * MS, MALLOC_CAP_SPIRAM);
+        m_stride = st / 2;
+    }
+    f_canvas = NULL;
+    if (m_buf) {
+        f_canvas = lv_canvas_create(root);
+        lv_canvas_set_buffer(f_canvas, m_buf, MW * MS, MH * MS, LV_COLOR_FORMAT_RGB565);
+        lv_obj_set_pos(f_canvas, 40, (SCR_H - MH * MS) / 2);
+    }
     // info a destra
     f_name = mk(root, &font_l, C_TEXT, 300, 12);
     f_quip = mk(root, &font_m, ui_accent(), 300, 52);
@@ -103,12 +226,15 @@ static void face_enter(lv_obj_t *root, void *arg)
 
     if (!pwn_running()) pwn_start();
     face_tick();
+    mascot_draw();
     tmr = lv_timer_create((lv_timer_cb_t)face_tick, 500, NULL);
+    if (f_canvas) anim_tmr = lv_timer_create(anim_cb, 120, NULL);
 }
 
 static void face_leave(void)
 {
     if (tmr) { lv_timer_delete(tmr); tmr = NULL; }
+    if (anim_tmr) { lv_timer_delete(anim_tmr); anim_tmr = NULL; }
     // il motore continua a girare tornando al menu del Radar: si ferma uscendo dall'app
 }
 

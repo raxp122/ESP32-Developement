@@ -238,7 +238,7 @@ Dal launcher: **Q-20**. Pensa a qualcosa (animale, oggetto, cibo, luogo, persona
 - Ampliare la conoscenza iniziale: modifica `tools/q20_gen.py` (le domande nuove solo in fondo), lancia `python3 tools/q20_gen.py` e aumenta `SEED_VERSION`: il Gadget aggiunge le cose nuove al suo file senza toccare quello che ha imparato.
 
 ## Radar
-Dal launcher: **Radar**. Un "radar" Wi-Fi passivo con personalità, in stile pwnagotchi: una faccina che reagisce a quello che sente, livello ed esperienza che crescono scoprendo reti nuove e captando handshake. **Tutto l'ascolto è passivo**: il Gadget non trasmette nulla e non disconnette nessuno.
+Dal launcher: **Radar**. Un "radar" Wi-Fi passivo con personalità, in stile pwnagotchi: una mascotte in pixel art (un pupazzetto arancione a blocchi con le braccine e quattro zampette, nello stile di quella di Claude Code) che reagisce a quello che sente: cammina guardandosi intorno, salta contenta a ogni rete nuova, si agita con gli occhi a stellina per un handshake, si annoia quando non c'è nessuno, mette gli occhiali da sole in mezzo a tante reti e dorme quando il radar è fermo; livello ed esperienza che crescono scoprendo reti nuove e captando handshake. **Tutto l'ascolto è passivo**: il Gadget non trasmette nulla e non disconnette nessuno.
 - **Apri il radar** (faccia e statistiche), **Avvia / ferma**.
 - **Pokédex reti**: le reti scoperte, salvate sulla microSD (`pwn/pokedex.dat`, anche nei backup).
 - **Impostazioni**: nome, *Cattura pcap* (salva gli handshake su microSD), personalità, stato della microSD, azzera Pokédex e livelli.
