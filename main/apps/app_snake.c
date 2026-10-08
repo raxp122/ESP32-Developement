@@ -4,6 +4,7 @@
 // BOOT o dito tenuto: pausa. In pausa e a fine partita: destra riprende/ricomincia,
 // sinistra esce. Il record resta in memoria (NVS).
 #include "apps.h"
+#include "input.h"
 #include "pet_art.h"
 #include "settings.h"
 #include <stdio.h>
@@ -35,7 +36,7 @@ static lv_obj_t *canvas, *l_score, *l_best, *l_msg, *l_sub;
 
 typedef struct { int8_t x, y; } pt_t;
 static pt_t *body;                   // body[0] = testa
-static int len, dir, ndir[2], nq;    // direzione: 0 destra, 1 giù, 2 sinistra, 3 su
+static int len, dir, ndir[3], nq;    // direzione: 0 destra, 1 giù, 2 sinistra, 3 su
 static pt_t food;
 static int score, best;
 static uint32_t step_ms, last_step;
@@ -178,7 +179,7 @@ static void reset(void)
 
 static void step(void)
 {
-    if (nq) { dir = ndir[0]; ndir[0] = ndir[1]; nq--; }
+    if (nq) { dir = ndir[0]; ndir[0] = ndir[1]; ndir[1] = ndir[2]; nq--; }
     pt_t h = {(int8_t)(body[0].x + DX[dir]), (int8_t)(body[0].y + DY[dir])};
     bool eat = h.x == food.x && h.y == food.y;
     // la coda si sposta in questo passo (a meno che non mangi): ci si può entrare
@@ -202,16 +203,49 @@ static void step(void)
 
 static void turn(int d)
 {
-    // al massimo due svolte in coda (due swipe rapidi); niente inversione su se stesso
+    // al massimo tre svolte in coda (swipe rapidi); niente inversione su se stesso
     int last = nq ? ndir[nq - 1] : dir;
-    if (d == last || d == (last + 2) % 4 || nq == 2) return;
+    if (d == last || d == (last + 2) % 4 || nq == 3) return;
     ndir[nq++] = d;
+}
+
+/* Svolte dal dito mentre si muove: lo swipe normale arriva solo quando il dito si stacca
+ * (più ~85 ms di conferma), troppo tardi per due svolte su due quadratini di fila. Qui la
+ * svolta parte appena il dito si è spostato di DRAG_MIN pixel; poi il punto di partenza
+ * si sposta lì, così un solo gesto a "L" (es. giù e poi a sinistra) fa l'inversione. */
+#define DRAG_MIN     (SCR_ROUND ? 26 : 20)
+#define DRAG_RELEASE 4            // letture vuote di fila per considerare il dito staccato
+static struct { bool down; int ox, oy, gone, turns; } drag;
+
+static void drag_poll(void)
+{
+    int x, y;
+    if (!input_touch(&x, &y)) {
+        if (drag.down && ++drag.gone >= DRAG_RELEASE) drag.down = false;
+        return;
+    }
+    drag.gone = 0;
+    if (!drag.down) { drag = (typeof(drag)){.down = true, .ox = x, .oy = y}; return; }
+    int dx = x - drag.ox, dy = y - drag.oy;
+    if (abs(dx) < DRAG_MIN && abs(dy) < DRAG_MIN) return;
+    int d;
+    if (abs(dx) > abs(dy)) d = dx > 0 ? 0 : 2;
+    else {
+        bool up = dy < 0;
+        if (g_set.invert_scroll) up = !up;   // come gli swipe (e le liste)
+        d = up ? 3 : 1;
+    }
+    turn(d);
+    drag.turns++;
+    drag.ox = x;
+    drag.oy = y;
 }
 
 static void tick_cb(lv_timer_t *t)
 {
     uint32_t now = lv_tick_get();
     frame++;
+    if (st == S_PLAY) drag_poll();
     bool moved = false;
     if (st == S_PLAY && now - last_step >= step_ms) {
         last_step = now;
@@ -227,6 +261,7 @@ static void start(int d)
     if (st == S_OVER) reset();
     st = S_PLAY;
     if (d >= 0) turn(d);
+    drag = (typeof(drag)){0};
     last_step = lv_tick_get();
     hud();
 }
@@ -339,7 +374,8 @@ static bool nav(nav_t ev)
     switch (st) {
     case S_PLAY:
         if (ev == NAV_BTN || ev == NAV_QUICK) { st = S_PAUSE; hud(); return true; }
-        if (d >= 0) { turn(d); return true; }
+        // lo swipe a dito staccato vale solo se il gesto non ha già fatto svoltare
+        if (d >= 0) { if (!drag.turns) turn(d); drag.turns = 0; return true; }
         return false;
     case S_READY:
         if (ev == NAV_BACK) return false;   // esce

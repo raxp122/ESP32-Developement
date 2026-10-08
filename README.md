@@ -292,7 +292,7 @@ Dal launcher: **Sismografo** → *Avvia*. Appoggia il Gadget su una superficie f
 - **Registra sulla microSD**: ogni evento, con 5 s prima e 5 s dopo, va in `sismo/AAAAMMGG-hhmmss.csv` (100 campioni al secondo, x/y/z in mg: si apre con Excel); il registro di tutti è `sismo/eventi.csv`. Dal menu si consultano gli ultimi 50 e si cancellano.
 
 ## Snake
-Dal launcher: **Snake**, in pixel art con i colori del Polipetto: un serpente di quadratini arancioni (la testa ha gli occhi) che mangia i pesci gialli. Con gli swipe nelle quattro direzioni si gira; muri e coda fanno perdere, e ogni pesce lo rende un po' più veloce. Lo schermo resta tutto per il gioco: sul 3,49" una griglia 53×12, sul tondo 20×20 con quadratini più grandi.
+Dal launcher: **Snake**, in pixel art con i colori del Polipetto: un serpente di quadratini arancioni (la testa ha gli occhi) che mangia i pesci gialli. Con gli swipe nelle quattro direzioni si gira: la svolta parte appena il dito si sposta, senza aspettare che si stacchi, e un solo gesto a "L" (per esempio giù e poi a sinistra, senza alzare il dito) fa l'inversione a U su due quadratini di fila. Fino a tre svolte restano in coda; muri e coda fanno perdere, e ogni pesce lo rende un po' più veloce. Lo schermo resta tutto per il gioco: sul 3,49" una griglia 53×12, sul tondo 20×20 con quadratini più grandi.
 
 - **Partenza**: uno swipe qualsiasi (sinistra esce).
 - **Pausa**: BOOT o dito tenuto. In pausa e a fine partita: destra riprende o ricomincia, sinistra esce.
