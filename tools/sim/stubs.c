@@ -64,7 +64,6 @@ ota_state_t ota_state(void) { return sim_ota; }
 void radio_only_ble(void) {}
 void radio_only_wifi(void) {}
 void settings_defer(bool on) {}
-const char *settings_quick_name(int q) { return "Torcia"; }
 void settings_reset(void) {}
 void settings_save(void) {}
 void text_norm(const char *in, char *out, size_t n) { snprintf(out, n, "%s", in); }

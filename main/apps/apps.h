@@ -48,7 +48,10 @@ extern const app_t app_wifitest_meter; // Tester Wi-Fi: misura di una rete (arg 
 extern menu_t chess_menu;              // Orologio per scacchi
 void chess_menu_init(void);
 
-// App all'avvio (Impostazioni): elenco con indici stabili, salvati in g_set.boot_app
-int  boot_app_count(void);
-const char *boot_app_name(int i);
-void boot_app_launch(void);   // apre l'app scelta sopra la home (da chiamare con LVGL bloccato)
+// Scorciatoie (shortcuts.c): tutte le app del launcher e le loro voci interne, per l'Azione
+// rapida e l'App all'avvio. Si scelgono per nome (g_set.quick_name, g_set.boot_name).
+int  shortcut_count(void);
+const char *shortcut_name(int i);
+bool shortcut_run(const char *name);   // false se non c'è (o "Nessuna")
+void shortcut_pick(bool boot);         // apre l'elenco per sceglierla
+void boot_app_launch(void);            // apre l'app scelta sopra la home (da chiamare con LVGL bloccato)
