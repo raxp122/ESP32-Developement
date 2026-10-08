@@ -62,6 +62,7 @@ void ota_auto_start(void) {}
 void ota_check(void) {}
 const char *ota_current(void) { return "0.14.69"; }
 const char *ota_error(void) { return ""; }
+const char *ota_error_detail(void) { return ""; }
 void ota_install(void) {}
 const char *ota_latest(void) { return "0.15.0"; }
 int ota_progress(void) { return 42; }
@@ -118,6 +119,7 @@ void audio_stop_if(audio_synth_t s) {}
 audio_synth_t audio_current(void) { return NULL; }
 bool audio_mic_active(void) { return false; }
 bool audio_mic_ok(void) { return true; }
+bool audio_mic_probe(int ms, int *pk, int *rms, int *z) { *pk = 9000; *rms = 800; *z = 0; return true; }
 const char *audio_status(void) { return "Pronto"; }
 void audio_set_volume(int p) {}
 wifi_state_t wifi_mgr_state(void) { return sim_wifi; }
@@ -138,3 +140,8 @@ menu_t backup_menu = {"Backup", none, 1, 0, NULL}, chess_menu = {"Scacchi", none
 void chess_menu_init(void) {}
 bool sd_ok(void) { return true; }
 void tuner_menu_init(void) {}
+const char *logcon_reset_reason(void) { return "errore (panic)"; }
+bool logcon_has_prev(void) { return true; }
+bool logcon_write_report(const char *p) { return true; }
+void input_touch_counts(uint32_t c[4]) { c[0] = 812; c[1] = 40210; c[2] = 0; c[3] = 3; }
+int board_touch_recoveries(void) { return 1; }

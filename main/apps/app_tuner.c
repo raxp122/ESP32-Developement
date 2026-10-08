@@ -12,6 +12,8 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "esp_heap_caps.h"
+#include "esp_log.h"
+#include "esp_memory_utils.h"
 
 /* ---------------- accordature ---------------- */
 
@@ -90,6 +92,7 @@ static void tuning_notes(const tuning_t *t, char *b, int n)
 static volatile float det_hz;      // 0 = nessuna nota
 static volatile float det_level;   // dBFS
 static volatile uint32_t det_seq;
+static volatile bool det_fail;     // niente memoria per l'analisi
 static volatile bool run;
 static TaskHandle_t task_h;
 
@@ -186,9 +189,15 @@ static float median3(const float *h, int n)
 static void mic_task(void *arg)
 {
     EXT_RAM_BSS_ATTR static int16_t in[HOP * 2];
-    // tutto in RAM interna: è lì che i calcoli vanno veloci
+    // in RAM interna i calcoli vanno veloci; se lì non c'è posto (memoria frammentata dopo
+    // Wi-Fi, Bluetooth…) si usa la PSRAM, più lenta ma sufficiente. Prima in quel caso il
+    // task finiva subito in silenzio e l'accordatore restava muto.
     float *buf = heap_caps_calloc(WIN, sizeof(float), MALLOC_CAP_INTERNAL);
+    if (!buf) buf = heap_caps_calloc(WIN, sizeof(float), MALLOC_CAP_SPIRAM);
     yin_work_t *w = heap_caps_malloc(sizeof(yin_work_t), MALLOC_CAP_INTERNAL);
+    if (!w) w = heap_caps_malloc(sizeof(yin_work_t), MALLOC_CAP_SPIRAM);
+    if (!buf || !w) det_fail = true;
+    else if (!esp_ptr_internal(buf) || !esp_ptr_internal(w)) ESP_LOGW("tuner", "analisi in PSRAM (RAM interna insufficiente)");
     float hist[3] = {0};
     int nh = 0, hi = 0, misses = 0, jump = 0, filled = 0;
     float dc = 0;
@@ -356,6 +365,7 @@ static void show_ref(void)
 
 static void ui_cb(lv_timer_t *t)
 {
+    if (det_fail) { ui_set_text(l_status, "Memoria insufficiente per l'analisi: esci e riprova"); ui_set_text_color(l_status, C_WARN); return; }
     if (det_seq == seen) return;
     seen = det_seq;
     float f = det_hz;
@@ -482,9 +492,18 @@ static void enter(lv_obj_t *root, void *arg)
         lv_label_set_text(l_status, "Microfono non disponibile");
         return;
     }
+    // il task precedente (uscita e rientro veloci) deve essere finito
+    for (int i = 0; i < 50 && task_h; i++) vTaskDelay(pdMS_TO_TICKS(10));
     run = true;
+    det_fail = false;
     seen = det_seq;
-    xTaskCreatePinnedToCore(mic_task, "tuner", 6144, NULL, 4, &task_h, 0);
+    if (xTaskCreatePinnedToCore(mic_task, "tuner", 6144, NULL, 4, &task_h, 0) != pdPASS) {
+        task_h = NULL;
+        run = false;
+        audio_mic_stop();
+        lv_label_set_text(l_status, "Memoria insufficiente: chiudi qualche app e riprova");
+        return;
+    }
     ui_timer = lv_timer_create(ui_cb, 30, NULL);
 }
 

@@ -12,6 +12,7 @@ endif()
 idf_component_register(
     SRCS ${APP_SRCS}
     INCLUDE_DIRS "." "apps" "doom"
+    LDFRAGMENTS "linker.lf"   # variabili delle app in PSRAM (vedi il file)
     REQUIRES lvgl axs15231b esp_lcd driver esp_adc esp_wifi esp_netif esp_event
              nvs_flash esp_http_server esp_timer bt lwip esp_driver_usb_serial_jtag fatfs sdmmc esp_driver_sdmmc prboom es8311 es7210 esp_driver_i2s
              app_update esp_app_format esp_https_ota esp_http_client mbedtls ${USB_REQ})

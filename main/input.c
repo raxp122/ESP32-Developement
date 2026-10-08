@@ -1,12 +1,16 @@
 // input.c — polling del touch AXS15231B, gesti e pulsanti
 #include "input.h"
+#include "ui.h"
 #include "board.h"
 #include "display.h"
 #include "settings.h"
+#include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include "lvgl.h"
 #include "esp_timer.h"
 #include "esp_log.h"
+#include "esp_system.h"
 
 static const char *TAG = "input";
 
@@ -38,10 +42,15 @@ static struct { bool down; int64_t t0; bool long_fired; } btn_boot, btn_pwr;
 #define TOUCH_RECOVER_GAP  3000000   // µs fra un recupero e l'altro
 static int touch_err_run;
 static int64_t touch_recover_us;
+// diagnostica (comando I dal seriale): quante letture con il dito, senza, con dati non
+// validi e con errore I2C, e gli ultimi byte grezzi non validi
+static uint32_t st_touch, st_none, st_bad, st_err;
+static uint8_t st_raw[8];
 
 static bool touch_i2c_ok(esp_err_t r)
 {
     if (r == ESP_OK) { touch_err_run = 0; return true; }
+    st_err++;
     if (touch_err_run++ == 0) ESP_LOGW(TAG, "touch: lettura I2C fallita (%s)", esp_err_to_name(r));
     return false;
 }
@@ -52,7 +61,9 @@ static bool touch_read_raw(int *px, int *py)
     uint8_t buf[14] = {0};
     if (!touch_i2c_ok(i2c_master_transmit_receive(board_touch_dev(), cmd, sizeof(cmd), buf, sizeof(buf), 20)))
         return false;
-    if (buf[1] == 0 || buf[1] > 4) return false;
+    if (buf[1] == 0) { st_none++; return false; }
+    if (buf[1] > 4) { st_bad++; memcpy(st_raw, buf, sizeof(st_raw)); return false; }
+    st_touch++;
     int rx = ((buf[2] & 0x0F) << 8) | buf[3];
     int ry = ((buf[4] & 0x0F) << 8) | buf[5];
     if (rx > LCD_H - 1) rx = LCD_H - 1;
@@ -72,9 +83,10 @@ static bool touch_read_round(int *x, int *y)
     uint8_t b[15] = {0};
     if (!touch_i2c_ok(i2c_master_transmit_receive(board_touch_dev(), rd, 2, b, sizeof(b), 20))) return false;
     i2c_master_transmit(board_touch_dev(), ack, 3, 20);
-    if (b[6] != 0xAB) return false;
+    if (b[6] != 0xAB) { st_bad++; memcpy(st_raw, b, sizeof(st_raw)); return false; }
     int n = b[5] & 0x7F;
-    if (n == 0 || n > 2 || (b[0] & 0x0F) != 0x06) return false;
+    if (n == 0 || n > 2 || (b[0] & 0x0F) != 0x06) { st_none++; return false; }
+    st_touch++;
     int rx = (b[1] << 4) | (b[3] >> 4);
     int ry = (b[2] << 4) | (b[3] & 0x0F);
     if (rx > R_LCD_W - 1) rx = R_LCD_W - 1;
@@ -171,6 +183,17 @@ static void poll_cb(lv_timer_t *t)
     }
     process_touch(now);
     process_btn(board_btn_boot(), now, &btn_boot, NAV_BTN, NAV_QUICK, 800);
+    // BOOT tenuto 15 s: riavvio software (nessuna app lo tiene così a lungo). Serve quando il
+    // touch non risponde: il log di questa sessione resta e dopo il riavvio si manda da
+    // Impostazioni » Diagnostica. Si riavvia al rilascio: con BOOT premuto durante il reset
+    // la scheda potrebbe entrare in modalità di caricamento del firmware.
+    static bool restart_armed;
+    if (!restart_armed && btn_boot.down && now - btn_boot.t0 > 15000000) {
+        restart_armed = true;
+        ESP_LOGW(TAG, "BOOT tenuto 15 s: riavvio al rilascio");
+        ui_toast("Rilascia BOOT: la scheda si riavvia");
+    }
+    if (restart_armed && !board_btn_boot()) esp_restart();
     process_btn(board_btn_pwr(), now, &btn_pwr, NAV_PWR_CLICK, NAV_PWR_LONG, 2000);
 }
 
@@ -183,3 +206,14 @@ void input_init(nav_handler_t h)
     btn_pwr.long_fired = true;
     lv_timer_create(poll_cb, POLL_MS, NULL);
 }
+
+void input_touch_stats(char *b, int n)
+{
+    snprintf(b, n, "touch: %lu con il dito, %lu senza, %lu non valide, %lu errori I2C · ultimi byte non validi "
+             "%02X %02X %02X %02X %02X %02X %02X %02X%s",
+             (unsigned long)st_touch, (unsigned long)st_none, (unsigned long)st_bad, (unsigned long)st_err,
+             st_raw[0], st_raw[1], st_raw[2], st_raw[3], st_raw[4], st_raw[5], st_raw[6], st_raw[7],
+             locked ? " · BLOCCATO (schermo spento col tasto)" : "");
+}
+
+void input_touch_counts(uint32_t c[4]) { c[0] = st_touch; c[1] = st_none; c[2] = st_bad; c[3] = st_err; }

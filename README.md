@@ -351,7 +351,7 @@ Il Bluetooth è predisposto per collegarsi nei due sensi (le funzioni vere arriv
 Limite dell'hardware: l'ESP32-S3 ha solo il Bluetooth Low Energy. Casse e cuffie riproducono l'audio col Bluetooth "classico" (A2DP), che questo chip non ha: per l'audio servirebbe un modulo esterno.
 
 ### Audio
-Impostazioni › **Audio**: *Prova audio* suona tre note (do-mi-sol) e accanto dice com'è andato l'avvio dell'audio: "Pronto" (con i microfoni ok o assenti), oppure "ES8311 non risponde" / "I2S occupato" se qualcosa non va, e se l'uscita è occupata da un'app. *Volume* è lo stesso della Spada laser e vale per tutte le app (Theremin, Polipetto, scacchi, Doom).
+Impostazioni › **Audio**: *Prova audio* suona tre note (do-mi-sol) e accanto dice com'è andato l'avvio dell'audio: "Pronto" (con i microfoni ok o assenti), oppure "ES8311 non risponde" / "I2S occupato" se qualcosa non va, e se l'uscita è occupata da un'app. *Prova microfono* ascolta per un secondo e dice il livello misurato, oppure "silenzio assoluto" se il convertitore dei microfoni non manda dati ("microfoni ok" vuol dire solo che il chip ha risposto). Il convertitore si riconfigura ogni volta che un'app accende i microfoni. *Volume* è lo stesso della Spada laser e vale per tutte le app (Theremin, Polipetto, scacchi, Doom).
 
 ### Data e ora
 Impostazioni › **Data e ora**: ora e data, *Sincronizza ora* (da Internet, NTP), fuso orario, e **Orologio della scheda**, che dice se l'orologio interno (RTC PCF85063) risponde, se ha l'ora e com'era all'accensione.
@@ -376,7 +376,7 @@ Il file è di testo con un controllo CRC: un backup rovinato o incompleto viene 
 Impostazioni › App all'avvio: se scegli un'app (o una sua schermata interna, stesso elenco automatico dell'Azione rapida), all'accensione si apre quella; swipe indietro torna al menu. "Nessuna" lascia tutto com'era. Le scelte fatte con i firmware precedenti vengono convertite da sole.
 
 ## Aggiornamenti
-- **Dalla scheda (OTA):** Impostazioni › Sistema › Aggiornamento firmware. Ogni merge su `main` pubblica una release su GitHub con il firmware; la scheda la scarica via Wi-Fi e si riavvia. Se il nuovo firmware non riesce ad avviarsi, al riavvio torna da solo quello precedente. Mentre sei nella schermata di aggiornamento il Bluetooth va in pausa (la radio è condivisa col Wi-Fi) e si riaccende uscendo. Con "Cerca aggiornamenti da solo" avvisa quando ne esce uno nuovo. Se il controllo fallisce due volte, il Gadget ricollega da capo il Wi-Fi (indirizzo e DNS nuovi, con un DNS di riserva) e riprova. L'errore dice anche il motivo: *(DNS)* se il nome di GitHub non si risolve, *(connessione)* o *(TLS …)* se il server non risponde; nel log seriale c'è il dettaglio.
+- **Dalla scheda (OTA):** Impostazioni › Sistema › Aggiornamento firmware. Ogni merge su `main` pubblica una release su GitHub con il firmware; la scheda la scarica via Wi-Fi e si riavvia. Se il nuovo firmware non riesce ad avviarsi, al riavvio torna da solo quello precedente. Mentre sei nella schermata di aggiornamento il Bluetooth va in pausa (la radio è condivisa col Wi-Fi) e si riaccende uscendo. Con "Cerca aggiornamenti da solo" avvisa quando ne esce uno nuovo. Se il controllo fallisce due volte, il Gadget ricollega da capo il Wi-Fi (indirizzo e DNS nuovi, con un DNS di riserva) e riprova. Sotto l'errore compare il motivo (DNS, connessione rifiutata, nessuna risposta, tempo scaduto, con il codice); nel log seriale c'è il dettaglio.
 - **Via USB:** `gadget.bin` a `0x0` (immagine unica) oppure solo `gadget-app.bin` a `0x20000`.
 
 Dalla 0.14 le impostazioni (NVS) stanno in fondo alla flash (`0xFF0000`): né l'OTA né i file qui sopra le toccano più.
@@ -404,7 +404,9 @@ Il firmware conserva in RAM gli ultimi 16 KB di log dall'accensione. Dal monitor
 
 **Cicli di riavvii.** Se la scheda si riavvia per un errore mentre il Bluetooth è acceso, al riavvio il Bluetooth resta spento (con un avviso). Dopo tre riavvii per errore di fila parte in *modalità sicura*: Bluetooth spento e niente app all'avvio. Il comando `P` mostra il log di quello che è successo prima del riavvio.
 
-Se il touch smette di rispondere (bus I2C bloccato, per esempio dopo un riavvio software a metà di una lettura), il firmware lo sblocca e ricrea il bus da solo entro mezzo secondo. `I` dice quante volte è successo, e il log riporta il motivo.
+**Diagnostica senza cavo.** Impostazioni › **Diagnostica** mostra il motivo dell'ultimo riavvio, le letture del touch (con il dito, vuote, non valide, errori, recuperi) e la memoria. *Manda il rapporto al telefono* scrive sulla microSD un file con le informazioni, il log della sessione prima del riavvio e quello dall'accensione, e lo passa al telefono con l'hotspot (Copia tutto / Scarica). Se il touch non risponde, **tieni premuto BOOT per 15 secondi** e poi rilascialo: la scheda si riavvia conservando il log di quella sessione, che poi trovi nel rapporto.
+
+Se il touch smette di rispondere (bus I2C bloccato, per esempio dopo un riavvio software a metà di una lettura), il firmware lo sblocca e ricrea il bus da solo entro mezzo secondo. `I` dice quante volte è successo e quante letture del touch sono andate a buon fine, senza dito, non valide o in errore (con gli ultimi byte strani ricevuti); il log riporta il motivo.
 
 ## Struttura
 - `main/board.*` riconoscimento della scheda, pin, alimentazione (3.49: latch TCA9554 EXIO6 e batteria sull'ADC; AMOLED: AXP2101), RTC PCF85063, IMU QMI8658, pulsanti
@@ -447,5 +449,12 @@ const app_t app_ciao = { .name = "Ciao", .icon = ICON_GHOST, .enter = enter, .na
 ```
 Poi aggiungi `extern const app_t app_ciao;` in `apps/apps.h` e una voce in `apps/home.c`.
 Il file viene compilato in automatico. Flag utili: `APP_FULLSCREEN`, `APP_NO_SLEEP`, `APP_OWN_QUICK`, `APP_ROUND_OK` (l'app è disegnata anche per lo schermo tondo: usa `SCR_W`/`SCR_H`/`SCR_ROUND` invece di coordinate fisse).
+**Memoria.** La RAM interna (~340 KB) è poca e serve a Wi-Fi, Bluetooth, DMA del display e stack dei task; la PSRAM (8 MB) è più lenta ma enorme. Per questo:
+- le variabili statiche di tutti i file vanno da sole in PSRAM (`main/linker.lf`): anche quelle di un'app nuova, senza fare niente. Restano in RAM interna solo i file elencati lì (display, touch, interfaccia, log, audio, motore degli scacchi, Doom);
+- i buffer grandi si allocano entrando nell'app e si liberano uscendo, in PSRAM (`heap_caps_malloc(n, MALLOC_CAP_SPIRAM)`); la RAM interna solo per DMA o calcoli dove la velocità conta davvero, e sempre con un ripiego in PSRAM se non c'è posto (vedi l'accordatore);
+- uno stack di task in RAM interna si paga finché il task vive: i task delle app finiscono quando si esce.
+
+Impostazioni › Diagnostica › Memoria mostra la RAM interna libera, il minimo toccato e il blocco più grande disponibile.
+
 Il callback `tick` viene chiamato ogni 200 ms mentre l'app è aperta. Tutto gira nel task LVGL:
 dagli altri task non toccare oggetti LVGL senza `display_lock()`.

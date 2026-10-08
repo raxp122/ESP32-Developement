@@ -1,0 +1,38 @@
+# linker.lf — dove stanno le variabili statiche (azzerate) del firmware.
+#
+# La RAM interna (~340 KB) è poca e serve a chi non può farne a meno: Wi-Fi, Bluetooth, DMA
+# del display, stack dei task, codice che gira a cache spenta. Le variabili delle app
+# restavano lì anche ad app chiusa (~90 KB): ogni app nuova ne toglieva un po' a tutti.
+#
+# Regola: tutte le variabili del firmware vanno in PSRAM (8 MB), comprese quelle delle app
+# che verranno; restano in RAM interna solo i file elencati qui sotto, che ne hanno
+# bisogno (interrupt e DMA, spinlock, cicli in tempo reale, calcoli dove conta la velocità).
+# Una variabile che deve restare interna in un altro file: DRAM_ATTR.
+[mapping:gadget_bss]
+archive: libmain.a
+entries:
+    * (extram_bss)
+    # display e touch: interrupt di fine trasferimento, letture a 80 Hz
+    board (default)
+    display (default)
+    display_round (default)
+    input (default)
+    # interfaccia (pila delle schermate, barra), menu, avvio, impostazioni, microSD
+    ui (default)
+    menu (default)
+    main (default)
+    settings (default)
+    sd (default)
+    fonts_sel (default)
+    # log: spinlock (portMUX) che deve stare in RAM interna
+    logcon (default)
+    # audio: ciclo in tempo reale del sintetizzatore e dei microfoni
+    audio (default)
+    # tastiera USB: callback di TinyUSB
+    usbhid (default)
+    usb_keymap (default)
+    # velocità: ricerca degli scacchi, Doom (gira da solo, con tutta la memoria)
+    chess_engine (default)
+    app_doom (default)
+    i_gadget (default)
+    doom_boot (default)
