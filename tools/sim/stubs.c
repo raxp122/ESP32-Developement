@@ -133,9 +133,9 @@ DUMMY_APP(app_level) DUMMY_APP(app_q20) DUMMY_APP(app_search)
 DUMMY_APP(app_theremin) DUMMY_APP(app_torch)
 static const menu_item_t none[] = {{.label = "x"}};
 menu_t backup_menu = {"Backup", none, 1, 0, NULL}, chess_menu = {"Scacchi", none, 1, 0, NULL},
-       clips_menu = {"Appunti", none, 1, 0, NULL}, dice_menu = {"Dadi", none, 1, 0, NULL},
+       clips_menu = {"Appunti", none, 1, 0, NULL},
        doom_menu = {"Doom", none, 1, 0, NULL},
-       radar_menu = {"Radar", none, 1, 0, NULL}, saber_menu = {"Spada", none, 1, 0, NULL},
+       saber_menu = {"Spada", none, 1, 0, NULL},
        tuner_menu = {"Accordatore", none, 1, 0, NULL};
 void chess_menu_init(void) {}
 bool sd_ok(void) { return true; }
@@ -145,3 +145,19 @@ bool logcon_has_prev(void) { return true; }
 bool logcon_write_report(const char *p) { return true; }
 void input_touch_counts(uint32_t c[4]) { c[0] = 812; c[1] = 40210; c[2] = 0; c[3] = 3; }
 int board_touch_recoveries(void) { return 1; }
+// Radar: motore finto (la scena sceglie reti vicine e handshake)
+#include "pwn.h"
+int sim_pwn_near = 3, sim_pwn_run = 1;
+uint32_t sim_pwn_hs, sim_pwn_nets = 12;
+void pwn_start(void) { sim_pwn_run = 1; }
+void pwn_stop(void) { sim_pwn_run = 0; }
+bool pwn_running(void) { return sim_pwn_run; }
+void pwn_get_stats(pwn_stats_t *o) { memset(o, 0, sizeof(*o)); snprintf(o->name, sizeof(o->name), "Gadget"); o->level = 7; o->xp = 3000; o->nets_total = sim_pwn_nets; o->handshakes = sim_pwn_hs; o->pkts = 48213; }
+void pwn_set_name(const char *n) {}
+int pwn_net_count(void) { return 0; }
+bool pwn_net_get(int i, pwn_net_t *o) { return false; }
+int pwn_recent_channel(void) { return 6; }
+int pwn_aps_near(void) { return sim_pwn_near; }
+void pwn_save(void) {}
+void pwn_reset_pokedex(void) {}
+const char *pwn_last_event(void) { return "guardo in giro"; }

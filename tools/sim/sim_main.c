@@ -281,6 +281,45 @@ int main(int argc, char **argv)
     for (int i = 0; i < 6; i++) nav(NAV_NEXT);
     shot("46_azione_rapida");
     ui_pop(); run(300);
+    // Radar: la mascotte nelle sue espressioni (motore finto, vedi stubs.c)
+    if (!sim_round) {
+        extern menu_t radar_menu;
+        extern int sim_pwn_near, sim_pwn_run;
+        extern uint32_t sim_pwn_hs, sim_pwn_nets;
+        ui_home(); run(300);
+        ui_push(&app_menu, &radar_menu); run(200);
+        nav(NAV_SELECT); run(1000);
+        sim_pwn_near = 3; run(700); shot("80_radar_guarda");
+        sim_pwn_nets++; run(300); shot("81_radar_contento");
+        run(2000); sim_pwn_hs++; run(400); shot("82_radar_handshake");
+        run(3000); sim_pwn_near = 0; run(600); shot("83_radar_annoiato");
+        sim_pwn_near = 8; run(600); shot("84_radar_caccia");
+        sim_pwn_run = 0; run(600); shot("85_radar_dorme");
+        sim_pwn_run = 1; sim_pwn_near = 3;
+        ui_home(); run(300);
+    }
+    // Dadi: preferiti (incantesimi) e tiro con su/giù fra i preferiti
+    {
+        extern menu_t dice_menu;
+        extern void dice_sim_add_fav(const char *, const int *, int);
+        static const int fb[7] = {0, 8, 0, 0, 0, 0, 0}, mm[7] = {3, 0, 0, 0, 0, 0, 0}, cw[7] = {0, 0, 1, 0, 0, 0, 0};
+        dice_sim_add_fav("Palla di fuoco", fb, 0);
+        dice_sim_add_fav("Dardo incantato", mm, 3);
+        dice_sim_add_fav("Cura ferite", cw, 3);
+        ui_home(); run(300);
+        ui_push(&app_menu, &dice_menu); run(200);
+        for (int i = 0; i < 11; i++) nav(NAV_NEXT);   // Preferiti
+        shot("90_dadi_menu");
+        nav(NAV_SELECT);
+        shot("91_dadi_preferiti");
+        nav(NAV_SELECT); run(1200);
+        shot("92_dadi_palla_di_fuoco");
+        nav(NAV_NEXT); run(200);
+        shot("93_dadi_dardo");
+        nav(NAV_SELECT); run(1200);
+        shot("94_dadi_dardo_tiro");
+        ui_home(); run(300);
+    }
     // Diagnostica senza monitor seriale
     ui_home(); run(300);
     ui_push(&app_menu, &settings_menu); run(200);

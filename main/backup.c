@@ -49,7 +49,7 @@ static const char *TAG = "backup";
 //  - microSD, cartelle intere: Radar (Pokédex e catture), Q-20 (quello che ha imparato),
 //    Scacchi (partite, Elo, esercizi), Sismografo (eventi), Theremin (registrazioni), Doom
 //    (salvataggi e configurazione, non i WAD).
-static const char *const NAMESPACES[] = {"gadget", "pet", "pwn", "level", "theremin", "chess", "sismo", "clips", "snake", "morse"};
+static const char *const NAMESPACES[] = {"gadget", "pet", "pwn", "level", "theremin", "chess", "sismo", "clips", "snake", "morse", "dice"};
 static const char *const DIRS[] = {"pwn", "q20", "scacchi", "sismo", "theremin", "doom"};
 #define N_NS    (int)(sizeof(NAMESPACES) / sizeof(NAMESPACES[0]))
 #define N_DIRS  (int)(sizeof(DIRS) / sizeof(DIRS[0]))

@@ -60,6 +60,8 @@ Dal launcher: **Berciometro**. Misura il livello sonoro dal microfono (RMS su bl
 Dal launcher: **Dadi**. Si compone un "pool" di dadi misti, con la somma automatica:
 - **d4, d6, d8, d10, d12, d20, d100**: quanti di ciascuno (destra per regolare, su/giù cambia); **Modificatore** da aggiungere; **Svuota il pool**.
 - **Tira**: risultato di ogni dado e totale. Swipe a destra o una scossa ritira, sinistra torna al pool.
+- **Salva come preferito**: i dadi impostati (con il modificatore) si salvano con un nome scritto con la tastiera, per esempio *Palla di fuoco* (8d6) o *Dardo incantato* (3d4 + 3). Con lo stesso nome il preferito si aggiorna. Fino a 24, anche nei backup.
+- **Preferiti**: l'elenco con il nome e i dadi di ognuno; destra lo carica e lo tira subito. Mentre tiri un preferito **su/giù passa al preferito successivo/precedente** (in alto il nome, sotto "preferito 2 di 5"), destra o una scossa tira. In fondo all'elenco *Elimina un preferito* (con conferma).
 - **Daggerheart**: i due dadi Speranza e Paura con modificatore e vantaggio/svantaggio; il risultato dice se è *con Speranza* o *con Paura*.
 
 ## Doom
@@ -238,7 +240,7 @@ Dal launcher: **Q-20**. Pensa a qualcosa (animale, oggetto, cibo, luogo, persona
 - Ampliare la conoscenza iniziale: modifica `tools/q20_gen.py` (le domande nuove solo in fondo), lancia `python3 tools/q20_gen.py` e aumenta `SEED_VERSION`: il Gadget aggiunge le cose nuove al suo file senza toccare quello che ha imparato.
 
 ## Radar
-Dal launcher: **Radar**. Un "radar" Wi-Fi passivo con personalità, in stile pwnagotchi: una faccina che reagisce a quello che sente, livello ed esperienza che crescono scoprendo reti nuove e captando handshake. **Tutto l'ascolto è passivo**: il Gadget non trasmette nulla e non disconnette nessuno.
+Dal launcher: **Radar**. Un "radar" Wi-Fi passivo con personalità, in stile pwnagotchi: una mascotte in pixel art (un pupazzetto arancione a blocchi con le braccine e quattro zampette, nello stile di quella di Claude Code) che reagisce a quello che sente: cammina guardandosi intorno, salta contenta a ogni rete nuova, si agita con gli occhi a stellina per un handshake, si annoia quando non c'è nessuno, mette gli occhiali da sole in mezzo a tante reti e dorme quando il radar è fermo; livello ed esperienza che crescono scoprendo reti nuove e captando handshake. **Tutto l'ascolto è passivo**: il Gadget non trasmette nulla e non disconnette nessuno.
 - **Apri il radar** (faccia e statistiche), **Avvia / ferma**.
 - **Pokédex reti**: le reti scoperte, salvate sulla microSD (`pwn/pokedex.dat`, anche nei backup).
 - **Impostazioni**: nome, *Cattura pcap* (salva gli handshake su microSD), personalità, stato della microSD, azzera Pokédex e livelli.
@@ -287,7 +289,7 @@ Dal launcher: **Scacchi**. Un motore scritto apposta per il Gadget gira sulla sc
 ## Sismografo
 Dal launcher: **Sismografo** → *Avvia*. Appoggia il Gadget su una superficie ferma (tavolo, pavimento): l'accelerometro misura le vibrazioni 200 volte al secondo e, tolta la gravità, il grafico mostra l'asse verticale con la scala che si adatta da sola. In alto la vibrazione attuale e il picco in mg (millesimi di g), con un'intensità locale stimata sulla scala Mercalli (Wald 1999: è quella che sente il Gadget, non quella del terremoto). BOOT azzera il picco, swipe a destra apre gli eventi. Lo schermo può spegnersi: le letture continuano finché l'app è aperta.
 
-- **Eventi**: dopo 20 s di calibrazione, un evento scatta quando la media breve dell'energia (STA, 0,5 s) supera di 3,5–5 volte quella lunga (LTA, 20 s) e la vibrazione supera la soglia scelta (metodo STA/LTA dei sismografi). Finisce dopo 2 s di calma (al massimo 2 minuti).
+- **Eventi**: all'avvio 3 s di attesa ("Appoggia la scheda e lasciala ferma": lo swipe che apre la schermata non finisce nel grafico né nella calibrazione), poi 20 s di calibrazione; dopo, un evento scatta quando la media breve dell'energia (STA, 0,5 s) supera di 3,5–5 volte quella lunga (LTA, 20 s) e la vibrazione supera la soglia scelta (metodo STA/LTA dei sismografi). Finisce dopo 2 s di calma (al massimo 2 minuti).
 - **Sensibilità**: alta (anche vibrazioni deboli), media, bassa (solo scosse forti). I colpi secchi e brevi (un passo, una porta) di solito non bastano: serve una vibrazione che duri almeno qualche decimo di secondo.
 - **Registra sulla microSD**: ogni evento, con 5 s prima e 5 s dopo, va in `sismo/AAAAMMGG-hhmmss.csv` (100 campioni al secondo, x/y/z in mg: si apre con Excel); il registro di tutti è `sismo/eventi.csv`. Dal menu si consultano gli ultimi 50 e si cancellano.
 
@@ -361,7 +363,7 @@ Sulla scheda 3.49 V1 l'orologio interno non ha una batteria tampone: da spenta l
 ### Backup e ripristino
 Impostazioni › Backup e ripristino:
 - **Crea un backup ora**: salva in un file della cartella `backup` sulla microSD tutto quello che scegli o crei:
-  - dalla memoria interna: impostazioni e Wi-Fi, Polipetto (con conchiglie, oggetti, diario, album e amici), livella, Radar, Theremin, Scacchi (impostazioni ed Elo), Sismografo, gli Appunti ricevuti, il record di Snake, il corso Morse;
+  - dalla memoria interna: impostazioni e Wi-Fi, Polipetto (con conchiglie, oggetti, diario, album e amici), livella, Radar, Theremin, Scacchi (impostazioni ed Elo), Sismografo, gli Appunti ricevuti, il record di Snake, il corso Morse, i preferiti dei Dadi;
   - dalla microSD, cartelle intere: `pwn/` (Pokédex e catture del Radar), `q20/` (quello che ha imparato), `scacchi/` (partite, Elo, esercizi), `sismo/` (eventi), `theremin/` (registrazioni), `doom/` (salvataggi e configurazione; i WAD no, si ricopiano a parte).
 
   Con molte registrazioni il backup diventa grande e ci mette un po'.

@@ -121,6 +121,7 @@ static void update(lv_timer_t *t)
     int st = seismo_state();
     lv_color_t c = ui_accent();
     if (!ok) { snprintf(b, sizeof(b), "Accelerometro non disponibile"); c = C_WARN; }
+    else if (st == SEISMO_WARMUP && seismo_settling()) { snprintf(b, sizeof(b), "Appoggia la scheda e lasciala ferma… %d s", seismo_warmup_left()); c = C_DIM; }
     else if (st == SEISMO_WARMUP) { snprintf(b, sizeof(b), "Calibrazione… %d s, non toccare", seismo_warmup_left()); c = C_DIM; }
     else if (st == SEISMO_EVENT) { snprintf(b, sizeof(b), "EVENTO in corso"); c = C_WARN; }
     else if (seismo_writing()) snprintf(b, sizeof(b), "Salvataggio sulla microSD…");
