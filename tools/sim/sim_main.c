@@ -298,6 +298,28 @@ int main(int argc, char **argv)
         sim_pwn_run = 1; sim_pwn_near = 3;
         ui_home(); run(300);
     }
+    // Dadi: preferiti (incantesimi) e tiro con su/giù fra i preferiti
+    {
+        extern menu_t dice_menu;
+        extern void dice_sim_add_fav(const char *, const int *, int);
+        static const int fb[7] = {0, 8, 0, 0, 0, 0, 0}, mm[7] = {3, 0, 0, 0, 0, 0, 0}, cw[7] = {0, 0, 1, 0, 0, 0, 0};
+        dice_sim_add_fav("Palla di fuoco", fb, 0);
+        dice_sim_add_fav("Dardo incantato", mm, 3);
+        dice_sim_add_fav("Cura ferite", cw, 3);
+        ui_home(); run(300);
+        ui_push(&app_menu, &dice_menu); run(200);
+        for (int i = 0; i < 11; i++) nav(NAV_NEXT);   // Preferiti
+        shot("90_dadi_menu");
+        nav(NAV_SELECT);
+        shot("91_dadi_preferiti");
+        nav(NAV_SELECT); run(1200);
+        shot("92_dadi_palla_di_fuoco");
+        nav(NAV_NEXT); run(200);
+        shot("93_dadi_dardo");
+        nav(NAV_SELECT); run(1200);
+        shot("94_dadi_dardo_tiro");
+        ui_home(); run(300);
+    }
     // Diagnostica senza monitor seriale
     ui_home(); run(300);
     ui_push(&app_menu, &settings_menu); run(200);

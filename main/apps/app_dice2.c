@@ -1,11 +1,17 @@
 // app_dice2.c — Dadi: pool di dadi misti con somma automatica + modalità Daggerheart
 //
-// Menu Dadi:  Tira · d4 … d100 (quantità) · Modificatore · Azzera · Daggerheart
-// Schermata risultato: swipe a destra o scuoti = ritira, sinistra = torna al pool
+// Menu Dadi:  Tira · d4 … d100 (quantità) · Modificatore · Azzera · Salva come preferito ·
+//             Preferiti · Daggerheart
+// Schermata risultato: swipe a destra o scuoti = ritira, sinistra = torna al pool; tirando
+// un preferito, su/giù passa al preferito successivo/precedente
 #include "apps.h"
 #include "board.h"
+#include "keyboard.h"
+#include "nvs.h"
 #include <stdio.h>
 #include <string.h>
+#include <strings.h>
+#include <stdint.h>
 #include <math.h>
 #include "esp_random.h"
 
@@ -23,14 +29,55 @@ static int pool_dice(void)
     return n;
 }
 
-static void pool_text(char *b, int n)
+static void pool_text_of(const int *c, int m, char *b, int n)
 {
     int o = 0;
     b[0] = 0;
     for (int i = 0; i < NT && o < n - 1; i++)
-        if (counts[i]) o += snprintf(b + o, n - o, "%s%dd%d", o ? " + " : "", counts[i], faces[i]);
-    if (mod && o < n - 1) o += snprintf(b + o, n - o, " %c %d", mod > 0 ? '+' : '-', mod > 0 ? mod : -mod);
+        if (c[i]) o += snprintf(b + o, n - o, "%s%dd%d", o ? " + " : "", c[i], faces[i]);
+    if (m && o < n - 1) o += snprintf(b + o, n - o, " %c %d", m > 0 ? '+' : '-', m > 0 ? m : -m);
     if (!o) snprintf(b, n, "Nessun dado: aggiungine qui sotto");
+}
+
+static void pool_text(char *b, int n) { pool_text_of(counts, mod, b, n); }
+
+/* ---------------- preferiti (NVS "dice", anche nei backup) ---------------- */
+
+#define FAV_MAX  24
+#define FAV_NAME 24
+typedef struct { char name[FAV_NAME]; uint8_t counts[NT]; int8_t mod; } fav_t;
+static fav_t favs[FAV_MAX];
+static int n_fav;
+static bool fav_loaded;
+static int roll_fav = -1;   // tirando un preferito: quale (-1 = il pool del menu)
+
+static void fav_load(void)
+{
+    if (fav_loaded) return;
+    fav_loaded = true;
+    nvs_handle_t h;
+    if (nvs_open("dice", NVS_READONLY, &h) != ESP_OK) return;
+    size_t len = sizeof(favs);
+    if (nvs_get_blob(h, "fav", favs, &len) == ESP_OK) n_fav = len / sizeof(fav_t);
+    nvs_close(h);
+    for (int i = 0; i < n_fav; i++) favs[i].name[FAV_NAME - 1] = 0;
+}
+
+static void fav_save(void)
+{
+    nvs_handle_t h;
+    if (nvs_open("dice", NVS_READWRITE, &h) != ESP_OK) return;
+    if (n_fav) nvs_set_blob(h, "fav", favs, n_fav * sizeof(fav_t));
+    else nvs_erase_key(h, "fav");
+    nvs_commit(h);
+    nvs_close(h);
+}
+
+// il preferito i diventa il pool
+static void fav_apply(int i)
+{
+    for (int k = 0; k < NT; k++) counts[k] = favs[i].counts[k];
+    mod = favs[i].mod;
 }
 
 /* ---------------- shake ---------------- */
@@ -133,18 +180,39 @@ static void r_roll(void)
     r_anim = lv_timer_create(r_anim_cb, 45, NULL);
 }
 
-static void r_enter(lv_obj_t *root, void *arg)
+static lv_obj_t *r_fav;
+static bool roll_fav_arg(void *arg) { return arg != NULL; }
+
+// intestazione: il pool (e, tirando un preferito, il suo nome con la posizione)
+static void r_header(void)
 {
     char p[96];
     pool_text(p, sizeof(p));
-    r_pool = mk(root, &font_m, ui_accent());
-    lv_label_set_text_fmt(r_pool, ICON_D20 "  %s", p);
-    lv_obj_set_pos(r_pool, 24, 10);
-    lv_obj_set_width(r_pool, 420);
+    if (roll_fav >= 0) {
+        lv_label_set_text_fmt(r_pool, LV_SYMBOL_DIRECTORY "  %s  ·  %s", favs[roll_fav].name, p);
+        lv_label_set_text_fmt(r_fav, "preferito %d di %d · su/giù: un altro", roll_fav + 1, n_fav);
+    } else {
+        lv_label_set_text_fmt(r_pool, ICON_D20 "  %s", p);
+        lv_label_set_text(r_fav, "");
+    }
+}
+
+static void r_enter(lv_obj_t *root, void *arg)
+{
+    r_pool = mk(root, roll_fav_arg(arg) ? &font_l : &font_m, ui_accent());
+    lv_obj_set_pos(r_pool, 24, arg ? 6 : 10);
+    lv_obj_set_width(r_pool, arg ? SCR_W - 48 - 110 : 420);
     lv_label_set_long_mode(r_pool, LV_LABEL_LONG_DOT);
+    r_fav = mk(root, &font_s, C_DIM);
+    lv_obj_set_pos(r_fav, 230, 100);
+    lv_obj_set_width(r_fav, SCR_W - 230 - 24);
+    lv_label_set_long_mode(r_fav, LV_LABEL_LONG_DOT);
+    roll_fav = arg ? (int)(intptr_t)arg - 1 : -1;   // arg = numero del preferito + 1
+    if (roll_fav >= n_fav) roll_fav = -1;
+    r_header();
 
     r_total = mk(root, &font_xl, C_TEXT);
-    lv_obj_set_pos(r_total, 24, 34);
+    lv_obj_set_pos(r_total, 24, arg ? 40 : 34);
     lv_label_set_text(r_total, "?");
 
     r_note = mk(root, &font_m, C_DIM);
@@ -169,6 +237,19 @@ static void r_leave(void) { if (r_anim) { lv_timer_delete(r_anim); r_anim = NULL
 static bool r_nav(nav_t ev)
 {
     if (ev == NAV_SELECT) { r_roll(); return true; }
+    if ((ev == NAV_NEXT || ev == NAV_PREV) && roll_fav >= 0 && n_fav > 0 && !r_anim) {
+        // passa al preferito dopo/prima: nome e dadi nuovi, si tira con destra o scuotendo
+        roll_fav = (roll_fav + (ev == NAV_NEXT ? 1 : n_fav - 1)) % n_fav;
+        fav_apply(roll_fav);
+        r_header();
+        lv_label_set_text(r_total, "?");
+        lv_obj_set_style_text_color(r_total, C_DIM, 0);
+        lv_label_set_text(r_detail, "destra o scuoti per tirare");
+        lv_label_set_text(r_note, "");
+        hist_n = 0;
+        lv_label_set_text(r_hist, "");
+        return true;
+    }
     return ev == NAV_NEXT || ev == NAV_PREV;
 }
 
@@ -347,6 +428,112 @@ static void a_clear(void)
     ui_toast("Pool svuotato");
 }
 
+/* ---------------- preferiti: salva, elenco, elimina ---------------- */
+
+static char fav_name_buf[FAV_NAME];
+
+static void fav_name_done(const char *t, void *arg)
+{
+    keyboard_close();
+    ui_pop();
+    if (!t || !t[0]) return;
+    fav_load();
+    int i = 0;
+    while (i < n_fav && strcasecmp(favs[i].name, t)) i++;   // stesso nome: si aggiorna
+    if (i == n_fav) {
+        if (n_fav >= FAV_MAX) { ui_toast("Preferiti pieni: eliminane uno"); return; }
+        n_fav++;
+    }
+    fav_t *f = &favs[i];
+    snprintf(f->name, sizeof(f->name), "%s", t);
+    for (int k = 0; k < NT; k++) f->counts[k] = counts[k];
+    f->mod = mod;
+    fav_save();
+    char b[64];
+    snprintf(b, sizeof(b), "Preferito salvato: %.24s", f->name);
+    ui_toast(b);
+}
+static void fav_name_enter(lv_obj_t *root, void *arg)
+{
+    fav_name_buf[0] = 0;
+    keyboard_open(root, "Nome del preferito (es. Palla di fuoco)", fav_name_buf, false, FAV_NAME - 1, fav_name_done, NULL);
+}
+static void fav_name_leave(void) { keyboard_close(); }
+static bool fav_name_nav(nav_t ev) { return keyboard_nav(ev); }
+static const app_t app_fav_name = {
+    .name = "Nome", .enter = fav_name_enter, .leave = fav_name_leave, .nav = fav_name_nav,
+    .flags = APP_FULLSCREEN | APP_OWN_QUICK,
+};
+
+static void a_fav_save(void)
+{
+    if (!pool_dice()) { ui_toast("Prima imposta i dadi da salvare"); return; }
+    ui_push(&app_fav_name, NULL);
+}
+
+// elenchi costruiti all'apertura (i preferiti cambiano)
+static menu_item_t fav_items[FAV_MAX + 1], del_items[FAV_MAX];
+static char fav_hint[FAV_MAX][96];
+static menu_t fav_menu = {"Dadi » Preferiti", fav_items, 0, 0, NULL};
+static menu_t del_menu = {"Dadi » Elimina un preferito", del_items, 0, 0, NULL};
+
+static void fav_open(void *arg)
+{
+    int i = (int)(intptr_t)arg;
+    if (i < 0 || i >= n_fav) return;
+    fav_apply(i);
+    ui_push(&app_roll, (void *)(intptr_t)(i + 1));
+}
+
+static void fav_delete(void *arg)
+{
+    int i = (int)(intptr_t)arg;
+    if (i < 0 || i >= n_fav) return;
+    char b[64];
+    snprintf(b, sizeof(b), "Eliminato: %.24s", favs[i].name);
+    memmove(&favs[i], &favs[i + 1], (n_fav - i - 1) * sizeof(fav_t));
+    n_fav--;
+    fav_save();
+    ui_pop();   // elimina → torna ai Preferiti, che vanno ricostruiti
+    ui_pop();
+    ui_toast(b);
+}
+
+static void a_fav_delete_menu(void)
+{
+    for (int i = 0; i < n_fav; i++)
+        del_items[i] = (menu_item_t){.icon = LV_SYMBOL_TRASH, .label = favs[i].name, .hint = fav_hint[i],
+                                     .on_pick = fav_delete, .arg = (void *)(intptr_t)i, .confirm = true};
+    del_menu.count = n_fav;
+    del_menu.sel = 0;
+    ui_push(&app_menu, &del_menu);
+}
+
+static void a_favs(void)
+{
+    fav_load();
+    if (!n_fav) { ui_toast("Nessun preferito: imposta i dadi e usa \"Salva come preferito\""); return; }
+    int k = 0;
+    for (int i = 0; i < n_fav; i++) {
+        int c[NT];
+        for (int j = 0; j < NT; j++) c[j] = favs[i].counts[j];
+        pool_text_of(c, favs[i].mod, fav_hint[i], sizeof(fav_hint[i]));
+        fav_items[k++] = (menu_item_t){.icon = ICON_D20, .label = favs[i].name, .hint = fav_hint[i],
+                                       .on_pick = fav_open, .arg = (void *)(intptr_t)i};
+    }
+    fav_items[k++] = (menu_item_t){.icon = LV_SYMBOL_TRASH, .label = "Elimina un preferito", .on_select = a_fav_delete_menu};
+    fav_menu.count = k;
+    if (fav_menu.sel >= k) fav_menu.sel = 0;
+    ui_push(&app_menu, &fav_menu);
+}
+
+static void v_favs(char *b, int n)
+{
+    fav_load();
+    if (n_fav) snprintf(b, n, "%d salvat%c", n_fav, n_fav == 1 ? 'o' : 'i');
+    else snprintf(b, n, "Nessuno");
+}
+
 static const menu_item_t dice_items[] = {
     {.icon = ICON_D20, .label = "Tira", .value = v_pool, .on_select = a_roll},
     {.icon = ICON_DICE, .label = "d4",   .value = v_c0, .on_adjust = j_c0},
@@ -358,6 +545,21 @@ static const menu_item_t dice_items[] = {
     {.icon = ICON_DICE, .label = "d100", .value = v_c6, .on_adjust = j_c6},
     {.icon = ICON_SLIDERS, .label = "Modificatore", .value = v_mod, .on_adjust = j_mod},
     {.icon = LV_SYMBOL_TRASH, .label = "Svuota il pool", .on_select = a_clear},
+    {.icon = LV_SYMBOL_SAVE, .label = "Salva come preferito", .hint = "Gli dai un nome (es. Palla di fuoco)", .on_select = a_fav_save},
+    {.icon = LV_SYMBOL_DIRECTORY, .label = "Preferiti", .value = v_favs, .on_select = a_favs},
     {.icon = ICON_GHOST, .label = "Daggerheart", .value = NULL, .app = &app_menu, .arg = &dh_menu},
 };
 menu_t dice_menu = {"Dadi", dice_items, sizeof(dice_items) / sizeof(dice_items[0]), 0, NULL};
+
+#ifdef SEISMO_SIM
+// simulatore: un preferito senza passare dalla tastiera
+void dice_sim_add_fav(const char *name, const int *c, int m)
+{
+    fav_load();
+    if (n_fav >= FAV_MAX) return;
+    fav_t *f = &favs[n_fav++];
+    snprintf(f->name, sizeof(f->name), "%s", name);
+    for (int k = 0; k < NT; k++) f->counts[k] = c[k];
+    f->mod = m;
+}
+#endif

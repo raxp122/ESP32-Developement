@@ -133,7 +133,7 @@ DUMMY_APP(app_level) DUMMY_APP(app_q20) DUMMY_APP(app_search)
 DUMMY_APP(app_theremin) DUMMY_APP(app_torch)
 static const menu_item_t none[] = {{.label = "x"}};
 menu_t backup_menu = {"Backup", none, 1, 0, NULL}, chess_menu = {"Scacchi", none, 1, 0, NULL},
-       clips_menu = {"Appunti", none, 1, 0, NULL}, dice_menu = {"Dadi", none, 1, 0, NULL},
+       clips_menu = {"Appunti", none, 1, 0, NULL},
        doom_menu = {"Doom", none, 1, 0, NULL},
        saber_menu = {"Spada", none, 1, 0, NULL},
        tuner_menu = {"Accordatore", none, 1, 0, NULL};

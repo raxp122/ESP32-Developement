@@ -60,6 +60,8 @@ Dal launcher: **Berciometro**. Misura il livello sonoro dal microfono (RMS su bl
 Dal launcher: **Dadi**. Si compone un "pool" di dadi misti, con la somma automatica:
 - **d4, d6, d8, d10, d12, d20, d100**: quanti di ciascuno (destra per regolare, su/giù cambia); **Modificatore** da aggiungere; **Svuota il pool**.
 - **Tira**: risultato di ogni dado e totale. Swipe a destra o una scossa ritira, sinistra torna al pool.
+- **Salva come preferito**: i dadi impostati (con il modificatore) si salvano con un nome scritto con la tastiera, per esempio *Palla di fuoco* (8d6) o *Dardo incantato* (3d4 + 3). Con lo stesso nome il preferito si aggiorna. Fino a 24, anche nei backup.
+- **Preferiti**: l'elenco con il nome e i dadi di ognuno; destra lo carica e lo tira subito. Mentre tiri un preferito **su/giù passa al preferito successivo/precedente** (in alto il nome, sotto "preferito 2 di 5"), destra o una scossa tira. In fondo all'elenco *Elimina un preferito* (con conferma).
 - **Daggerheart**: i due dadi Speranza e Paura con modificatore e vantaggio/svantaggio; il risultato dice se è *con Speranza* o *con Paura*.
 
 ## Doom
@@ -361,7 +363,7 @@ Sulla scheda 3.49 V1 l'orologio interno non ha una batteria tampone: da spenta l
 ### Backup e ripristino
 Impostazioni › Backup e ripristino:
 - **Crea un backup ora**: salva in un file della cartella `backup` sulla microSD tutto quello che scegli o crei:
-  - dalla memoria interna: impostazioni e Wi-Fi, Polipetto (con conchiglie, oggetti, diario, album e amici), livella, Radar, Theremin, Scacchi (impostazioni ed Elo), Sismografo, gli Appunti ricevuti, il record di Snake, il corso Morse;
+  - dalla memoria interna: impostazioni e Wi-Fi, Polipetto (con conchiglie, oggetti, diario, album e amici), livella, Radar, Theremin, Scacchi (impostazioni ed Elo), Sismografo, gli Appunti ricevuti, il record di Snake, il corso Morse, i preferiti dei Dadi;
   - dalla microSD, cartelle intere: `pwn/` (Pokédex e catture del Radar), `q20/` (quello che ha imparato), `scacchi/` (partite, Elo, esercizi), `sismo/` (eventi), `theremin/` (registrazioni), `doom/` (salvataggi e configurazione; i WAD no, si ricopiano a parte).
 
   Con molte registrazioni il backup diventa grande e ci mette un po'.
