@@ -14,6 +14,9 @@
 #include "esp_mac.h"
 #include "esp_random.h"
 #include "esp_timer.h"
+#include "esp_attr.h"
+#include "esp_heap_caps.h"
+#include "esp_system.h"
 #include "nimble/nimble_port.h"
 #include "nimble/nimble_port_freertos.h"
 #include "host/ble_hs.h"
@@ -574,10 +577,32 @@ static void host_task(void *arg)
     nimble_port_freertos_deinit();
 }
 
+// Lo stack acceso sopravvive ai riavvii per crash (memoria RTC): se la scheda è ripartita
+// per un errore mentre il Bluetooth era acceso, all'avvio dopo non lo si riaccende, o un
+// Bluetooth che manda in crash la scheda la farebbe riavviare in continuazione
+#define BLE_LIVE_MAGIC 0xB1E0A11Eu
+static RTC_NOINIT_ATTR uint32_t ble_live;
+
+bool ble_mgr_boot_guard(void)
+{
+    uint32_t was = ble_live;
+    ble_live = 0;
+    esp_reset_reason_t r = esp_reset_reason();
+    bool crash = r == ESP_RST_PANIC || r == ESP_RST_INT_WDT || r == ESP_RST_TASK_WDT || r == ESP_RST_WDT || r == ESP_RST_BROWNOUT;
+    if (!crash || was != BLE_LIVE_MAGIC || !g_set.ble_on) return false;
+    ESP_LOGW(TAG, "riavvio per errore (%d) col Bluetooth acceso: resta spento", r);
+    g_set.ble_on = false;
+    settings_save();
+    return true;
+}
+
 static void stack_start(void)
 {
     if (running) return;
-    if (nimble_port_init() != ESP_OK) { ESP_LOGE(TAG, "nimble_port_init fallito"); return; }
+    ESP_LOGI(TAG, "avvio dello stack · RAM interna libera %u (blocco %u)", (unsigned)heap_caps_get_free_size(MALLOC_CAP_INTERNAL),
+             (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL));
+    ble_live = BLE_LIVE_MAGIC;
+    if (nimble_port_init() != ESP_OK) { ESP_LOGE(TAG, "nimble_port_init fallito"); ble_live = 0; return; }
     ble_hs_cfg.sync_cb = on_sync;
     ble_hs_cfg.reset_cb = on_reset;
     ble_hs_cfg.store_status_cb = ble_store_util_status_rr;
@@ -619,6 +644,7 @@ static void stack_stop(void)
     scanning = false;
     if (nimble_port_stop() == 0) nimble_port_deinit();
     running = false;
+    ble_live = 0;
     synced = false;
     lock();
     memset(conn_used, 0, sizeof(conn_used));

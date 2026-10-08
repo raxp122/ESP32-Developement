@@ -25,6 +25,9 @@ typedef struct {
 } ble_dev_t;
 
 void ble_mgr_apply(void);          // applica g_set.ble_on / ble_visible
+// all'avvio, prima di ble_mgr_apply(): se la scheda si è riavviata per un errore mentre il
+// Bluetooth era acceso, lo spegne (niente riavvii a ripetizione) e restituisce true
+bool ble_mgr_boot_guard(void);
 void ble_mgr_suspend(bool on);     // spegne lo stack per un po' (es. aggiornamento) senza toccare le impostazioni
 bool ble_mgr_on(void);             // l'utente ha attivato il Bluetooth
 bool ble_mgr_ready(void);          // stack avviato e sincronizzato

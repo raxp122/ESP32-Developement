@@ -5,6 +5,9 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "esp_log.h"
+#include "esp_attr.h"
+#include "esp_system.h"
+#include "esp_timer.h"
 #include "board.h"
 #include "display.h"
 #include "settings.h"
@@ -39,12 +42,38 @@ static void time_from_rtc(void)
     }
 }
 
+// Riavvii per errore di fila (memoria RTC: sopravvive al reset, non allo spegnimento). Si
+// azzera dopo 30 s di funzionamento; al terzo errore di fila la scheda parte in modalità
+// sicura (niente Bluetooth, niente app all'avvio), così un'impostazione che la fa bloccare
+// non la tiene in un ciclo di riavvii.
+#define CRASH_MAGIC 0xC4A5u
+static RTC_NOINIT_ATTR uint32_t crash_run;
+static void crash_clear(void *arg) { crash_run = 0; }
+
+static bool safe_mode_check(void)
+{
+    esp_reset_reason_t r = esp_reset_reason();
+    bool crash = r == ESP_RST_PANIC || r == ESP_RST_INT_WDT || r == ESP_RST_TASK_WDT || r == ESP_RST_WDT || r == ESP_RST_BROWNOUT;
+    uint32_t n = (crash_run >> 16) == CRASH_MAGIC ? crash_run & 0xFFFF : 0;
+    n = crash ? n + 1 : 0;
+    crash_run = (CRASH_MAGIC << 16) | (n & 0xFFFF);
+    static esp_timer_handle_t t;
+    const esp_timer_create_args_t a = {.callback = crash_clear, .name = "crash_clr"};
+    if (esp_timer_create(&a, &t) == ESP_OK) esp_timer_start_once(t, 30 * 1000000);
+    if (n < 3) return false;
+    ESP_LOGW(TAG, "%u riavvii per errore di fila: modalità sicura", (unsigned)n);
+    g_set.ble_on = false;
+    settings_save();
+    return true;
+}
+
 void app_main(void)
 {
     logcon_init();         // conserva in RAM anche i log di avvio (comando "L" dal monitor)
     board_init();          // subito dopo: tiene accesa la scheda quando va a batteria
     ui_fonts_init();       // caratteri per lo schermo della scheda riconosciuta
     settings_load();
+    bool safe = safe_mode_check();
     time_from_rtc();
     sd_mount();
     clips_init();          // Appunti: testi ricevuti dal PC
@@ -69,13 +98,16 @@ void app_main(void)
 
     wifi_mgr_init();
     clip_ble_register();   // servizio Bluetooth degli Appunti (prima di accendere lo stack)
+    bool ble_guard = ble_mgr_boot_guard();
     ble_mgr_apply();
 
     // il polipetto vive in sottofondo; poi l'eventuale app scelta per l'avvio
     // (dopo Wi-Fi e Bluetooth, che gli scanner usano subito)
     display_lock();
     pet_init();
-    boot_app_launch();
+    if (!safe) boot_app_launch();
+    else ui_toast("Modalità sicura: la scheda si era riavviata per errore più volte (Bluetooth spento)");
+    if (ble_guard) ui_toast("Bluetooth spento: la scheda si era bloccata col Bluetooth acceso (log: comando P dal seriale)");
     display_unlock();
 
     logcon_start();
