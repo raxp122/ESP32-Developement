@@ -1,5 +1,6 @@
 // input.c — polling del touch AXS15231B, gesti e pulsanti
 #include "input.h"
+#include "ui.h"
 #include "board.h"
 #include "display.h"
 #include "settings.h"
@@ -182,12 +183,17 @@ static void poll_cb(lv_timer_t *t)
     }
     process_touch(now);
     process_btn(board_btn_boot(), now, &btn_boot, NAV_BTN, NAV_QUICK, 800);
-    // BOOT tenuto 15 s: riavvio software (nessuna app lo tiene così a lungo). Serve quando il touch non risponde: il log di
-    // questa sessione resta e dopo il riavvio si manda da Impostazioni » Diagnostica
-    if (btn_boot.down && now - btn_boot.t0 > 15000000) {
-        ESP_LOGW(TAG, "BOOT tenuto 15 s: riavvio");
-        esp_restart();
+    // BOOT tenuto 15 s: riavvio software (nessuna app lo tiene così a lungo). Serve quando il
+    // touch non risponde: il log di questa sessione resta e dopo il riavvio si manda da
+    // Impostazioni » Diagnostica. Si riavvia al rilascio: con BOOT premuto durante il reset
+    // la scheda potrebbe entrare in modalità di caricamento del firmware.
+    static bool restart_armed;
+    if (!restart_armed && btn_boot.down && now - btn_boot.t0 > 15000000) {
+        restart_armed = true;
+        ESP_LOGW(TAG, "BOOT tenuto 15 s: riavvio al rilascio");
+        ui_toast("Rilascia BOOT: la scheda si riavvia");
     }
+    if (restart_armed && !board_btn_boot()) esp_restart();
     process_btn(board_btn_pwr(), now, &btn_pwr, NAV_PWR_CLICK, NAV_PWR_LONG, 2000);
 }
 
