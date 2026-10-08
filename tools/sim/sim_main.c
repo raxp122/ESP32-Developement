@@ -184,6 +184,18 @@ int main(int argc, char **argv)
         sim_touch = 0; run(500);
         shot("24_snake_inversione");
         ui_pop(); run(300);
+        // swipe lento verso destra con un punto fantasma al centro a metà: deve svoltare a destra
+        ui_push(&app_snake, NULL); run(300);
+        sim_nav(NAV_NEXT); run(200);     // parte verso l'alto
+        sim_touch = 1;
+        for (int i = 0; i <= 12; i++) {
+            sim_tx = (sim_round ? 260 : 400) + i * 4; sim_ty = sim_round ? 300 : 120;
+            if (i == 6) { sim_tx = sim_round ? 233 : 320; sim_ty = sim_round ? 233 : 86; }   // fantasma
+            run(20);
+        }
+        sim_touch = 0; run(300);
+        shot("25_snake_swipe_lento");
+        ui_pop(); run(300);
     }
     // Scacchi: una partita col cursore (BOOT sceglie), suggerimento, abbandono, analisi,
     // allenamento, Elo ed elenco delle partite (l'archivio va nella "microSD" del PC)

@@ -212,10 +212,15 @@ static void turn(int d)
 /* Svolte dal dito mentre si muove: lo swipe normale arriva solo quando il dito si stacca
  * (più ~85 ms di conferma), troppo tardi per due svolte su due quadratini di fila. Qui la
  * svolta parte appena il dito si è spostato di DRAG_MIN pixel; poi il punto di partenza
- * si sposta lì, così un solo gesto a "L" (es. giù e poi a sinistra) fa l'inversione. */
+ * si sposta lì, così un solo gesto a "L" (es. giù e poi a sinistra) fa l'inversione.
+ * Il touch della 3.49 ogni tanto riporta per una lettura un punto fantasma (di solito al
+ * centro): con uno swipe lento quel salto sembrava un movimento all'indietro e il serpente
+ * svoltava dal lato opposto. Quindi un punto troppo lontano dal precedente si scarta, e
+ * la direzione deve risultare uguale in due letture di fila prima di svoltare. */
 #define DRAG_MIN     (SCR_ROUND ? 26 : 20)
+#define DRAG_JUMP    (SCR_ROUND ? 110 : 80)   // più di così in 20 ms non è un dito
 #define DRAG_RELEASE 4            // letture vuote di fila per considerare il dito staccato
-static struct { bool down; int ox, oy, gone, turns; } drag;
+static struct { bool down; int ox, oy, lx, ly, gone, turns, cand, cand_n, jumps; } drag;
 
 static void drag_poll(void)
 {
@@ -224,10 +229,26 @@ static void drag_poll(void)
         if (drag.down && ++drag.gone >= DRAG_RELEASE) drag.down = false;
         return;
     }
+    if (!drag.down) {
+        drag = (typeof(drag)){.down = true, .ox = x, .oy = y, .lx = x, .ly = y, .turns = drag.turns, .cand = -1};
+        return;
+    }
+    // salto impossibile rispetto all'ultima lettura buona: fantasma, si ignora. Se però
+    // continua (il fantasma era il punto di partenza) si riparte da dove è davvero il dito
+    if (abs(x - drag.lx) > DRAG_JUMP || abs(y - drag.ly) > DRAG_JUMP) {
+        if (++drag.jumps < 3) return;
+        drag.ox = drag.lx = x;
+        drag.oy = drag.ly = y;
+        drag.jumps = 0;
+        drag.cand = -1;
+        return;
+    }
+    drag.jumps = 0;
     drag.gone = 0;
-    if (!drag.down) { drag = (typeof(drag)){.down = true, .ox = x, .oy = y}; return; }
+    drag.lx = x;
+    drag.ly = y;
     int dx = x - drag.ox, dy = y - drag.oy;
-    if (abs(dx) < DRAG_MIN && abs(dy) < DRAG_MIN) return;
+    if (abs(dx) < DRAG_MIN && abs(dy) < DRAG_MIN) { drag.cand = -1; return; }
     int d;
     if (abs(dx) > abs(dy)) d = dx > 0 ? 0 : 2;
     else {
@@ -235,10 +256,14 @@ static void drag_poll(void)
         if (g_set.invert_scroll) up = !up;   // come gli swipe (e le liste)
         d = up ? 3 : 1;
     }
+    // conferma: la stessa direzione in due letture di fila
+    if (d != drag.cand) { drag.cand = d; drag.cand_n = 1; return; }
+    if (++drag.cand_n < 2) return;
     turn(d);
     drag.turns++;
     drag.ox = x;
     drag.oy = y;
+    drag.cand = -1;
 }
 
 static void tick_cb(lv_timer_t *t)
