@@ -32,6 +32,8 @@ static const char *const PIECES[7][10] = {
 #define C_CHECK   0xE5484D
 #define C_CURSOR  0x2D7FF9
 #define C_MARK    0x3A2C22
+#define C_ARROW   0xFF7A1A   // ultima mossa
+#define C_ARROW_H 0x2D7FF9   // suggerimento / mossa migliore
 
 static uint16_t *buf;
 static uint32_t stride;
@@ -80,6 +82,36 @@ static void draw_piece(int pc, int x, int y)
     if (black) art_px(x + 4, y + (t == CP_P ? 2 : 4), 0x5A5355);   // un riflesso: i neri non sembrano buchi
 }
 
+// freccia da una casa all'altra (sotto i pezzi): linea spessa 2 pixel logici e un pallino
+// sulla casa di partenza
+static void arrow(const cboard_t *b, int from, int to, uint32_t col)
+{
+    int x0, y0, x1, y1;
+    sq_xy(b, from, &x0, &y0);
+    sq_xy(b, to, &x1, &y1);
+    x0 += 4; y0 += 4; x1 += 4; y1 += 4;
+    int dx = abs(x1 - x0), dy = -abs(y1 - y0), sx = x0 < x1 ? 1 : -1, sy = y0 < y1 ? 1 : -1, e = dx + dy;
+    for (;;) {
+        art_rect(x0, y0, 2, 2, col);
+        if (x0 == x1 && y0 == y1) break;
+        int e2 = 2 * e;
+        if (e2 >= dy) { e += dy; x0 += sx; }
+        if (e2 <= dx) { e += dx; y0 += sy; }
+    }
+    sq_xy(b, from, &x0, &y0);
+    art_rect(x0 + 3, y0 + 4, 4, 2, col);   // pallino
+    art_rect(x0 + 4, y0 + 3, 2, 4, col);
+}
+
+// cornice attorno alla casa d'arrivo
+static void frame(const cboard_t *b, int sq, uint32_t col)
+{
+    int x, y;
+    sq_xy(b, sq, &x, &y);
+    art_rect(x, y, 10, 1, col); art_rect(x, y + 9, 10, 1, col);
+    art_rect(x, y, 1, 10, col); art_rect(x + 9, y, 1, 10, col);
+}
+
 void cb_draw(cboard_t *b, const cpos_t *p)
 {
     art_begin(buf, 80, 80, b->sc, stride);
@@ -96,6 +128,9 @@ void cb_draw(cboard_t *b, const cpos_t *p)
             if (sq == check) c = C_CHECK;
             art_rect(x, y, 10, 10, c);
         }
+    // l'ultima mossa (e il suggerimento) come frecce: si vede subito cosa è cambiato
+    if (b->last_from >= 0 && b->last_to >= 0) arrow(b, b->last_from, b->last_to, C_ARROW);
+    if (b->hint_from >= 0 && b->hint_to >= 0) arrow(b, b->hint_from, b->hint_to, C_ARROW_H);
     for (int s = 0; s < 128; s++) {
         if (s & 0x88) { s += 7; continue; }
         int x, y;
@@ -110,6 +145,8 @@ void cb_draw(cboard_t *b, const cpos_t *p)
             } else art_rect(x + 4, y + 4, 2, 2, C_MARK);
         }
     }
+    if (b->last_to >= 0 && b->last_to != b->cursor) frame(b, b->last_to, C_ARROW);
+    if (b->hint_to >= 0 && b->hint_to != b->cursor) frame(b, b->hint_to, C_ARROW_H);
     if (b->cursor >= 0) {
         int x, y;
         sq_xy(b, b->cursor, &x, &y);
