@@ -47,7 +47,7 @@ Dal launcher: **Accordatore**. Ascolta con i due microfoni e riconosce la nota (
 Serve per ridigitare codici e stringhe su un PC facendo da tastiera USB. Dal launcher: **Appunti**.
 
 1. **Ricevi dal PC** (Bluetooth): il Gadget si fa trovare per qualche minuto. Dal PC apri la pagina Appunti in Chrome o Edge, premi *Collega il Gadget*, scegli il nome `Gadget-xxxx`. Poi ogni testo che incolli nella pagina arriva nella lista del Gadget.
-2. **Scarica la pagina** (Wi-Fi): se sul PC non hai ancora la pagina, qui il Gadget apre un hotspot Wi-Fi con una pagina da salvare (premi *Scarica*). Chiudendo questa schermata l'hotspot si spegne e il Wi-Fi torna com'era. La pagina salvata funziona poi da sola (apri il file, usa il Bluetooth).
+2. **Scarica la pagina** (Wi-Fi): se sul PC non hai ancora la pagina, qui il Gadget apre un hotspot Wi-Fi con una pagina da salvare (premi *Scarica*). Chiudendo questa schermata l'hotspot si spegne e il Wi-Fi torna com'era. Nel browser scrivi l'indirizzo con `http://` (`http://192.168.4.1`): Edge e Chrome provano prima `https://`, ma il Gadget non ha un certificato. Se compare l'avviso "connessione non sicura" o "certificato", scegli di continuare: la pagina non manda niente in rete. La pagina salvata funziona poi da sola (apri il file, usa il Bluetooth).
 3. **Codici salvati**: la lista. Swipe a destra su una voce apre il dettaglio; con la USB-C collegata a un PC, un secondo swipe la digita come se la scrivessi a tastiera. BOOT (due volte) cancella la voce; *Cancella tutti* svuota la lista.
 4. **Layout tastiera**: come è impostata la tastiera del PC su cui digiti: Italiano (predefinito), US, US internazionale, Regno Unito, Tedesco, Francese, Spagnolo. Scegli quello del PC, non quello della tastiera che vedi: il Gadget preme i tasti e il PC li traduce col suo layout. Le lettere accentate senza tasto proprio passano dal tasto morto (es. ´ poi a). Le cifre su Francese vogliono Shift: il Gadget lo fa da solo.
 
@@ -400,7 +400,9 @@ Senza la scheda si possono provare parecchie cose sul PC:
 
 ## Monitor seriale
 Il firmware conserva in RAM gli ultimi 16 KB di log dall'accensione. Dal monitor seriale (115200) invia:
-`L` ristampa il log dall'accensione · `I` info di sistema · `R` riavvio software · `H` aiuto.
+`L` ristampa il log dall'accensione · `P` log della sessione prima dell'ultimo riavvio (dopo un crash o un watchdog) · `I` info di sistema · `R` riavvio software · `H` aiuto.
+
+**Cicli di riavvii.** Se la scheda si riavvia per un errore mentre il Bluetooth è acceso, al riavvio il Bluetooth resta spento (con un avviso). Dopo tre riavvii per errore di fila parte in *modalità sicura*: Bluetooth spento e niente app all'avvio. Il comando `P` mostra il log di quello che è successo prima del riavvio.
 
 Se il touch smette di rispondere (bus I2C bloccato, per esempio dopo un riavvio software a metà di una lettura), il firmware lo sblocca e ricrea il bus da solo entro mezzo secondo. `I` dice quante volte è successo, e il log riporta il motivo.
 

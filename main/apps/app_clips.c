@@ -344,7 +344,7 @@ static void wpage_tick(void)
 {
     bool pc = wifi_mgr_portal_clients() > 0;
     // solo se cambia: ogni modifica ridisegna l'intero schermo
-    ui_set_text(w_status, pc ? "PC collegato: apri 192.168.4.1 e salva la pagina" : "In attesa del PC…");
+    ui_set_text(w_status, pc ? "PC collegato: apri http://192.168.4.1 e salva la pagina" : "In attesa del PC…");
     ui_set_text_color(w_status, pc ? ui_accent() : C_DIM);
 }
 
@@ -365,7 +365,8 @@ static void wpage_enter(lv_obj_t *root, void *arg)
     lv_obj_set_pos(s2, 24, 48);
     lv_obj_set_width(s2, SCR_W - 48);
     lv_label_set_long_mode(s2, LV_LABEL_LONG_WRAP);
-    lv_label_set_text(s2, "2  Si apre la pagina (o vai su 192.168.4.1). Premi \"Scarica\" per tenerla sul PC, poi usala.");
+    // i browser provano prima https: il Gadget non ha (né può avere) un certificato
+    lv_label_set_text(s2, "2  Nel browser apri http://192.168.4.1 (se avvisa che non è sicuro, continua) e premi \"Scarica\".");
     w_status = lv_label_create(root);
     lv_obj_set_style_text_font(w_status, &font_m, 0);
     lv_obj_set_pos(w_status, 24, 118);
