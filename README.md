@@ -115,7 +115,8 @@ Dal launcher: **Scacchi**. Un motore scritto apposta per il Gadget gira sulla sc
   - In apertura segue un piccolo libro di linee principali (spagnola, siciliana, francese, gambetto di donna…).
   - L'Elo del Gadget è indicativo: i livelli sono in ordine di forza, ma non sono tarati su giocatori veri.
 - **Comandi sulla scacchiera**:
-  - tocca un pezzo e poi la casa, oppure muovi il cursore blu con gli swipe e conferma con BOOT (sul 3,49" le case sono piccole);
+  - muovi il cursore blu con gli swipe e conferma con BOOT: la prima volta sceglie il pezzo, la seconda la casa. Sul tondo si possono anche toccare il pezzo e la casa; sul 3,49" no, perché il touch a volte registra tocchi fantasma al centro;
+  - nella partita a due sul 3,49" a destra c'è il pulsante **Conferma**, che fa come BOOT: entrambi i giocatori muovono senza il tasto fisico;
   - i puntini mostrano dove può andare il pezzo scelto; in una promozione scegli il pezzo;
   - il **dito tenuto** apre il menu della partita: suggerimento, annulla mossa, gira la scacchiera, proponi patta (il Gadget accetta solo se sta peggio), abbandona, esci.
 - **Riprendi la partita**: una partita interrotta si salva a ogni mossa e si riprende anche dopo aver spento.

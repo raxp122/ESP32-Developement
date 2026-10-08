@@ -219,6 +219,12 @@ int main(int argc, char **argv)
         shot("36_scacchi_telefono");
         nav(NAV_NEXT); run(200);
         shot("37_scacchi_telefono_2");
+        ui_pop(); run(300);
+        chessplay_menu.sel = 2; ui_pop(); run(200);   // partita a due: sul 3,49" c'è il pulsante Conferma
+        ui_push(&app_menu, &chessplay_menu); run(200);
+        nav(NAV_SELECT); run(300);
+        sim_nav(NAV_BTN); run(200); sim_nav(NAV_BTN); run(200); nav(NAV_NEXT); nav(NAV_NEXT); sim_nav(NAV_BTN); run(300);
+        shot("38_scacchi_due");
         ui_pop(); run(300); ui_pop(); run(300);
         #undef GOTO
     }

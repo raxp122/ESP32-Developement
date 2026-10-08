@@ -195,7 +195,16 @@ static void job_cancel(void)
 
 /* ================= pannello di testo (comune) ================= */
 
-static lv_obj_t *l_t, *l_a, *l_b, *l_c, *l_h;
+static lv_obj_t *l_t, *l_a, *l_b, *l_c, *l_h, *b_ok;
+static uint32_t b_ok_t;
+
+// Sul 3,49" il controller del touch registra a volte tocchi fantasma al centro: lì la
+// scacchiera non si tocca, si usano solo gli swipe (cursore) e BOOT. Sul tondo si tocca.
+#define TAP_BOARD (SCR_ROUND)
+#define BTN_X 516   // pulsante Conferma (3,49", partita a due): a destra, lontano dal centro
+#define BTN_Y 26
+#define BTN_W 116
+#define BTN_H 118
 
 static lv_obj_t *mk(lv_obj_t *p, const lv_font_t *f, lv_color_t c)
 {
@@ -210,6 +219,8 @@ static lv_obj_t *mk(lv_obj_t *p, const lv_font_t *f, lv_color_t c)
 // scacchiera al centro, una riga sopra e due sotto
 static void build(lv_obj_t *root)
 {
+    b_ok = NULL;
+    b_ok_t = 0;
     if (SCR_ROUND) {
         cb_create(&B, root, (SCR_W - 320) / 2, (SCR_H - 320) / 2, 320);
         l_t = mk(root, &font_s, C_DIM);
@@ -336,6 +347,44 @@ static void moves_text(char *b, int n, int max_plies)
     }
 }
 
+// partita a due sul 3,49": il pulsante Conferma fa quello che fa BOOT, così entrambi i
+// giocatori possono muovere senza il tasto fisico
+static void ok_button(lv_obj_t *root)
+{
+    b_ok = lv_obj_create(root);
+    lv_obj_remove_style_all(b_ok);
+    lv_obj_set_pos(b_ok, BTN_X, BTN_Y);
+    lv_obj_set_size(b_ok, BTN_W, BTN_H);
+    lv_obj_set_style_radius(b_ok, 14, 0);
+    lv_obj_set_style_bg_opa(b_ok, LV_OPA_COVER, 0);
+    lv_obj_set_style_bg_color(b_ok, C_FAINT, 0);
+    lv_obj_set_style_border_width(b_ok, 2, 0);
+    lv_obj_set_style_border_color(b_ok, ui_accent(), 0);
+    lv_obj_clear_flag(b_ok, LV_OBJ_FLAG_CLICKABLE | LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_t *ic = mk(b_ok, &font_l, ui_accent());
+    lv_label_set_text(ic, LV_SYMBOL_OK);
+    lv_obj_align(ic, LV_ALIGN_CENTER, 0, -12);
+    lv_obj_t *l = mk(b_ok, &font_s, C_TEXT);
+    lv_label_set_text(l, "Conferma");
+    lv_obj_align(l, LV_ALIGN_CENTER, 0, 26);
+    // i testi a destra si stringono per lasciargli posto
+    lv_obj_t *ls[] = {l_t, l_a, l_b, l_c, l_h};
+    for (int i = 0; i < 5; i++) lv_obj_set_width(ls[i], BTN_X - 180 - 10);
+}
+
+static bool in_ok_button(int x, int y)
+{
+    return b_ok && x >= BTN_X && x < BTN_X + BTN_W && y >= BTN_Y && y < BTN_Y + BTN_H;
+}
+
+static void ok_flash(bool on)
+{
+    if (b_ok) lv_obj_set_style_bg_color(b_ok, on ? ui_accent() : C_FAINT, 0);
+    b_ok_t = on ? lv_tick_get() : 0;
+}
+
+static void g_confirm(void);
+
 static void g_render(void)
 {
     char b[128];
@@ -357,7 +406,7 @@ static void g_render(void)
     else {
         bool chk = cp_in_check(&P);
         if (G->info.mode == CG_MODE_BOT) snprintf(b, sizeof(b), "%s", chk ? "Scacco! Tocca a te" : "Tocca a te");
-        else snprintf(b, sizeof(b), "%s il %s%s", "Tocca al", P.side ? "nero" : "bianco", chk ? " · scacco!" : "");
+        else snprintf(b, sizeof(b), "Tocca al %s%s", P.side ? "nero" : "bianco", chk ? " · scacco!" : "");
         if (chk) col = C_WARN;
     }
     ui_set_text(l_a, b);
@@ -370,7 +419,9 @@ static void g_render(void)
     ui_set_text(l_b, G->n || g_over ? b : "Prima mossa");
     ui_set_text(l_c, g_info);
     ui_set_text(l_h, g_over ? "Destra: analizza · BOOT: nuova partita · sinistra: esci"
-                            : "Tocca o swipe+BOOT: muovi · dito tenuto: menu");
+                            : TAP_BOARD ? "Tocca o swipe+BOOT: muovi · dito tenuto: menu"
+                            : b_ok ? "Swipe: cursore · Conferma · dito tenuto: menu"
+                                   : "Swipe: cursore · BOOT: scegli e muovi · dito tenuto: menu");
     cb_draw(&B, &P);
 }
 
@@ -503,9 +554,11 @@ static void g_tick(lv_timer_t *t)
         return;
     }
     if (g_thinking && !job_busy && job_gen != g_bot_gen) { g_thinking = false; start_bot(); }   // partenza rimandata
+    if (b_ok_t && lv_tick_elaps(b_ok_t) > 150) ok_flash(false);
     int x, y;
     if (cb_tap_poll(&x, &y)) {
-        if (g_over) return;
+        if (in_ok_button(x, y)) { ok_flash(true); if (!g_over) g_confirm(); return; }
+        if (!TAP_BOARD || g_over) return;
         if (g_thinking || bot_turn()) return;
         cmove_t m;
         bool promo = false;
@@ -533,6 +586,7 @@ static void g_enter(lv_obj_t *root, void *arg)
     if (G->info.mode == CG_MODE_TWO && cg_cfg.flip_two) B.flip = P.side == 1;
     else B.flip = G->info.mode == CG_MODE_BOT && G->info.color == 1;
     B.flip ^= g_flip_user;
+    if (!SCR_ROUND && G->info.mode == CG_MODE_TWO) ok_button(root);
     // ritorno dalla scelta della promozione o dal menu della partita
     if (g_promo_pick) {
         cmove_t m = g_promo_move;
@@ -572,6 +626,20 @@ static void g_leave(void)
     }
 }
 
+// BOOT o il pulsante Conferma: fa comparire il cursore, poi sceglie il pezzo o la casa
+static void g_confirm(void)
+{
+    if (B.cursor < 0) { cb_move_cursor(&B, 0, 0); g_render(); return; }
+    if (g_thinking || bot_turn()) return;
+    cmove_t m;
+    bool promo = false;
+    if (pick_square(&P, B.cursor, my_side(), &m, &promo)) {
+        if (promo) { g_promo_move = m; g_promo_pick = 0; pr_menu.sel = 0; ui_push(&app_menu, &pr_menu); return; }
+        play(m);
+    }
+    g_render();
+}
+
 static bool g_nav(nav_t ev)
 {
     if (g_over) {
@@ -591,18 +659,7 @@ static bool g_nav(nav_t ev)
         return ev == NAV_NEXT || ev == NAV_PREV || ev == NAV_QUICK;
     }
     if (ev == NAV_QUICK) { gm_menu.sel = 0; ui_push(&app_menu, &gm_menu); return true; }
-    if (ev == NAV_BTN) {
-        if (B.cursor < 0) { cb_move_cursor(&B, 0, 0); g_render(); return true; }
-        if (g_thinking || bot_turn()) return true;
-        cmove_t m;
-        bool promo = false;
-        if (pick_square(&P, B.cursor, my_side(), &m, &promo)) {
-            if (promo) { g_promo_move = m; g_promo_pick = 0; pr_menu.sel = 0; ui_push(&app_menu, &pr_menu); return true; }
-            play(m);
-        }
-        g_render();
-        return true;
-    }
+    if (ev == NAV_BTN) { g_confirm(); return true; }
     if (swipe_cursor(ev)) { g_render(); return true; }
     return false;
 }
@@ -904,8 +961,10 @@ static void pz_render(void)
     }
     snprintf(b, sizeof(b), "Oggi %d su %d · da risolvere %d di %d", pz_done_ok, pz_done_n, todo, n);
     ui_set_text(l_c, b);
-    ui_set_text(l_h, pz_state == PZ_RESULT ? "Tocca o BOOT: il prossimo · dito tenuto: esci"
-                                           : "Tocca o swipe+BOOT: muovi · dito tenuto: esci");
+    if (TAP_BOARD) ui_set_text(l_h, pz_state == PZ_RESULT ? "Tocca o BOOT: il prossimo · dito tenuto: esci"
+                                                          : "Tocca o swipe+BOOT: muovi · dito tenuto: esci");
+    else ui_set_text(l_h, pz_state == PZ_RESULT ? "BOOT: il prossimo · dito tenuto: esci"
+                                                : "Swipe: cursore · BOOT: scegli e muovi · dito tenuto: esci");
     cpos_t q = pz_pos;
     cb_draw(&B, &q);
 }
@@ -946,7 +1005,7 @@ static void pz_tick(lv_timer_t *t)
         return;
     }
     int x, y;
-    if (!cb_tap_poll(&x, &y)) return;
+    if (!cb_tap_poll(&x, &y) || !TAP_BOARD) return;
     if (pz_state == PZ_RESULT) { pz_next(); pz_render(); return; }
     if (pz_state != PZ_SOLVE) return;
     cmove_t m;
