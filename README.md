@@ -449,5 +449,12 @@ const app_t app_ciao = { .name = "Ciao", .icon = ICON_GHOST, .enter = enter, .na
 ```
 Poi aggiungi `extern const app_t app_ciao;` in `apps/apps.h` e una voce in `apps/home.c`.
 Il file viene compilato in automatico. Flag utili: `APP_FULLSCREEN`, `APP_NO_SLEEP`, `APP_OWN_QUICK`, `APP_ROUND_OK` (l'app è disegnata anche per lo schermo tondo: usa `SCR_W`/`SCR_H`/`SCR_ROUND` invece di coordinate fisse).
+**Memoria.** La RAM interna (~340 KB) è poca e serve a Wi-Fi, Bluetooth, DMA del display e stack dei task; la PSRAM (8 MB) è più lenta ma enorme. Per questo:
+- le variabili statiche di tutti i file vanno da sole in PSRAM (`main/linker.lf`): anche quelle di un'app nuova, senza fare niente. Restano in RAM interna solo i file elencati lì (display, touch, interfaccia, log, audio, motore degli scacchi, Doom);
+- i buffer grandi si allocano entrando nell'app e si liberano uscendo, in PSRAM (`heap_caps_malloc(n, MALLOC_CAP_SPIRAM)`); la RAM interna solo per DMA o calcoli dove la velocità conta davvero, e sempre con un ripiego in PSRAM se non c'è posto (vedi l'accordatore);
+- uno stack di task in RAM interna si paga finché il task vive: i task delle app finiscono quando si esce.
+
+Impostazioni › Diagnostica › Memoria mostra la RAM interna libera, il minimo toccato e il blocco più grande disponibile.
+
 Il callback `tick` viene chiamato ogni 200 ms mentre l'app è aperta. Tutto gira nel task LVGL:
 dagli altri task non toccare oggetti LVGL senza `display_lock()`.

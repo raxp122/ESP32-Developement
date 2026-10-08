@@ -13,6 +13,7 @@
 #include "freertos/task.h"
 #include "esp_log.h"
 #include "esp_timer.h"
+#include "esp_attr.h"
 #include "driver/gpio.h"
 
 #define PIN_MCLK (BOARD_IS_ROUND() ? 42 : 7)
@@ -203,7 +204,7 @@ bool audio_mic_probe(int ms, int *peak, int *rms, int *zeros_pct)
     if (!audio_init()) return false;
     bool mine = !rx_on;
     if (mine && !audio_mic_start()) return false;
-    static int16_t buf[480 * 2];
+    EXT_RAM_BSS_ATTR static int16_t buf[480 * 2];   // in PSRAM: serve solo per la prova
     long long sum = 0;
     int n = 0, pk = 0, z = 0;
     for (int t = 0; t < ms; t += 20) {
