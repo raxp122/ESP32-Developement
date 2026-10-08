@@ -171,5 +171,51 @@ int main(int argc, char **argv)
         shot("23_snake_pausa");
         ui_pop(); run(300);
     }
+    // Scacchi: una partita col cursore (BOOT sceglie), suggerimento, abbandono, analisi,
+    // allenamento, Elo ed elenco delle partite (l'archivio va nella "microSD" del PC)
+    ui_home(); run(300);
+    {
+        extern menu_t chessplay_menu;
+        ui_push(&app_menu, &chessplay_menu); run(300);
+        shot("24_scacchi_menu");
+        nav(NAV_SELECT); run(300);   // Gioca contro il Gadget (col bianco)
+        int cf = 4, cr = 1;
+        #define GOTO(f, r) do { while (cf < (f)) { nav(NAV_SELECT); cf++; } while (cf > (f)) { nav(NAV_BACK); cf--; } \
+                                while (cr < (r)) { nav(NAV_NEXT); cr++; } while (cr > (r)) { nav(NAV_PREV); cr--; } \
+                                sim_nav(NAV_BTN); run(200); } while (0)
+        sim_nav(NAV_BTN); run(200);    // compare il cursore su e2
+        sim_nav(NAV_BTN); run(200);    // sceglie il pedone
+        shot("25_scacchi_scelta");
+        GOTO(4, 3); run(1200);         // e4, poi risponde il Gadget
+        GOTO(6, 0); GOTO(5, 2); run(1200);   // Cf3
+        GOTO(5, 0); GOTO(2, 3); run(1200);   // Ac4
+        shot("26_scacchi_partita");
+        sim_nav(NAV_HOLD); run(400);
+        shot("27_scacchi_menu_partita");
+        nav(NAV_SELECT); run(600);     // suggerimento
+        shot("28_scacchi_suggerimento");
+        sim_nav(NAV_HOLD); run(400);
+        for (int i = 0; i < 4; i++) nav(NAV_NEXT);
+        nav(NAV_SELECT); nav(NAV_SELECT); run(600);   // abbandona (con conferma)
+        shot("29_scacchi_fine");
+        nav(NAV_SELECT); run(600);     // analisi della partita
+        shot("30_scacchi_analisi");
+        nav(NAV_SELECT); run(300);     // prossimo errore
+        shot("31_scacchi_errore");
+        sim_nav(NAV_BTN); run(300);    // la mossa migliore
+        shot("32_scacchi_migliore");
+        ui_pop(); run(300); ui_pop(); run(300);
+        chessplay_menu.sel = 4; ui_push(&app_menu, &chessplay_menu); run(200);
+        nav(NAV_SELECT); run(400);
+        shot("33_scacchi_allenamento");
+        ui_pop(); run(300);
+        nav(NAV_PREV); nav(NAV_SELECT); run(400);
+        shot("34_scacchi_partite");
+        ui_pop(); run(300);
+        nav(NAV_NEXT); nav(NAV_NEXT); nav(NAV_SELECT); run(400);
+        shot("35_scacchi_elo");
+        ui_pop(); run(300); ui_pop(); run(300);
+        #undef GOTO
+    }
     return 0;
 }

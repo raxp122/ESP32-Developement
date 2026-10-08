@@ -38,6 +38,7 @@ extern const app_t app_theremin;
 extern const app_t app_seismo;         // Sismografo
 extern menu_t seismo_menu;
 extern const app_t app_snake;          // Snake
+extern menu_t chessplay_menu;          // Scacchi (partite, analisi, allenamento)
 extern const app_t app_wifitest;       // Tester Wi-Fi: elenco delle reti
 extern const app_t app_wifitest_meter; // Tester Wi-Fi: misura di una rete (arg = la rete)
 extern menu_t chess_menu;              // Orologio per scacchi

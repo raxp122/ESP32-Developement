@@ -107,6 +107,35 @@ Pulsanti a destra:
 - **Registra**: registra quello che suoni in un file WAV nella cartella `theremin` della microSD. Con **Mic: sì** mixa anche il microfono, per cantare mentre suoni (il microfono sente anche l'altoparlante).
 - **Registrazioni**: elenco per riascoltarle (swipe a destra) o cancellarle (BOOT due volte).
 
+## Scacchi
+Dal launcher: **Scacchi**. Un motore scritto apposta per il Gadget gira sulla scheda, senza Internet. Sullo schermo tondo la scacchiera è più grande, ma si gioca bene anche sul 3,49".
+
+- **Gioca contro il Gadget**: livello da 400 a 2400 Elo, oppure *Adattivo*, che gioca al tuo Elo. Scegli il tuo colore: bianco, nero o a caso.
+  - Ai livelli bassi il Gadget sceglie spesso una mossa buona ma non la migliore, come una persona; ai livelli alti cerca fino a 4 secondi per mossa.
+  - In apertura segue un piccolo libro di linee principali (spagnola, siciliana, francese, gambetto di donna…).
+  - L'Elo del Gadget è indicativo: i livelli sono in ordine di forza, ma non sono tarati su giocatori veri.
+- **Comandi sulla scacchiera**:
+  - tocca un pezzo e poi la casa, oppure muovi il cursore blu con gli swipe e conferma con BOOT (sul 3,49" le case sono piccole);
+  - i puntini mostrano dove può andare il pezzo scelto; in una promozione scegli il pezzo;
+  - il **dito tenuto** apre il menu della partita: suggerimento, annulla mossa, gira la scacchiera, proponi patta (il Gadget accetta solo se sta peggio), abbandona, esci.
+- **Riprendi la partita**: una partita interrotta si salva a ogni mossa e si riprende anche dopo aver spento.
+- **Partita a due**: sulla stessa scacchiera, senza motore. Si può girare la scacchiera a ogni mossa.
+- **Il tuo Elo**: parte da 1200 e cambia dopo ogni partita finita contro il Gadget, con la formula Elo.
+  - Le prime 20 partite contano di più (K=40, poi 20).
+  - Suggerimenti e mosse annullate tolgono la partita dal conto.
+  - La schermata mostra l'Elo, il grafico dell'andamento e vinte, patte e perse.
+- **Partite giocate**: tutte le partite finite. Ognuna si rivede mossa per mossa (su/giù).
+- **Analisi**: con *destra* il Gadget analizza la partita, circa 0,6 s per posizione (una partita di 40 mosse in meno di un minuto).
+  - Ogni mossa riceve un giudizio: migliore, buona, imprecisione, errore, grave errore. Il giudizio dipende da quanta probabilità di vittoria fa perdere, come sui siti di scacchi.
+  - Per ogni mossa la valutazione; per ogni errore la mossa migliore. *Destra* salta al tuo prossimo errore, BOOT mostra sulla scacchiera la mossa migliore.
+  - Alla fine c'è la precisione di ciascun giocatore. Dopo una partita, *destra* la analizza subito.
+- **Allenamento**: le posizioni dove hai commesso un errore o un grave errore (nelle partite analizzate) diventano esercizi: trova la mossa migliore.
+  - Se giochi una mossa diversa ma buona quanto quella del Gadget, il Gadget la controlla e la accetta.
+  - Gli esercizi sbagliati tornano più spesso.
+- **Esporta per un'IA**: scrive `scacchi/per_IA.txt` con istruzioni, riepilogo (Elo e andamento, risultati, aperture che scegli, precisione media) e tutte le partite contro il Gadget in PGN, con i commenti dell'analisi dove c'è. Lo copi in un assistente come Claude per un'analisi del tuo stile e un piano di allenamento.
+- **Sulla microSD** (cartella `scacchi/`): `partite/0001.pgn`… (PGN standard, si aprono con qualunque programma di scacchi), `indice.csv`, `elo.csv`, `esercizi.csv`, `incorso.txt`. Senza scheda si gioca lo stesso, ma le partite non restano; l'Elo sì, nella memoria interna.
+- **Notazione**: italiana (C A T D R) o inglese (N B R Q K), solo sullo schermo; i file sono sempre in PGN inglese.
+
 ## Snake
 Dal launcher: **Snake**, in pixel art con i colori del Polipetto: un serpente di quadratini arancioni (la testa ha gli occhi) che mangia i pesci gialli. Con gli swipe nelle quattro direzioni si gira; muri e coda fanno perdere, e ogni pesce lo rende un po' più veloce. Lo schermo resta tutto per il gioco: sul 3,49" una griglia 53×12, sul tondo 20×20 con quadratini più grandi.
 
@@ -205,6 +234,7 @@ Dalla 0.14 le impostazioni (NVS) stanno in fondo alla flash (`0xFF0000`): né l'
 - `main/pet_core.*` regole del Polipetto (pure, senza hardware) · `main/pet.*` tempo reale, salvataggio, contapassi, versi
 - `main/clips.*` Appunti (testi dal PC) · `main/clip_ble.c` servizio Bluetooth di ricezione · `main/usbhid.*` tastiera USB · `main/apps/app_clips.c` le schermate
 - `main/backup.*` backup e ripristino su microSD · `main/ota.*` aggiornamenti via internet · `main/settings.*` impostazioni (con migrazione dalla vecchia tabella)
+- `main/chess_engine.*` regole e motore degli Scacchi · `main/chess_game.*` partite, analisi, Elo, archivio PGN · `main/apps/chess_ui.c` scacchiera · `main/apps/app_chessplay.c` le schermate · `tools/chess/` prove sul PC (perft, notazione, livelli, archivio)
 - `main/apps/` le app (`app_pet.c` + `pet_art.c` per il Polipetto, `app_ota.c` per gli aggiornamenti, `app_backup.c`, `app_level.c` per la livella)
 - `components/axs15231b` driver Waveshare inclusi nel progetto
 
