@@ -6,6 +6,9 @@
 #include <stdlib.h>
 #include "lvgl.h"
 #include "esp_timer.h"
+#include "esp_log.h"
+
+static const char *TAG = "input";
 
 #define POLL_MS        12
 // in pixel della 3.49; sullo schermo tondo i pixel sono più piccoli (circa 1,4 volte)
@@ -28,11 +31,26 @@ static struct {
 
 static struct { bool down; int64_t t0; bool long_fired; } btn_boot, btn_pwr;
 
+// Letture del touch fallite di fila (errore I2C, non "nessun dito"): se il controller o il
+// driver restano incastrati (succedeva all'avvio, soprattutto dopo un riavvio software) si
+// ricrea il bus invece di lasciare il touch morto fino allo spegnimento
+#define TOUCH_ERR_RECOVER  25        // ~300 ms
+#define TOUCH_RECOVER_GAP  3000000   // µs fra un recupero e l'altro
+static int touch_err_run;
+static int64_t touch_recover_us;
+
+static bool touch_i2c_ok(esp_err_t r)
+{
+    if (r == ESP_OK) { touch_err_run = 0; return true; }
+    if (touch_err_run++ == 0) ESP_LOGW(TAG, "touch: lettura I2C fallita (%s)", esp_err_to_name(r));
+    return false;
+}
+
 static bool touch_read_raw(int *px, int *py)
 {
     static const uint8_t cmd[11] = {0xb5, 0xab, 0xa5, 0x5a, 0x0, 0x0, 0x0, 0x0e, 0x0, 0x0, 0x0};
     uint8_t buf[14] = {0};
-    if (i2c_master_transmit_receive(board_touch_dev(), cmd, sizeof(cmd), buf, sizeof(buf), 20) != ESP_OK)
+    if (!touch_i2c_ok(i2c_master_transmit_receive(board_touch_dev(), cmd, sizeof(cmd), buf, sizeof(buf), 20)))
         return false;
     if (buf[1] == 0 || buf[1] > 4) return false;
     int rx = ((buf[2] & 0x0F) << 8) | buf[3];
@@ -52,7 +70,7 @@ static bool touch_read_round(int *x, int *y)
 {
     static const uint8_t rd[2] = {0xD0, 0x00}, ack[3] = {0xD0, 0x00, 0xAB};
     uint8_t b[15] = {0};
-    if (i2c_master_transmit_receive(board_touch_dev(), rd, 2, b, sizeof(b), 20) != ESP_OK) return false;
+    if (!touch_i2c_ok(i2c_master_transmit_receive(board_touch_dev(), rd, 2, b, sizeof(b), 20))) return false;
     i2c_master_transmit(board_touch_dev(), ack, 3, 20);
     if (b[6] != 0xAB) return false;
     int n = b[5] & 0x7F;
@@ -146,6 +164,11 @@ static void process_btn(bool pressed, int64_t now, typeof(btn_boot) *b, nav_t cl
 static void poll_cb(lv_timer_t *t)
 {
     int64_t now = esp_timer_get_time();
+    if (touch_err_run >= TOUCH_ERR_RECOVER && now - touch_recover_us > TOUCH_RECOVER_GAP) {
+        touch_recover_us = now;
+        touch_err_run = 0;
+        board_touch_recover();
+    }
     process_touch(now);
     process_btn(board_btn_boot(), now, &btn_boot, NAV_BTN, NAV_QUICK, 800);
     process_btn(board_btn_pwr(), now, &btn_pwr, NAV_PWR_CLICK, NAV_PWR_LONG, 2000);

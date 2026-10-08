@@ -71,7 +71,11 @@ const char *board_name(void);
 typedef struct { float x, y, z; } vec3_t;
 
 void board_init(void);                      // I2C, latch alimentazione, ADC, pulsanti
-i2c_master_dev_handle_t board_touch_dev(void);
+i2c_master_dev_handle_t board_touch_dev(void);   // NULL se il bus del touch non c'è
+// Il touch non risponde più (bus bloccato, driver I2C in errore dopo un timeout): sblocca
+// e ricrea il bus (3.49) o azzera bus e controller (tondo). Dal task che legge il touch.
+bool board_touch_recover(void);
+int  board_touch_recoveries(void);
 i2c_master_bus_handle_t board_i2c0(void);   // bus di TCA9554, RTC, IMU e codec audio
 
 void  board_power_off(void);               // rilascia il latch (solo a batteria)
