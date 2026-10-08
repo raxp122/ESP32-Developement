@@ -10,6 +10,8 @@
 #include "wifi_mgr.h"
 #include "ota.h"
 #include "seismo.h"
+#include "pet.h"
+#include "pet_art.h"
 #include <math.h>
 
 extern int sim_round;
@@ -51,7 +53,7 @@ int main(int argc, char **argv)
 {
     sim_round = argc > 1 && !strcmp(argv[1], "round");
     if (!sim_round) { g_scr_w = 640; g_scr_h = 172; }
-    g_set.brightness = 80; g_set.accent = 0; g_set.wifi_on = 1;
+    g_set.brightness = 80; g_set.accent = 0; g_set.wifi_on = 1; g_set.pet_clock = 1; g_set.pet_steps = 1;
     snprintf(g_set.wifi_ssid, sizeof(g_set.wifi_ssid), "Casa");
     ui_fonts_init();
     lv_init();
@@ -63,6 +65,8 @@ int main(int argc, char **argv)
     lv_display_set_buffers(d, buf, NULL, g_scr_w * g_scr_h * 2, LV_DISPLAY_RENDER_MODE_DIRECT);
     lv_display_set_flush_cb(d, flush);
     ui_init();
+    pet_init();
+    if (argc > 2 && !strcmp(argv[2], "pet")) goto pet;
     shot("1_home");
     ui_push(&app_menu, &settings_menu);
     shot("2_impostazioni");
@@ -255,5 +259,110 @@ int main(int argc, char **argv)
     for (int i = 0; i < 6; i++) nav(NAV_NEXT);
     shot("46_azione_rapida");
     ui_pop(); run(300);
+pet:
+    // Polipetto: una polpa saggia viola a puntini, con corona e una decorazione
+    ui_home(); run(300);
+    {
+        extern int sim_touch;
+        extern wifi_espnow_cb_t sim_espnow_cb;
+        pet_t *p = pet_get();
+        pet_core_new_egg(p, 1234);
+        uint8_t g[GENE_COUNT][2] = {{COL_PURPLE, COL_GOLD}, {PAT_SPOTS, PAT_NONE}, {TENT_LONG, TENT_NORMAL}, {TEMP_LIVELY, TEMP_CALM}};
+        memcpy(p->genes, g, sizeof(g));
+        snprintf(p->parent[0], PET_NAME_LEN, "Perla");
+        snprintf(p->parent[1], PET_NAME_LEN, "Guizzo");
+        pet_clock_t c = {.hour = -1, .sleep_h = -1, .wake_h = -1};
+        pet_core_step(p, 61, &c);   // si schiude: nome e sesso
+        p->sex = SEX_F;
+        snprintf(p->name, PET_NAME_LEN, "Ottavia");
+        p->stage = PET_ADULT; p->form = FORM_SAGE; p->weight = 31;
+        p->hunger = p->thirst = 4; p->happy = 3; p->discipline = 3; p->age_s = 9 * 86400;
+        p->poop = 0; p->needs = 0; p->asleep = 0; p->sick = 0; p->tantrum = 0;
+        pet_world_t *w = pet_world();
+        w->shells = 57; w->owned = (1u << 7) | (1u << 18) | (1u << 14); w->hat = 7; w->deco = (1u << 18) | (1u << 14);
+        w->colors_seen = (1 << COL_ORANGE) | (1 << COL_PURPLE) | (1 << COL_BLUE); w->forms_seen = 1 << FORM_SAGE;
+        w->best[REC_MEMORY] = 7; w->best[REC_RHYTHM] = 41;
+        pet_diary_add("È nata Ottavia, figlia di Perla e Guizzo");
+        pet_diary_add("Ottavia ora è: Polpo saggio");
+        pet_diary_add("Comprato: Corona");
+        if (sim_round) {   // il Polipetto c'è solo sulla 3,49"; sul tondo si vede nell'orologio
+            ui_push(&app_clock, NULL);
+            shot("47_orologio_polipetto");
+            ui_home(); run(300);
+            return 0;
+        }
+        ui_push(&app_pet, NULL); run(500);
+        shot("50_polipetto");
+        run(3500);   // finisce la festa (regalo della Giornata del polpo, se è oggi)
+        nav(NAV_NEXT); nav(NAV_SELECT);            // Gioca
+        shot("51_gioca_menu");
+        nav(NAV_SELECT); run(900);                 // Gioca veloce: palla
+        shot("52_gioca_palla");
+        run(3000);
+        nav(NAV_SELECT); nav(NAV_NEXT); nav(NAV_SELECT);   // menu Gioca, 1 2 3 stella
+        run(2500); sim_touch = 1; run(900);
+        shot("53_stella_avanti");
+        for (int i = 0; i < 200 && 1; i++) { run(50); }
+        sim_touch = 0;
+        shot("54_stella");
+        sim_nav(NAV_BACK); run(300);
+        nav(NAV_NEXT); nav(NAV_SELECT); run(1500);   // Memoria
+        shot("55_memoria");
+        sim_nav(NAV_BTN); run(300);
+        nav(NAV_NEXT); nav(NAV_SELECT); run(2900);   // Ritmo
+        shot("56_ritmo");
+        sim_nav(NAV_BACK); run(300);
+        sim_nav(NAV_BACK); run(300);                 // al menu principale
+        p->t_reward = 0; p->snacks_today = 1;
+        sim_nav(NAV_PREV); run(100);                 // Cibo
+        nav(NAV_SELECT); nav(NAV_NEXT);
+        shot("57_spuntino");
+        sim_nav(NAV_BACK); run(200);
+        sim_nav(NAV_PREV); run(100);                 // Diario e altro
+        nav(NAV_SELECT);
+        shot("58_altro");
+        nav(NAV_NEXT); nav(NAV_SELECT);              // Diario
+        shot("59_diario");
+        sim_nav(NAV_BACK); run(200);
+        nav(NAV_NEXT); nav(NAV_SELECT);              // Album
+        shot("60_album");
+        sim_nav(NAV_PREV); run(200);
+        shot("61_collezione");
+        sim_nav(NAV_BACK); run(200);
+        nav(NAV_NEXT); nav(NAV_SELECT); nav(NAV_NEXT);   // Famiglia: colore
+        shot("62_geni_colore");
+        nav(NAV_NEXT);
+        shot("63_geni_motivo");
+        sim_nav(NAV_BACK); run(200);
+        nav(NAV_NEXT); nav(NAV_SELECT);              // Negozio
+        for (int i = 0; i < 2; i++) nav(NAV_NEXT);
+        shot("64_negozio_cuffia");
+        for (int i = 0; i < 8; i++) nav(NAV_NEXT);
+        shot("65_negozio_occhiali");
+        for (int i = 0; i < 7; i++) nav(NAV_NEXT);
+        shot("66_negozio_castello");
+        sim_nav(NAV_BACK); run(200);
+        nav(NAV_NEXT); nav(NAV_SELECT); run(500);    // Incontra un amico
+        shot("67_amico_cerca");
+        // arriva un altro Gadget: un maschio adulto azzurro a strisce, col cilindro
+        struct __attribute__((packed)) {
+            char magic[4]; uint8_t ver, flags; uint32_t uid, peer; char name[PET_NAME_LEN], family[PET_NAME_LEN];
+            uint8_t sex, stage, form, hat, acc, asleep, nest; uint8_t genes[GENE_COUNT][2]; uint16_t gen; uint8_t gift_seq, gift_n;
+        } k = {{'G', 'P', 'E', 'T'}, 1, 0, 0xBEEF, 0, "Nettuno", "Scogliera", SEX_M, PET_ADULT, FORM_EXPLORER, 0, 11, 0, 0,
+               {{COL_BLUE, COL_BLUE}, {PAT_STRIPES, PAT_STRIPES}, {0, 0}, {0, 0}}, 3, 0, 0};
+        for (int i = 0; i < 20; i++) { sim_espnow_cb(NULL, (const uint8_t *)&k, sizeof(k)); run(300); }
+        shot("68_amico_visita");
+        nav(NAV_SELECT);
+        k.flags = 1;
+        for (int i = 0; i < 4; i++) { sim_espnow_cb(NULL, (const uint8_t *)&k, sizeof(k)); run(300); }
+        shot("69_amico_uovo");
+        sim_nav(NAV_BACK); run(300);
+        sim_nav(NAV_BACK); run(300);
+        shot("70_polipetto_nido");
+        ui_home(); run(300);
+        ui_push(&app_clock, NULL);
+        shot("47_orologio_polipetto");
+        ui_home(); run(300);
+    }
     return 0;
 }

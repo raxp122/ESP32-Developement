@@ -36,12 +36,17 @@ void esp_restart(void) {}
 uint32_t input_idle_ms(void) { return 0; }
 void input_init(nav_handler_t h) { sim_nav = h; }
 void input_mark_activity(void) {}
-bool input_touch(int *x, int *y) { return false; }
+int sim_touch;
+bool input_touch(int *x, int *y) { if (x) *x = 100; if (y) *y = 80; return sim_touch; }
+bool display_is_dark(void) { return false; }
+bool board_imu_ok(void) { return true; }
+bool board_imu_accel(vec3_t *g) { g->x = 0; g->y = 0; g->z = 1; return true; }
 static bool sim_locked;
 void input_set_locked(bool l) { sim_locked = l; }
 bool input_locked(void) { return sim_locked; }
 bool board_btn_boot(void) { return false; }
-bool wifi_mgr_espnow_start(int ch, wifi_espnow_cb_t cb) { return true; }
+wifi_espnow_cb_t sim_espnow_cb;
+bool wifi_mgr_espnow_start(int ch, wifi_espnow_cb_t cb) { sim_espnow_cb = cb; return true; }
 void wifi_mgr_espnow_stop(void) {}
 bool wifi_mgr_espnow_send(const void *d, int n) { return true; }
 void ble_mgr_addr(char *b, int n) { snprintf(b, n, "AA:BB:CC:DD:EE:FF"); }
@@ -122,12 +127,12 @@ bool wifi_mgr_time_synced(void) { return true; }
 
 #define DUMMY_APP(n) static void n##_e(lv_obj_t *r, void *a) {} const app_t n = {.name = #n, .enter = n##_e};
 DUMMY_APP(app_8ball) DUMMY_APP(app_bercio) DUMMY_APP(app_ble_conns) DUMMY_APP(app_ble_pair) DUMMY_APP(app_blescan)
-DUMMY_APP(app_level) DUMMY_APP(app_pet) DUMMY_APP(app_q20) DUMMY_APP(app_search)
+DUMMY_APP(app_level) DUMMY_APP(app_q20) DUMMY_APP(app_search)
 DUMMY_APP(app_theremin) DUMMY_APP(app_torch)
 static const menu_item_t none[] = {{.label = "x"}};
 menu_t backup_menu = {"Backup", none, 1, 0, NULL}, chess_menu = {"Scacchi", none, 1, 0, NULL},
        clips_menu = {"Appunti", none, 1, 0, NULL}, dice_menu = {"Dadi", none, 1, 0, NULL},
-       doom_menu = {"Doom", none, 1, 0, NULL}, pet_settings_menu = {"Pet", none, 1, 0, NULL},
+       doom_menu = {"Doom", none, 1, 0, NULL},
        radar_menu = {"Radar", none, 1, 0, NULL}, saber_menu = {"Spada", none, 1, 0, NULL},
        tuner_menu = {"Accordatore", none, 1, 0, NULL};
 void chess_menu_init(void) {}

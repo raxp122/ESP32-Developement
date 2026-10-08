@@ -3,10 +3,10 @@
 // icone delle cure e i messaggi. Su/giù sceglie, destra conferma, sinistra torna
 // indietro. Dito tenuto sullo schermo: coccole. Scuotere la scheda: lo fa ridere.
 // Le regole del gioco sono in pet_core.c, il tempo che scorre in pet.c.
-#include "apps.h"
-#include "pet.h"
-#include "pet_art.h"
+#include "pet_ui.h"
 #include "board.h"
+#include "input.h"
+#include "keyboard.h"
 #include "settings.h"
 #include <math.h>
 #include <stdio.h>
@@ -14,10 +14,7 @@
 #include "esp_heap_caps.h"
 #include "esp_random.h"
 
-#define LW       64
-#define LH       32
 #define SC       5
-#define FLOOR    28        // ultima riga d'acqua: i tentacoli poggiano qui
 #define IC_SLOT  12        // pixel logici per icona
 #define IC_SC    3
 #define IC_LW    (PICON_COUNT * IC_SLOT)
@@ -28,16 +25,17 @@
 #define FISH_MS  30000
 #define C_DIM_RGB 0x6E747C
 
-typedef enum { M_MAIN, M_FOOD, M_PLAY, M_STATS, M_LR, M_FISH, M_WALK } view_t;
+typedef enum { M_MAIN, M_FOOD, M_PLAY, M_MORE, M_STATS, M_LR, M_FISH, M_WALK, M_MOD } view_t;
 typedef enum {
     A_NONE, A_EAT, A_SNACK, A_DRINK, A_NO, A_HAPPY, A_CLEAN, A_MED, A_SCOLD, A_SAD,
-    A_HEARTS, A_LAUGH, A_GRUMPY, A_HATCH, A_EVOLVE,
+    A_HEARTS, A_LAUGH, A_GRUMPY, A_HATCH, A_EVOLVE, A_PLAY, A_REWARD, A_FEST, A_BDAY,
 } anim_t;
 
 static const uint16_t anim_ms[] = {
     [A_EAT] = 2400, [A_SNACK] = 2400, [A_DRINK] = 2400, [A_NO] = 1200, [A_HAPPY] = 1600,
     [A_CLEAN] = 1600, [A_MED] = 1800, [A_SCOLD] = 1500, [A_SAD] = 1500, [A_HEARTS] = 1500,
-    [A_LAUGH] = 1800, [A_GRUMPY] = 1500, [A_HATCH] = 2000, [A_EVOLVE] = 2600,
+    [A_LAUGH] = 1800, [A_GRUMPY] = 1500, [A_HATCH] = 2000, [A_EVOLVE] = 2600, [A_PLAY] = 2800,
+    [A_REWARD] = 2400, [A_FEST] = 3000, [A_BDAY] = 3500,
 };
 
 static uint16_t *scene_buf, *icon_buf;
@@ -49,7 +47,7 @@ static int sel, sub, page;
 static anim_t anim;
 static uint32_t anim_t0;
 static int anim_arg;
-static char msg[80];
+static char msg[128];
 static uint32_t msg_until;
 // confronti tra istanti di lv_tick_get() che restano giusti anche quando il contatore
 // ricomincia da zero (dopo ~49 giorni di accensione)
@@ -61,6 +59,9 @@ static int target_x = 20;
 static bool face_left;
 static uint32_t next_wander;
 static struct { int8_t x, y; } bub[3] = {{3, 20}, {5, 9}, {59, 15}};
+static const pet_mod_t *mod;     // schermata a modulo aperta (M_MOD)
+static view_t mod_back;          // e il menu da cui ci si era entrati
+static int mod_sub;
 
 /* ---------------- utilità ---------------- */
 
@@ -94,32 +95,15 @@ static float anim_k(void)
 
 static uint32_t accent_rgb(void) { return lv_color_to_u32(ui_accent()) & 0xFFFFFF; }
 
-static void fmt_age(uint32_t s, char *b, int n)
+void pu_fmt_age(uint32_t s, char *b, int n)
 {
     if (s < 3600) snprintf(b, n, "%lu min", (unsigned long)(s / 60));
     else if (s < 86400) snprintf(b, n, "%lu or%s", (unsigned long)(s / 3600), s < 7200 ? "a" : "e");
     else snprintf(b, n, "%lu giorn%s", (unsigned long)(s / 86400), s < 2 * 86400 ? "o" : "i");
 }
 
-static const char *stage_name(const pet_t *p)
-{
-    switch (p->stage) {
-    case PET_EGG:   return "Uovo";
-    case PET_BABY:  return "Polipetto neonato";
-    case PET_CHILD: return "Polipetto bimbo";
-    case PET_TEEN:  return p->form == FORM_TEEN_BAD ? "Polipetto ribelle" : "Polipetto ragazzo";
-    case PET_ADULT:
-        switch (p->form) {
-        case FORM_SAGE:     return "Polpo saggio";
-        case FORM_EXPLORER: return "Polpo esploratore";
-        case FORM_GLUTTON:  return "Polpo goloso";
-        case FORM_MESSY:    return "Polpo pasticcione";
-        default:            return "Polpo";
-        }
-    case PET_DEAD:  return "Addio, polipetto…";
-    default:        return "Polipetto";
-    }
-}
+#define fmt_age pu_fmt_age
+#define stage_name pet_stage_name
 
 static const char *need_text(const pet_t *p)
 {
@@ -130,6 +114,7 @@ static const char *need_text(const pet_t *p)
     if (!p->hunger) return "Ha fame!";
     if (!p->thirst) return "Ha sete!";
     if (p->tantrum) return "Fa i capricci: sgridalo!";
+    if (p->t_reward) return "Ha capito la lezione: premialo con uno spuntino";
     if (!p->happy) return "È triste: gioca con lui";
     if (p->poop >= 2) return "Pulisci l'inchiostro";
     return NULL;
@@ -241,6 +226,7 @@ static void draw_main(const pet_t *p)
         if (ink_xy[i][0] > wave) art_sprite(&SPR_INK, ink_xy[i][0], ink_xy[i][1], false);
     if (anim == A_CLEAN)
         for (int y = 10; y <= FLOOR; y += 4) art_sprite(&SPR_BUBBLE, wave + ((y >> 2) & 1), y, false);
+    if (pet_world()->has_egg) art_sprite(&SPR_NEST_EGG, 6, FLOOR - 5, false);   // l'uovo nel nido
 
     if (p->stage == PET_EGG) {
         uint32_t left = pet_core_egg_left(p);
@@ -277,7 +263,15 @@ static void draw_main(const pet_t *p)
     float k = anim_k();
     switch (anim) {
     case A_EAT: case A_SNACK: case A_DRINK: e = EXPR_EAT; fr = now_ms / 250; flip = false; look = 1; break;
-    case A_HAPPY: case A_HEARTS: case A_HATCH: case A_CLEAN: e = EXPR_HAPPY; break;
+    case A_HAPPY: case A_HEARTS: case A_HATCH: case A_CLEAN: case A_FEST: case A_BDAY: e = EXPR_HAPPY; break;
+    case A_REWARD: e = k < 0.6f ? EXPR_EAT : EXPR_HAPPY; fr = now_ms / 250; flip = false; look = 1; break;
+    case A_PLAY: {   // salta per colpire la palla
+        e = EXPR_HAPPY;
+        float ph = fmodf(k * 4, 1);
+        y -= (int)(6 * sinf(ph * 3.14159f));
+        fr = now_ms / 150;
+        break;
+    }
     case A_LAUGH: e = EXPR_HAPPY; x += (now_ms / 100) & 1; fr = now_ms / 120; break;
     case A_NO: e = EXPR_ANGRY; flip = (now_ms / 150) & 1; break;
     case A_GRUMPY: e = EXPR_ANGRY; break;
@@ -290,8 +284,8 @@ static void draw_main(const pet_t *p)
 
     // effetti
     switch (anim) {
-    case A_EAT: case A_SNACK: case A_DRINK: {
-        const sprite_t *s = anim == A_EAT ? &SPR_FISH : anim == A_SNACK ? &SPR_COOKIE : &SPR_GLASS;
+    case A_EAT: case A_SNACK: case A_DRINK: case A_REWARD: {
+        const sprite_t *s = anim == A_EAT ? &SPR_FISH : anim == A_DRINK ? &SPR_GLASS : &SPR_COOKIE;
         int ix = x + w + 1;
         if (ix + s->w > LW) ix = LW - s->w;
         int iy = FLOOR - s->h + 1 - (h > 10 ? 3 : 0);
@@ -302,8 +296,31 @@ static void draw_main(const pet_t *p)
         } else {
             art_sprite_from(s, ix, iy, (int)(k * 4) * s->w / 3);   // tre morsi
         }
+        if (anim == A_REWARD && k > 0.5f) {
+            art_sprite(&SPR_HEART, x - 3, y - 2 - (int)(k * 6), false);
+            art_sprite(&SPR_SPARK, x + w / 2 - 1, y - 6, false);
+        }
         break;
     }
+    case A_PLAY: {   // la palla rimbalza da una parte all'altra sopra la testa
+        float bx = k * 4;
+        int seg = (int)bx;
+        float f = bx - seg;
+        int x0 = 4, x1 = LW - 10;
+        int px = (seg & 1) ? x1 - (int)((x1 - x0) * f) : x0 + (int)((x1 - x0) * f);
+        int py = 2 + (int)(10 * fabsf(f - 0.5f) * 2);
+        art_sprite(&SPR_BALL, px, py, false);
+        break;
+    }
+    case A_FEST:
+        art_sprite(&SPR_GIFT, x + w + 2 > LW - 7 ? x - 9 : x + w + 2, FLOOR - 6, false);
+        for (int i = 0; i < 3; i++)
+            if (((now_ms / 200) + i) & 1) art_sprite(&SPR_SPARK, x - 4 + i * (w / 2 + 3), y - 4 + (i & 1) * 5, false);
+        break;
+    case A_BDAY:
+        art_sprite(&SPR_CAKE, x + w + 2 > LW - 9 ? x - 11 : x + w + 2, FLOOR - 7, false);
+        if ((now_ms / 300) & 1) art_sprite(&SPR_HEART, x + w / 2 - 2, y - 6, false);
+        break;
     case A_HAPPY: case A_HEARTS: case A_HATCH:
         art_sprite(&SPR_HEART, x - 3, y - 2 - (int)(k * 8), false);
         art_sprite(&SPR_HEART, x + w - 2, y - 5 - (int)(k * 8), false);
@@ -465,40 +482,67 @@ static void draw_icons(const pet_t *p)
 
 /* ---------------- pannello di testo ---------------- */
 
-static const char *const main_labels[N_SEL] = {"Cibo", "Gioca", "Pulisci", "Medicina", "Luce", "Sgrida", "Stato"};
+static const char *const main_labels[N_SEL] = {"Cibo", "Gioca", "Pulisci", "Medicina", "Luce", "Sgrida", "Diario e altro"};
 static const char *const food_labels[] = {"Pasto", "Spuntino", "Acqua"};
-static const char *const play_labels[] = {"Da che parte?", "Pesca", "Passeggiata"};
-static const char *const play_hints[] = {
+static const char *const food_hints[] = {
+    "+1 fame (e un grammo)",
+    "+1 felicità · dopo una sgridata è il premio che fissa la lezione",
+    "+1 sete",
+};
+enum { PL_QUICK, PL_STAR, PL_MEMORY, PL_RHYTHM, PL_LR, PL_FISH, PL_WALK, N_PLAY };
+static const char *const play_labels[N_PLAY] = {"Gioca", "1, 2, 3 stella", "Memoria", "Ritmo", "Da che parte?", "Pesca", "Passeggiata"};
+static const char *const play_hints[N_PLAY] = {
+    "Due tiri a palla: +1 felicità, senza minigioco (ogni 20 min)",
+    "Tieni premuto quando è di spalle, lascia quando si gira",
+    "Ripeti la sequenza di frecce con gli swipe",
+    "Tocca lo schermo quando la bolla arriva al cerchio",
     "Indovina dove guarderà: 5 round",
     "Inclina la scheda e raccogli i pesci",
     "Portalo a spasso: conta i passi",
 };
+enum { MO_STATS, MO_DIARY, MO_ALBUM, MO_FAMILY, MO_SHOP, MO_VISIT, MO_NAME, N_MORE };
+static const char *const more_labels[N_MORE] = {"Stato", "Diario", "Album di famiglia", "Famiglia e geni", "Negozio", "Incontra un amico", "Cambia nome"};
+static const char *const more_hints[N_MORE] = {
+    "Fame, sete, felicità, disciplina, passi",
+    "Tutto quello che gli è successo",
+    "Le generazioni passate e le forme scoperte",
+    "Genitori, tratti genetici e l'uovo nel nido",
+    "Cappelli, accessori e decorazioni con le conchiglie",
+    "Via radio con un altro Gadget: giocano, e da adulti un uovo",
+    "Dagli il nome che vuoi",
+};
+static int sub_count(void) { return mode == M_FOOD ? 3 : mode == M_PLAY ? N_PLAY : N_MORE; }
 static const char *const stats_labels[] = {"Età e peso", "Fame", "Sete", "Felicità", "Disciplina", "Passi", "Ricordi"};
 #define N_PAGES 7
 
 static void draw_panel(const pet_t *p)
 {
-    char t[96], a[24], b[24];
-    set_text(l_title, stage_name(p));
+    char t[192], a[32], b[32];
+    if (p->name[0] && p->stage != PET_EGG) {
+        snprintf(t, sizeof(t), "%s · %s", p->name, p->stage == PET_DEAD ? "addio…" : stage_name(p));
+        set_text(l_title, t);
+    } else set_text(l_title, stage_name(p));
 
-    if (p->stage == PET_DEAD) {
+    if (p->stage == PET_DEAD && mode != M_MOD) {
         fmt_age(p->best_age_s, b, sizeof(b));
         snprintf(t, sizeof(t), "generazione %u · record %s", p->generation, b);
         set_text(l_info, t);
         static const char *const why[] = {"", "Di fame…", "Di sete…", "Di malattia…", "Buon viaggio!"};
         set_text(l_main, why[p->death <= DEATH_OLD ? p->death : 0]);
         fmt_age(p->age_s, a, sizeof(a));
-        snprintf(t, sizeof(t), "%s · visse %s · swipe a destra: nuovo uovo",
-                 p->death == DEATH_OLD ? "È tornato nel grande oceano" : "È diventato un angioletto", a);
+        snprintf(t, sizeof(t), "%s · visse %s · destra: %s · su/giù: diario e album",
+                 p->death == DEATH_OLD ? "È tornato nel grande oceano" : "È diventato un angioletto", a,
+                 pet_world()->has_egg ? "l'uovo del nido" : "nuovo uovo");
         set_text(l_hint, t);
         lv_obj_set_style_text_color(l_hint, C_DIM, 0);
         return;
     }
 
-    if (p->stage == PET_EGG) snprintf(t, sizeof(t), "si schiude tra %lu s", (unsigned long)pet_core_egg_left(p));
+    if (p->stage == PET_DEAD) snprintf(t, sizeof(t), "generazione %u", p->generation);
+    else if (p->stage == PET_EGG) snprintf(t, sizeof(t), "si schiude tra %lu s", (unsigned long)pet_core_egg_left(p));
     else {
         fmt_age(p->age_s, a, sizeof(a));
-        snprintf(t, sizeof(t), "età %s · %u g · generazione %u", a, p->weight, p->generation);
+        snprintf(t, sizeof(t), "%s · %s · %u g · gen. %u", p->sex == SEX_F ? "femmina" : "maschio", a, p->weight, p->generation);
     }
     set_text(l_info, t);
 
@@ -514,12 +558,40 @@ static void draw_panel(const pet_t *p)
         break;
     case M_FOOD:
         set_text(l_main, food_labels[sub]);
-        snprintf(t, sizeof(t), "Fame %d/4 · sete %d/4 · peso %u g", p->hunger, p->thirst, p->weight);
-        hint = t;
+        if (sub == 1 && p->t_reward) hint = "Ora è il momento: premio per la lezione imparata!";
+        else if (sub == 1) {
+            int left = PET_SNACKS_FREE - p->snacks_today;
+            if (left > 0) snprintf(t, sizeof(t), "+1 felicità (non sazia) · ancora %d oggi senza ingrassare · dopo una sgridata è il premio", left);
+            else snprintf(t, sizeof(t), "+1 felicità · oggi ne ha mangiati troppi: ingrassa · dopo una sgridata è il premio");
+            hint = t;
+        } else {
+            snprintf(t, sizeof(t), "%s · fame %d/4 · sete %d/4", food_hints[sub], p->hunger, p->thirst);
+            hint = t;
+        }
         break;
     case M_PLAY:
         set_text(l_main, play_labels[sub]);
         hint = play_hints[sub];
+        if (sub == PL_QUICK && p->t_play_cd) {
+            snprintf(t, sizeof(t), "Ha giocato da poco: di nuovo tra %lu min", (unsigned long)(p->t_play_cd + 59) / 60);
+            hint = t;
+        }
+        break;
+    case M_MORE:
+        set_text(l_main, more_labels[sub]);
+        hint = more_hints[sub];
+        if (sub == MO_SHOP) { snprintf(t, sizeof(t), "Hai %u conchiglie · %s", pet_world()->shells, more_hints[sub]); hint = t; }
+        break;
+    case M_MOD:
+        a[0] = 0;
+        t[0] = 0;
+        if (mod && mod->panel) {
+            char big[48];
+            big[0] = 0;
+            mod->panel(big, sizeof(big), t, sizeof(t));
+            set_text(l_main, big);
+        }
+        hint = t;
         break;
     case M_STATS:
         set_text(l_main, stats_labels[page]);
@@ -529,7 +601,7 @@ static void draw_panel(const pet_t *p)
         case 2: snprintf(t, sizeof(t), "%d su 4", p->thirst); break;
         case 3: snprintf(t, sizeof(t), "%d su 4", p->happy); break;
         case 4: snprintf(t, sizeof(t), "%d%%", p->discipline * 25); break;
-        case 5: snprintf(t, sizeof(t), "Oggi %lu · in tutto %lu", (unsigned long)p->steps_today, (unsigned long)p->steps_total); break;
+        case 5: snprintf(t, sizeof(t), "Oggi %lu · in tutto %lu · 1 conchiglia ogni 1000", (unsigned long)p->steps_today, (unsigned long)p->steps_total); break;
         default:
             fmt_age(p->best_age_s, b, sizeof(b));
             snprintf(t, sizeof(t), "Generazione %u · record %s", p->generation, p->best_age_s ? b : "nessuno");
@@ -572,6 +644,8 @@ static void feed(pet_action_t a)
     pet_do(a, &r);
     switch (r) {
     case RES_OK:     start(a == ACT_WATER ? A_DRINK : a == ACT_SNACK ? A_SNACK : A_EAT, 0); break;
+    case RES_REWARD: start(A_REWARD, 0); say("Bravo! Premio meritato: la lezione resta", false); break;
+    case RES_GREEDY: start(A_SNACK, 0); say("Troppi spuntini oggi: ingrassa!", true); break;
     case RES_FULL:   start(A_NO, 0); say(a == ACT_WATER ? "Non ha sete" : "È sazio!", false); break;
     case RES_REFUSE: start(A_NO, 0); say("Capriccio: non vuole! Sgridalo", true); break;
     case RES_ASLEEP: say("Sta dormendo…", false); break;
@@ -593,14 +667,119 @@ static void lr_start(void)
     lr_t0 = 0;
 }
 
-static void game_result(bool win, bool big, const char *text)
+static void game_result_ex(int rec, int score, int shells, bool win, bool big, const char *text)
 {
     pet_result_t r;
     pet_do(big ? ACT_GAME_BIG_WIN : win ? ACT_GAME_WIN : ACT_GAME_LOSE, &r);
+    if (rec >= 0) pet_record(rec, score);
+    char t[96];
+    if (shells > 0) {
+        pet_shells_add(shells);
+        pet_world_save();
+        snprintf(t, sizeof(t), "%s +%d conchigli%c", text, shells, shells == 1 ? 'a' : 'e');
+        text = t;
+    }
     mode = M_MAIN;
     start(win ? A_HAPPY : A_SAD, 0);
     say(text, false);
 }
+
+
+/* ---------------- moduli (pet_ui.h) ---------------- */
+
+uint32_t pu_now(void) { return now_ms; }
+void pu_say(const char *s, bool warn) { say(s, warn); }
+
+static void open_mod(const pet_mod_t *m)
+{
+    mod_back = mode;
+    mod_sub = sub;
+    mod = m;
+    mode = M_MOD;
+    lv_timer_set_period(tmr, m->period ? m->period : 100);
+    m->enter();
+}
+
+static void close_mod(void)
+{
+    const pet_mod_t *m = mod;
+    mod = NULL;
+    if (m && m->leave) m->leave();
+    lv_timer_set_period(tmr, 100);
+}
+
+void pu_exit(void)
+{
+    close_mod();
+    mode = mod_back;
+    sub = mod_sub;
+}
+
+void pu_result(int rec, int score, int shells, bool win, bool big, const char *text)
+{
+    close_mod();
+    game_result_ex(rec, score, shells, win, big, text);
+}
+
+void pu_look_genes(const uint8_t g[GENE_COUNT][2], int hat, int acc)
+{
+    art_look_t l = {
+        .color = pet_gene_show(g[GENE_COLOR], GENE_COLOR), .pattern = pet_gene_show(g[GENE_PATTERN], GENE_PATTERN),
+        .tent = pet_gene_show(g[GENE_TENT], GENE_TENT), .hat = hat, .acc = acc,
+    };
+    art_look(&l);
+}
+
+void pu_look_self(void)
+{
+    const pet_world_t *w = pet_world();
+    pu_look_genes(pet_get()->genes, w->hat, w->acc);
+}
+
+void pu_env(void)
+{
+    art_env_t e = {.daypart = pet_daypart(), .season = pet_season(), .holiday = pet_holiday(), .deco = pet_world()->deco};
+    art_env(&e);
+}
+
+void pu_dims(int *w, int *h) { pet_dims(pet_get(), w, h); }
+
+bool pu_held(void)
+{
+    // antirimbalzo: lo stato cambia solo se il nuovo dura almeno 90 ms (i tocchi
+    // fantasma della 3.49 sono brevissimi)
+    static bool st;
+    static uint32_t t_same;
+    int x, y;
+    bool raw = (input_touch(&x, &y) && !input_locked()) || board_btn_boot();
+    if (raw == st) t_same = now_ms;
+    else if (now_ms - t_same >= 90) { st = raw; t_same = now_ms; }
+    return st;
+}
+
+/* nome: la tastiera in un'app contenitore */
+static char name_buf[PET_NAME_LEN];
+static void name_done(const char *t, void *arg)
+{
+    keyboard_close();
+    ui_pop();
+    if (t && t[0]) {
+        pet_set_name(t);
+        ui_toast("Nome salvato");
+    }
+}
+static void name_enter(lv_obj_t *root, void *arg)
+{
+    snprintf(name_buf, sizeof(name_buf), "%s", pet_get()->name);
+    keyboard_open(root, "Nome del polipetto", name_buf, false, PET_NAME_LEN - 1, name_done, NULL);
+}
+static void name_leave(void) { keyboard_close(); }
+static bool name_nav(nav_t ev) { return keyboard_nav(ev); }
+static const app_t app_pet_name = {
+    .name = "Nome", .enter = name_enter, .leave = name_leave, .nav = name_nav,
+    .flags = APP_FULLSCREEN | APP_OWN_QUICK,
+};
+void pu_open_name(void) { ui_push(&app_pet_name, NULL); }
 
 static void lr_update(void)
 {
@@ -610,7 +789,7 @@ static void lr_update(void)
     char t[48];
     bool win = lr_score >= 3;
     snprintf(t, sizeof(t), win ? "Hai vinto %d a %d!" : "Hai perso %d a %d", lr_score, 5 - lr_score);
-    game_result(win, lr_score == 5, t);
+    game_result_ex(REC_LR, lr_score, lr_score == 5 ? 4 : win ? 2 : 0, win, lr_score == 5, t);
 }
 
 static void fish_start(const pet_t *p)
@@ -635,7 +814,7 @@ static void fish_end(bool aborted)
     if (aborted) { mode = M_PLAY; say("Partita annullata", false); return; }
     char t[48];
     snprintf(t, sizeof(t), "Hai pescato %d pesci!", fish_score);
-    game_result(fish_score >= 5, fish_score >= 10, t);
+    game_result_ex(REC_FISH, fish_score, fish_score / 3, fish_score >= 5, fish_score >= 10, t);
 }
 
 static void fish_update(const pet_t *p, uint32_t dt)
@@ -708,7 +887,7 @@ static void cuddle(const pet_t *p)
 static void activate(pet_t *p)
 {
     pet_result_t r;
-    if (p->stage == PET_EGG) { say("È ancora un uovo: aspetta che si schiuda", false); return; }
+    if (p->stage == PET_EGG && sel != 6) { say("È ancora un uovo: aspetta che si schiuda", false); return; }
     switch (sel) {
     case 0: mode = M_FOOD; sub = 0; break;
     case 1: if (!p->asleep) { mode = M_PLAY; sub = 0; } else say("Sta dormendo…", false); break;
@@ -730,11 +909,11 @@ static void activate(pet_t *p)
         break;
     case 5:
         pet_do(ACT_SCOLD, &r);
-        if (r == RES_OK) { start(A_SCOLD, 0); say("Ha capito la lezione!", false); }
+        if (r == RES_OK) { start(A_SCOLD, 0); say("Ha capito! Ora premialo con uno spuntino", false); }
         else if (r == RES_SAD) { start(A_SAD, 0); say("Non aveva fatto niente… ora è triste", true); }
         else if (r == RES_ASLEEP) say("Sta dormendo…", false);
         break;
-    case 6: mode = M_STATS; page = 0; break;
+    case 6: mode = M_MORE; sub = 0; break;
     }
 }
 
@@ -747,6 +926,7 @@ static void handle_events(pet_t *p)
     if (ev & EV_DEATH) {
         if (mode == M_WALK) pet_set_walking(false);
         if (mode == M_FISH) lv_timer_set_period(tmr, 100);
+        if (mode == M_MOD) close_mod();
         mode = M_MAIN;
         anim = A_NONE;
         return;
@@ -760,11 +940,20 @@ static void handle_events(pet_t *p)
         start(A_HEARTS, 0);
         if (mode == M_WALK) say("Che bella passeggiata!", false);
     }
-    if (ev & EV_ELDER) say("Ha 25 giorni! Ora vive per sempre, o puoi lasciarlo partire (Impostazioni)", false);
+    if ((ev & EV_BDAY) && mode == M_MAIN) { start(A_BDAY, 0); pet_play(SND_WIN); }
+    else if ((ev & EV_FEST) && mode == M_MAIN) { start(A_FEST, 0); pet_play(SND_WIN); }
+    if (ev & EV_BDAY) {
+        snprintf(t, sizeof(t), "Buon compleanno, %s! +5 conchiglie", p->name);
+        say(t, false);
+    } else if (ev & EV_FEST) {
+        snprintf(t, sizeof(t), "%s! Regalo: 10 conchiglie", pet_holiday_name(pet_holiday()));
+        say(t, false);
+    } else if (ev & EV_ELDER) say("Ha 25 giorni! Ora vive per sempre, o puoi lasciarlo partire (Impostazioni)", false);
     else if (ev & EV_SICK) say("Si è ammalato!", true);
     else if (ev & EV_SLEEP) say("Si è addormentato", false);
     else if (ev & EV_WAKE) say("Buongiorno!", false);
     else if (ev & EV_POOP) say("Ha fatto un po' d'inchiostro", false);
+    else if (ev & EV_SHELLS) say("Camminando ha trovato una conchiglia!", false);
 
     // scossoni: lo fanno ridere (o lo svegliano di soprassalto)
     if (pet_take_shakes() && mode == M_MAIN && anim == A_NONE && pet_core_alive(p)) {
@@ -786,6 +975,7 @@ static void frame_cb(lv_timer_t *t)
     if (anim != A_NONE && now_ms - anim_t0 >= anim_ms[anim]) anim = A_NONE;
     if (mode == M_LR) lr_update();
     if (mode == M_FISH) fish_update(p, dt);
+    if (mode == M_MOD && mod && mod->update) mod->update(dt);
     if (mode == M_WALK && p->steps_total != walk_seen) {
         walk_scroll += (int)(p->steps_total - walk_seen) * 2;
         walk_seen = p->steps_total;
@@ -796,7 +986,10 @@ static void frame_cb(lv_timer_t *t)
     if (display_is_dark()) return;
 
     art_begin(scene_buf, LW, LH, SC, scene_stride);
-    if (p->stage == PET_DEAD) draw_dead(p);
+    pu_env();
+    pu_look_self();
+    if (mode == M_MOD && mod) mod->draw(p);   // diario, album e negozio si vedono anche dopo l'addio
+    else if (p->stage == PET_DEAD) draw_dead(p);
     else switch (mode) {
         case M_STATS: draw_stats(p); break;
         case M_LR:    draw_lr(p); break;
@@ -804,6 +997,7 @@ static void frame_cb(lv_timer_t *t)
         case M_WALK:  draw_walk(p); break;
         default:      draw_main(p); break;
         }
+    art_look(NULL);
     lv_obj_invalidate(scene);
     draw_icons(p);
     draw_panel(p);
@@ -813,14 +1007,21 @@ static bool nav(nav_t ev)
 {
     if (!scene_buf || !icon_buf) return false;   // memoria non disponibile: l'app non è partita
     pet_t *p = pet_get();
+    if (mode == M_MOD && mod) {
+        if (mod->nav(ev)) return true;
+        if (ev == NAV_BACK || ev == NAV_BTN) { pu_exit(); return true; }
+        return ev != NAV_BTN;
+    }
     if (p->stage == PET_DEAD) {
         if (ev == NAV_SELECT) {
+            bool nest = pet_world()->has_egg;
             pet_new_egg();
             mode = M_MAIN;
             anim = A_NONE;
-            say("Un nuovo uovo! Si schiude tra un minuto", false);
+            say(nest ? "L'uovo del nido! Si schiude tra un minuto" : "Un nuovo uovo! Si schiude tra un minuto", false);
             return true;
         }
+        if (ev == NAV_NEXT || ev == NAV_PREV) { mode = M_MAIN; open_mod(ev == NAV_NEXT ? &PM_DIARY : &PM_ALBUM); return true; }
         return ev == NAV_QUICK;
     }
     switch (mode) {
@@ -834,28 +1035,66 @@ static bool nav(nav_t ev)
 
     case M_FOOD:
     case M_PLAY:
-        if (ev == NAV_NEXT) { sub = (sub + 1) % 3; return true; }
-        if (ev == NAV_PREV) { sub = (sub + 2) % 3; return true; }
+    case M_MORE: {
+        int n = sub_count();
+        if (ev == NAV_NEXT) { sub = (sub + 1) % n; return true; }
+        if (ev == NAV_PREV) { sub = (sub + n - 1) % n; return true; }
         if (ev == NAV_BACK) { mode = M_MAIN; return true; }
         if (ev == NAV_QUICK) { cuddle(p); return true; }
         if (ev != NAV_SELECT || anim != A_NONE) return ev != NAV_BTN;
         if (mode == M_FOOD) {
             static const pet_action_t acts[] = {ACT_MEAL, ACT_SNACK, ACT_WATER};
             feed(acts[sub]);
+        } else if (mode == M_MORE) {
+            switch (sub) {
+            case MO_STATS:
+                if (p->stage == PET_EGG) say("È ancora un uovo", false);
+                else { mode = M_STATS; page = 0; }
+                break;
+            case MO_DIARY:  open_mod(&PM_DIARY); break;
+            case MO_ALBUM:  open_mod(&PM_ALBUM); break;
+            case MO_FAMILY: open_mod(&PM_FAMILY); break;
+            case MO_SHOP:   open_mod(&PM_SHOP); break;
+            case MO_VISIT:
+                if (p->stage == PET_EGG) say("Prima deve nascere!", false);
+                else if (p->asleep) say("Sta dormendo…", false);
+                else open_mod(&PM_VISIT);
+                break;
+            case MO_NAME:
+                if (p->stage == PET_EGG) say("Il nome si sceglie quando nasce", false);
+                else pu_open_name();
+                break;
+            }
         } else if (!refuse_play(p)) {
-            if (sub == 0) lr_start();
-            else if (sub == 1) {
+            pet_result_t r;
+            switch (sub) {
+            case PL_QUICK:
+                pet_do(ACT_PLAY, &r);
+                if (r == RES_OK) { start(A_PLAY, 0); say("Che bella partita a palla!", false); mode = M_MAIN; }
+                else if (r == RES_COOLDOWN) say("Ha giocato da poco: prova un minigioco!", false);
+                else if (r == RES_REFUSE) { start(A_NO, 0); say("Capriccio: non vuole giocare. Sgridalo", true); }
+                break;
+            case PL_STAR:   open_mod(&PM_STAR); break;
+            case PL_MEMORY: open_mod(&PM_MEMORY); break;
+            case PL_RHYTHM: open_mod(&PM_RHYTHM); break;
+            case PL_LR:     lr_start(); break;
+            case PL_FISH:
                 if (board_imu_ok()) fish_start(p);
                 else say("Accelerometro non disponibile", true);
-            } else if (!g_set.pet_steps) say("Attiva il contapassi in Impostazioni » Polipetto", true);
-            else walk_start(p);
+                break;
+            default:
+                if (!g_set.pet_steps) say("Attiva il contapassi in Impostazioni » Polipetto", true);
+                else walk_start(p);
+                break;
+            }
         }
         return true;
+    }
 
     case M_STATS:
         if (ev == NAV_NEXT || ev == NAV_SELECT) { page = (page + 1) % N_PAGES; return true; }
         if (ev == NAV_PREV) { page = (page + N_PAGES - 1) % N_PAGES; return true; }
-        if (ev == NAV_BACK) { mode = M_MAIN; return true; }
+        if (ev == NAV_BACK) { mode = M_MORE; sub = MO_STATS; return true; }
         return ev != NAV_BTN;
 
     case M_LR:
@@ -874,6 +1113,9 @@ static bool nav(nav_t ev)
 
     case M_WALK:
         if (ev == NAV_BTN || ev == NAV_BACK) walk_end(p);
+        return true;
+    case M_MOD:
+        mode = M_MAIN;
         return true;
     }
     return false;
@@ -934,7 +1176,7 @@ static void enter(lv_obj_t *root, void *arg)
         say("Ecco il tuo uovo! Si schiude tra un minuto", false);
     }
     if (mode == M_WALK) pet_set_walking(true);
-    if (mode == M_FISH || mode == M_LR) mode = M_MAIN;   // le partite non riprendono
+    if (mode == M_FISH || mode == M_LR || mode == M_MOD) mode = M_MAIN;   // le partite non riprendono
     anim = A_NONE;
     last_ms = 0;
     tmr = lv_timer_create(frame_cb, 100, NULL);
@@ -943,6 +1185,7 @@ static void enter(lv_obj_t *root, void *arg)
 
 static void leave(void)
 {
+    if (mode == M_MOD) { close_mod(); mode = mod_back; sub = mod_sub; }
     if (tmr) { lv_timer_delete(tmr); tmr = NULL; }
     pet_set_walking(false);
     pet_set_foreground(false);
@@ -993,12 +1236,13 @@ static void v_release(char *b, int n)
     const pet_t *p = pet_get();
     if (!pet_core_alive(p)) snprintf(b, n, "Quando avrà 25 giorni");
     else if (pet_core_can_release(p)) snprintf(b, n, "Ha 25 giorni: se vuoi, può partire");
+    else if (p->stage == PET_ADULT && pet_world()->has_egg) snprintf(b, n, "Può partire ora: lascia il posto all'uovo del nido");
     else snprintf(b, n, "Dai 25 giorni · mancano %lu giorni", (unsigned long)((PET_RELEASE_S - p->age_s + 86399) / 86400));
 }
 static void a_release(void)
 {
     if (pet_release()) ui_toast("Buon viaggio, polipetto!");
-    else ui_toast("Potrà partire quando avrà 25 giorni");
+    else ui_toast("Potrà partire a 25 giorni (o da adulto, con un uovo nel nido)");
 }
 static void v_sound(char *b, int n) { snprintf(b, n, "%s", g_set.pet_sound ? "Acceso" : "Spento"); }
 static void a_sound(void)
@@ -1018,6 +1262,8 @@ static void v_steps(char *b, int n)
     else snprintf(b, n, "Spento");
 }
 static void a_steps(void) { g_set.pet_steps = !g_set.pet_steps; settings_save(); }
+static void v_clock(char *b, int n) { snprintf(b, n, "%s", g_set.pet_clock ? "Sì: passeggia sotto l'ora" : "No"); }
+static void a_clock(void) { g_set.pet_clock = !g_set.pet_clock; settings_save(); }
 static void v_tilt(char *b, int n) { snprintf(b, n, "%s", g_set.pet_tilt_inv ? "Invertita" : "Normale"); }
 static void a_tilt(void) { g_set.pet_tilt_inv = !g_set.pet_tilt_inv; settings_save(); }
 static void v_state(char *b, int n)
@@ -1039,6 +1285,7 @@ static const menu_item_t pet_items[] = {
     {.icon = LV_SYMBOL_PLAY, .label = "Ascolta il verso", .hint = "Blub-blub-pii!", .on_select = a_listen},
     {.icon = LV_SYMBOL_GPS, .label = "Contapassi", .value = v_steps, .on_select = a_steps},
     {.icon = ICON_SLIDERS, .label = "Inclinazione nel gioco", .value = v_tilt, .on_select = a_tilt},
+    {.icon = ICON_CLOCK, .label = "Sull'orologio", .value = v_clock, .on_select = a_clock},
     {.icon = LV_SYMBOL_UPLOAD, .label = "Lascialo tornare nell'oceano", .value = v_release, .on_select = a_release, .confirm = true},
     {.icon = LV_SYMBOL_REFRESH, .label = "Ricomincia da un uovo", .hint = "Il polipetto attuale se ne va", .on_select = a_egg, .confirm = true},
 };

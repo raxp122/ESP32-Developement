@@ -5,7 +5,7 @@
 #include <stdint.h>
 
 #define PET_MAGIC    0x50455431u   // "PET1"
-#define PET_VERSION  1
+#define PET_VERSION  2
 #define PET_MAX      4             // cuori/gocce/tacche massimi di ogni indicatore
 
 typedef enum { PET_NONE = 0, PET_EGG, PET_BABY, PET_CHILD, PET_TEEN, PET_ADULT, PET_DEAD } pet_stage_t;
@@ -58,6 +58,8 @@ typedef struct {
 typedef enum {
     ACT_MEAL, ACT_SNACK, ACT_WATER, ACT_CLEAN, ACT_MEDICINE, ACT_LIGHT,
     ACT_SCOLD, ACT_PET, ACT_SHAKE, ACT_GAME_WIN, ACT_GAME_BIG_WIN, ACT_GAME_LOSE,
+    ACT_PLAY,      // "Gioca" veloce: un cuore senza minigioco (con ricarica)
+    ACT_VISIT,     // ha giocato con un amico di un altro Gadget
 } pet_action_t;
 
 typedef enum {
@@ -70,7 +72,47 @@ typedef enum {
     RES_COOLDOWN,  // coccole/gioco ripetuti troppo presto: nessun effetto
     RES_WOKE,      // svegliato di soprassalto
     RES_DEAD,
+    RES_REWARD,    // spuntino dato come premio dopo una sgridata
+    RES_GREEDY,    // spuntino di troppo oggi: ingrassa
 } pet_result_t;
+
+/* ---------------- genetica ----------------
+ * Ogni tratto ha due alleli, uno dalla mamma e uno dal papà. Si vede quello dominante;
+ * a pari dominanza prevale quello della mamma. Ogni figlio prende a caso un allele per
+ * tratto da ciascun genitore, con una piccola probabilità di mutazione.
+ */
+enum { GENE_COLOR, GENE_PATTERN, GENE_TENT, GENE_TEMPER, GENE_COUNT };
+enum { COL_ORANGE, COL_CORAL, COL_PURPLE, COL_BLUE, COL_GREEN, COL_PINK, COL_GOLD, COL_COUNT };
+enum { PAT_NONE, PAT_SPOTS, PAT_STRIPES, PAT_COUNT };
+enum { TENT_NORMAL, TENT_LONG, TENT_SHORT, TENT_COUNT };
+enum { TEMP_CALM, TEMP_LIVELY, TEMP_GREEDY, TEMP_COUNT };
+enum { SEX_NONE = 0, SEX_M, SEX_F };
+
+#define PET_NAME_LEN 14
+
+// calendario (per il fondale e le feste)
+enum { DAY_DAWN, DAY_DAY, DAY_DUSK, DAY_NIGHT };
+enum { SEASON_WINTER, SEASON_SPRING, SEASON_SUMMER, SEASON_AUTUMN };
+enum {
+    HOL_NONE, HOL_NEWYEAR, HOL_BEFANA, HOL_VALENTINE, HOL_EASTER, HOL_FERRAGOSTO,
+    HOL_OCTOPUS, HOL_HALLOWEEN, HOL_CHRISTMAS, HOL_NYE, HOL_COUNT,
+};
+
+typedef struct {
+    uint8_t genes[GENE_COUNT][2];
+    char parent[2][PET_NAME_LEN];   // mamma, papà ("" = uovo selvatico)
+    char family[PET_NAME_LEN];      // cognome
+    uint16_t generation;
+} pet_egg_t;
+
+int  pet_gene_count(int gene);                         // quanti alleli possibili
+int  pet_gene_show(const uint8_t g[2], int gene);      // allele visibile
+const char *pet_allele_name(int gene, int allele);
+const char *pet_gene_name(int gene);
+void pet_genes_random(uint8_t g[GENE_COUNT][2], uint32_t *rng);   // uovo selvatico
+// figlio: un allele da ciascun genitore (a = mamma, b = papà)
+void pet_genes_child(uint8_t out[GENE_COUNT][2], const uint8_t a[GENE_COUNT][2], const uint8_t b[GENE_COUNT][2], uint32_t *rng);
+uint32_t pet_rand(uint32_t *rng);
 
 typedef struct {
     uint32_t magic;
@@ -98,9 +140,24 @@ typedef struct {
     uint32_t steps_total, steps_stage, steps_today;
     uint32_t steps_happy_acc, steps_weight_acc;
     int64_t  last_epoch;                          // ultimo istante reale noto (0 = sconosciuto)
+    // dalla versione 2
+    char     name[PET_NAME_LEN], family[PET_NAME_LEN];
+    uint8_t  sex;
+    uint8_t  genes[GENE_COUNT][2];
+    char     parent[2][PET_NAME_LEN];
+    uint32_t uid;                                 // identità (per gli amici degli altri Gadget)
+    uint32_t t_play_cd;                           // ricarica del "Gioca" veloce
+    uint32_t t_reward;                            // dopo una sgridata: tempo per premiarlo
+    uint8_t  snacks_today;                        // spuntini di oggi (dal quarto ingrassa)
+    uint8_t  pad2[3];
 } pet_t;
 
 void     pet_core_new_egg(pet_t *p, uint32_t seed);                 // conserva generazione e record
+// uovo con genitori (o selvatico se egg = NULL); nome e sesso si decidono alla schiusa
+void     pet_core_new_egg_from(pet_t *p, uint32_t seed, const pet_egg_t *egg);
+void     pet_core_upgrade(pet_t *p, uint32_t seed);                 // salvataggio v1: dà nome, sesso e geni
+const char *pet_random_name(int sex, uint32_t *rng);
+const char *pet_random_family(uint32_t *rng);
 uint32_t pet_core_step(pet_t *p, uint32_t dt, const pet_clock_t *c);
 uint32_t pet_core_action(pet_t *p, pet_action_t a, pet_result_t *res);
 uint32_t pet_core_steps(pet_t *p, uint32_t n, bool walking);
@@ -108,7 +165,8 @@ uint8_t  pet_core_base_weight(int stage);
 bool     pet_core_alive(const pet_t *p);                            // nato e non morto
 uint32_t pet_core_egg_left(const pet_t *p);                         // secondi alla schiusa
 bool     pet_core_can_release(const pet_t *p);                      // ha almeno PET_RELEASE_S
-uint32_t pet_core_release(pet_t *p);                                // lo lascia tornare nell'oceano
+// lo lascia tornare nell'oceano (early: da adulto anche prima dei 25 giorni, se c'è un uovo nel nido)
+uint32_t pet_core_release(pet_t *p, bool early);
 
 // Durate (s), esposte per UI e test
 #define PET_EGG_S        60u
@@ -119,3 +177,6 @@ uint32_t pet_core_release(pet_t *p);                                // lo lascia
 #define PET_STARVE_S     (8u * 3600u)
 #define PET_SICK_DEATH_S (8u * 3600u)
 #define PET_RELEASE_S    (25u * 86400u)   // da qui in poi vive finché non lo lasci andare
+#define PET_PLAY_CD_S    1200u            // "Gioca" veloce: una volta ogni 20 minuti
+#define PET_REWARD_S     600u             // 10 minuti per premiare dopo la sgridata
+#define PET_SNACKS_FREE  3                // spuntini al giorno che non fanno ingrassare

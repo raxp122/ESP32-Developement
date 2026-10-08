@@ -17,10 +17,10 @@ if [ ! -f obj/liblvgl.a ]; then
     wait
     ar rcs obj/liblvgl.a obj/*.o
 fi
-SRC="$M/ui.c $M/menu.c $M/apps/home.c $M/apps/keyboard.c $M/apps/app_ota.c $M/apps/app_clock.c $M/apps/app_wifiscan.c $M/apps/app_portal.c $M/apps/app_settings.c $M/apps/app_seismo.c $M/seismo.c $M/apps/app_wifitest.c $M/apps/app_snake.c $M/apps/pet_art.c $M/apps/app_share.c $M/apps/shortcuts.c $M/apps/app_morse.c $M/morse.c $M/apps/app_chessplay.c $M/apps/chess_ui.c $M/chess_game.c $M/chess_engine.c $M/fonts_sel.c $M/fonts/*.c"
+SRC="$M/ui.c $M/menu.c $M/apps/home.c $M/apps/keyboard.c $M/apps/app_ota.c $M/apps/app_clock.c $M/apps/app_wifiscan.c $M/apps/app_portal.c $M/apps/app_settings.c $M/apps/app_seismo.c $M/seismo.c $M/apps/app_wifitest.c $M/apps/app_snake.c $M/apps/pet_art.c $M/apps/app_pet.c $M/apps/pet_games.c $M/apps/pet_book.c $M/apps/pet_social.c $M/apps/pet_mini.c $M/pet.c $M/pet_core.c $M/apps/app_share.c $M/apps/shortcuts.c $M/apps/app_morse.c $M/morse.c $M/apps/app_chessplay.c $M/apps/chess_ui.c $M/chess_game.c $M/chess_engine.c $M/fonts_sel.c $M/fonts/*.c"
 gcc $CFLAGS -DSEISMO_SIM -I$M -I$M/apps $SRC stubs.c sim_main.c obj/liblvgl.a -lm -o obj/sim
-./obj/sim round
-./obj/sim lcd
+./obj/sim round $1
+./obj/sim lcd $1
 python3 - <<'PY'
 from PIL import Image, ImageDraw
 import glob, os

@@ -109,7 +109,7 @@ Dal launcher: **Morse**. Per imparare il codice Morse e usarlo fra Gadget vicini
 - **Impostazioni**: velocità (5-35 parole al minuto), velocità effettiva (spaziatura di Farnsworth: lettere veloci e pause lunghe, il modo consigliato per imparare), tono (400-1200 Hz), canale del Telegrafo, ricomincia il corso. Progressi e impostazioni entrano nei backup.
 
 ## Orologio
-Dal launcher: **Orologio**. Ora grande con la data; swipe a destra mostra o nasconde i secondi. Sul tondo l'ora sta al centro del cerchio, secondi e data sotto. L'ora arriva da Internet (Wi-Fi) e si conserva nell'orologio della scheda: vedi [Data e ora](#data-e-ora).
+Dal launcher: **Orologio**. Ora grande con la data; swipe a destra mostra o nasconde i secondi. Sul tondo l'ora sta al centro del cerchio, secondi e data sotto. Il Polipetto passeggia accanto all'ora (a destra sul 3,49", sotto la data sul tondo); si toglie da Impostazioni › Polipetto › Sull'orologio. L'ora arriva da Internet (Wi-Fi) e si conserva nell'orologio della scheda: vedi [Data e ora](#data-e-ora).
 
 ## Orologio scacchi
 Dal launcher: **Orologio scacchi** → *Nuova partita*. Lo schermo è diviso in due: chi ha mosso tocca la sua metà e parte l'orologio dell'avversario (all'inizio il nero tocca la sua metà per far partire il bianco). **BOOT** mette in pausa (con *Riprendi* e *Azzera*); in partita gli swipe non fanno nulla, si esce dalla pausa con swipe a sinistra.
@@ -122,23 +122,72 @@ Impostazioni nel menu:
 - **Lato del bianco**, **Suoni** (clic della mossa, avvisi, tempo scaduto), **Avviso tempo basso** (10 s – 1 min: tempo in rosso, un bip, poi un tic al secondo negli ultimi 10), **Conta le mosse**.
 
 ## Polipetto
-Un Tamagotchi originale con un polpetto arancione in pixel art. Dal launcher: Polipetto (al primo avvio compare un uovo che si schiude in un minuto).
+Un Tamagotchi originale con un polpetto in pixel art. Dal launcher: Polipetto (al primo avvio compare un uovo che si schiude in un minuto). Gira sul 3,49"; sul tondo si vede nell'Orologio.
 
 | Comando | Azione |
 |---|---|
-| Swipe su / giù | sceglie l'icona: Cibo, Gioca, Pulisci, Medicina, Luce, Sgrida, Stato |
+| Swipe su / giù | sceglie l'icona: Cibo, Gioca, Pulisci, Medicina, Luce, Sgrida, Diario e altro |
 | Swipe a destra | conferma; nei sottomenu sceglie (Pasto, Spuntino, Acqua…) |
 | Swipe a sinistra · BOOT | indietro / esce |
 | Dito tenuto premuto | coccole |
 | Scuotere la scheda | lo fa ridere (se dorme lo svegli!) |
 
 Cresce da neonato a bimbo, ragazzo e adulto; la forma adulta (saggio, esploratore, normale, goloso, pasticcione) dipende dalle cure. Fame, sete, felicità, disciplina, peso, inchiostro da pulire, malattie, nanna con la luce: se lo trascuri può morire e si ricomincia da un nuovo uovo.
-Giochi: *Da che parte?*, *Pesca* (inclinando la scheda) e *Passeggiata* (contapassi: i passi lo rendono felice e sbloccano l'esploratore).
-Impostazioni › Polipetto: scorrere del tempo, orari di nanna e sveglia, versi, contapassi, verso dell'inclinazione, nuovo uovo.
+
+**Nome, sesso e carattere.** Alla nascita riceve un nome (si cambia da *Diario e altro › Cambia nome*), un cognome di famiglia, il sesso e i suoi geni.
+
+**Cibo.**
+- *Pasto*: +1 fame.
+- *Acqua*: +1 sete.
+- *Spuntino*: non sazia, dà +1 felicità. I primi 3 del giorno non fanno ingrassare, dal quarto sì (e troppi lo rendono goloso). Se lo dai entro 10 minuti da una sgridata meritata (un capriccio) è un **premio**: +2 felicità, +1 disciplina, e non conta come golosità.
+
+**Gioca.**
+- *Gioca*: due tiri a palla, +1 felicità senza minigioco (una volta ogni 20 minuti).
+- *1, 2, 3 stella*: il polipetto conta girato verso lo scoglio. Tieni premuto (dito o BOOT) e il tuo pesciolino avanza. Quando si gira lascia subito, altrimenti ti vede e si riparte da zero. Hai 9 giri per arrivare; a volte finge di girarsi.
+- *Memoria*: ripeti la sequenza di frecce con gli swipe; a ogni giro si allunga (BOOT esce).
+- *Ritmo*: tocca lo schermo (o BOOT) quando la bolla entra nel cerchio. Perfetto = 2 punti, bene = 1.
+- *Da che parte?*, *Pesca* (inclinando la scheda), *Passeggiata* (contapassi).
+
+I minigiochi danno **conchiglie** e tengono i record. Le conchiglie arrivano anche da 1000 passi, dalle feste, dai compleanni e dalle visite.
+
+**Diario e altro.**
+- *Stato*: fame, sete, felicità, disciplina, passi.
+- *Diario*: nascita, evoluzioni, malattie, record, acquisti, visite, feste (gli ultimi 30 avvenimenti, con data e ora).
+- *Album di famiglia*: la collezione dei colori e delle forme scoperti, il polipetto di adesso e tutti quelli passati, con i loro colori.
+- *Famiglia e geni*: genitori, i quattro tratti con i due alleli (vedi sotto) e l'uovo nel nido.
+- *Negozio*: cappelli (cappellino, fiocco, cuffia, cappello da festa, cilindro, pirata, corona), accessori (fiore, papillon, sciarpa, occhiali da sole, monocolo) e decorazioni del fondale (stella marina, corallo, anfora, conchiglia gigante, forziere, castello, sottomarino). Destra compra (due volte, per conferma); poi indossa/toglie o espone/ritira.
+- *Incontra un amico*: vedi sotto.
+
+**Genetica.** Quattro tratti, ognuno con due alleli (uno dalla mamma, uno dal papà):
+- *Colore*: arancione, corallo, viola, azzurro, verde, rosa, oro. L'oro è recessivo e raro.
+- *Motivo*: tinta unita, a puntini (dominante), a strisce (recessivo).
+- *Tentacoli*: normali, lunghi, corti (recessivi).
+- *Carattere*:
+  - calmo: si rattrista più piano, meno capricci;
+  - vivace: le vittorie valgono doppio, ma si annoia prima;
+  - goloso: ha fame più spesso, gli spuntini valgono doppio.
+
+Si vede l'allele dominante (a pari dominanza quello della mamma). Ogni figlio prende a caso un allele per tratto da ciascun genitore, con una piccola probabilità di mutazione. I polipetti dei firmware precedenti restano arancioni a tinta unita.
+
+**Incontra un amico (ESP-NOW).** Due Gadget vicini con *Diario e altro › Incontra un amico* aperto si trovano via radio, senza rete. Ognuno vede l'altro polipetto con i suoi colori e vestiti.
+- Dopo 5 secondi insieme è una visita: +2 felicità e 3 conchiglie (una volta all'ora per amico). La visita finisce nel diario e l'amico resta nella lista.
+- *Su*: regala 5 conchiglie all'altro.
+- *Destra* (solo adulti di sesso diverso, con il nido vuoto): propone un uovo. Quando lo propongono tutti e due, **ognuno riceve un uovo** con un allele per tratto da ciascun genitore. L'uovo aspetta nel nido (si vede sul fondo).
+
+**Generazioni.** Dai 25 giorni non invecchia più: vive per sempre, oppure da Impostazioni › Polipetto puoi lasciarlo tornare nell'oceano. Con un uovo nel nido può partire già da adulto. Quando parte:
+- se c'è un uovo nel nido, nasce quello;
+- altrimenti lascia un uovo suo, della stessa famiglia, con i suoi geni rimescolati.
+
+Chi se ne va finisce nell'album.
+
+**Calendario.**
+- Il fondale segue l'ora (alba, giorno, tramonto, notte con il plancton luminoso) e la stagione: neve marina d'inverno, petali in primavera, raggi di sole d'estate, foglie in superficie d'autunno.
+- Feste con decorazioni e un regalo di 10 conchiglie una volta l'anno: Capodanno, Befana, San Valentino, Pasqua e Pasquetta, Ferragosto, Giornata del polpo (8 ottobre), Halloween, Natale, San Silvestro.
+- Ogni settimana di età è un compleanno, con torta e 5 conchiglie.
+
+Impostazioni › Polipetto: scorrere del tempo, orari di nanna e sveglia, versi, contapassi, verso dell'inclinazione, **Sull'orologio** (il polipetto passeggia accanto all'ora), partenza per l'oceano, nuovo uovo.
 - *Ibrida* (consigliata): tempo reale, anche a scheda spenta, ma negli orari di nanna scelti dorme protetto: nessuna chiamata, nessun errore, nessun pericolo. Senza ora impostata avanza solo a scheda accesa.
 - *Tempo reale*, *Solo a scheda accesa*, *Solo con l'app aperta*.
-
-Dai 25 giorni non invecchia più: vive per sempre, oppure da Impostazioni puoi lasciarlo tornare nell'oceano e ricominciare da un uovo.
 
 ## Q-20
 Dal launcher: **Q-20**. Pensa a qualcosa (animale, oggetto, cibo, luogo, persona…) e rispondi alle domande toccando *Sì*, *Forse sì*, *Non so*, *Forse no*, *No*. Dopo una ventina di domande (prima, se è sicuro) prova a indovinare; se sbaglia continua, fino a 30. Se vince lui, ricorda ancora meglio quella cosa; se perde ti chiede cosa pensavi e la impara. Il pulsante ← (o BOOT) torna indietro all'ultima domanda se cambi idea, anche quando sta già provando a indovinare.
@@ -273,7 +322,7 @@ Sulla scheda 3.49 V1 l'orologio interno non ha una batteria tampone: da spenta l
 ### Backup e ripristino
 Impostazioni › Backup e ripristino:
 - **Crea un backup ora**: salva in un file della cartella `backup` sulla microSD tutto quello che scegli o crei:
-  - dalla memoria interna: impostazioni e Wi-Fi, Polipetto, livella, Radar, Theremin, Scacchi (impostazioni ed Elo), Sismografo, gli Appunti ricevuti, il record di Snake, il corso Morse;
+  - dalla memoria interna: impostazioni e Wi-Fi, Polipetto (con conchiglie, oggetti, diario, album e amici), livella, Radar, Theremin, Scacchi (impostazioni ed Elo), Sismografo, gli Appunti ricevuti, il record di Snake, il corso Morse;
   - dalla microSD, cartelle intere: `pwn/` (Pokédex e catture del Radar), `q20/` (quello che ha imparato), `scacchi/` (partite, Elo, esercizi), `sismo/` (eventi), `theremin/` (registrazioni), `doom/` (salvataggi e configurazione; i WAD no, si ricopiano a parte).
 
   Con molte registrazioni il backup diventa grande e ci mette un po'.
@@ -305,7 +354,8 @@ Immagine unica per il flasher web (indirizzo 0x0), come fa la build su GitHub:
 
 ## Prove sul PC
 Senza la scheda si possono provare parecchie cose sul PC:
-- **Simulatore dell'interfaccia** (`tools/sim/run.sh`): compila LVGL e le schermate con gcc e salva le immagini in `tools/sim/png/`, sia per il 3,49" (`349_*`) sia per il tondo (`tondo_*`). Le scene (in `sim_main.c`) percorrono menu, Tester Wi-Fi, Sismografo, Snake e Scacchi; la "microSD" è la cartella `/sdcard` del PC. Serve prima un `idf.py build` (per `build/config/sdkconfig.h`) e Python con Pillow.
+- **Simulatore dell'interfaccia** (`tools/sim/run.sh`): compila LVGL e le schermate con gcc e salva le immagini in `tools/sim/png/`, sia per il 3,49" (`349_*`) sia per il tondo (`tondo_*`). Le scene (in `sim_main.c`) percorrono menu, Tester Wi-Fi, Sismografo, Snake, Scacchi e Polipetto (`run.sh pet` fa solo il Polipetto); la "microSD" è la cartella `/sdcard` del PC. Serve prima un `idf.py build` (per `build/config/sdkconfig.h`) e Python con Pillow.
+- **Polipetto** (`tools/pet/pet_test.c`): genetica (dominanza, eredità, mutazioni), spuntino come premio, "Gioca" veloce, salvataggi vecchi, partenza con l'uovo nel nido.
 - **Morse** (`tools/morse/morse_test.c`): il testo diventa audio con rumore a varie velocità, frequenze e volumi, e il rilevatore con la decodifica devono restituirlo; prova anche una battuta a mano irregolare.
 - **Motore degli Scacchi** (`tools/chess/chess_test.c`): perft su posizioni di riferimento, notazione, libro delle aperture, problemi tattici e partite fra livelli; `tools/chess/store_test.c` prova l'archivio (salvataggio, analisi, rilettura PGN, Elo, esportazione). I comandi sono in cima ai file.
 
@@ -322,7 +372,8 @@ Il firmware conserva in RAM gli ultimi 16 KB di log dall'accensione. Dal monitor
 - `main/menu.c` menu generico (usato da home e impostazioni)
 - `main/wifi_mgr.*` Wi-Fi, scansione, portale captive per configurare la rete dal telefono, NTP
 - `main/ble_mgr.*` NimBLE: visibilità, scansione, collegamenti nei due sensi, associazioni, profili · `main/apps/app_bt.c` le schermate
-- `main/pet_core.*` regole del Polipetto (pure, senza hardware) · `main/pet.*` tempo reale, salvataggio, contapassi, versi
+- `main/pet_core.*` regole del Polipetto e genetica (pure, senza hardware) · `main/pet.*` tempo reale, salvataggio, contapassi, versi, conchiglie, diario, album, amici, calendario delle feste
+- `main/apps/app_pet.c` l'app del Polipetto · `pet_ui.h` i moduli: `pet_games.c` (1-2-3 stella, Memoria, Ritmo), `pet_book.c` (diario, album, famiglia, negozio), `pet_social.c` (visite ESP-NOW), `pet_mini.c` (sull'orologio) · `pet_art.c` pixel art, colori dei geni, cappelli, decorazioni, fondale
 - `main/clips.*` Appunti (testi dal PC) · `main/clip_ble.c` servizio Bluetooth di ricezione · `main/usbhid.*` tastiera USB · `main/apps/app_clips.c` le schermate
 - `main/backup.*` backup e ripristino su microSD · `main/ota.*` aggiornamenti via internet · `main/settings.*` impostazioni (con migrazione dalla vecchia tabella)
 - `main/chess_engine.*` regole e motore degli Scacchi · `main/chess_game.*` partite, analisi, Elo, archivio PGN · `main/apps/chess_ui.c` scacchiera · `main/apps/app_chessplay.c` le schermate · `tools/chess/` prove sul PC (perft, notazione, livelli, archivio)

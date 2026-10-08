@@ -8,3 +8,4 @@ dependencies.lock
 # Appunti: tastiera USB (TinyUSB) scaricata solo in CI
 managed_components/
 main/idf_component.yml
+tools/pet/pet_test
