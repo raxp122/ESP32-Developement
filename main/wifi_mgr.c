@@ -5,6 +5,7 @@
 #include "board.h"
 #include <string.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <ctype.h>
 #include <sys/time.h>
 #include "freertos/FreeRTOS.h"
@@ -51,7 +52,8 @@ static volatile bool dns_run;
 static volatile bool portal_saved;
 static volatile int portal_clients;
 static char ap_ssid[24];
-static int portal_kind;   // 0 = configura Wi-Fi, 1 = pagina Appunti
+static int portal_kind;   // 0 = configura Wi-Fi, 1 = pagina Appunti, 2 = file di testo dalla microSD
+static char portal_file[64], portal_dl[32], portal_title[48];   // kind 2: il file, il nome per scaricarlo, il titolo
 static char pend_ssid[33], pend_pass[65];   // credenziali dal portale, da applicare
 static bool pend_creds;
 
@@ -555,14 +557,67 @@ static const char PAGE_CLIPS[] =
     "var a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='gadget-appunti.html';a.click();};"
     "</script></html>";
 
+// kind 2: "/" è una pagina col testo e i pulsanti Copia tutto / Scarica, "/<nome>" il file
+static const char FILE_HEAD[] =
+    "<style>textarea{width:100%;box-sizing:border-box;height:55vh;margin-top:14px;padding:10px;border-radius:10px;"
+    "border:1px solid #2a2f35;background:#16191d;color:#ededed;font:12px ui-monospace,monospace}"
+    "a.d{display:block;margin-top:10px;padding:14px;border-radius:10px;background:#24282d;color:#ededed;text-align:center;"
+    "text-decoration:none;font:600 1rem system-ui}#ok{color:#5cff8a;margin:10px 0 0}p.n{font-size:.85rem;margin-top:14px}</style>";
+static const char FILE_TAIL[] =
+    "</textarea><p class=n>Se i pulsanti non fanno nulla sei nella finestrina di accesso alla rete: chiudila restando "
+    "collegato all'hotspot e apri <b>192.168.4.1</b> nel browser.</p><script>"
+    "function m(s){document.getElementById('ok').textContent=s}"
+    "document.getElementById('cp').onclick=function(){var t=document.getElementById('t');t.focus();t.select();"
+    "t.setSelectionRange(0,t.value.length);var ok=false;try{ok=document.execCommand('copy')}catch(e){}"
+    "if(!ok&&navigator.clipboard){navigator.clipboard.writeText(t.value).then(function(){m('Copiato: incollalo nella chat')},"
+    "function(){m('Seleziona il testo e copialo a mano')});return}"
+    "m(ok?'Copiato: incollalo nella chat':'Seleziona il testo e copialo a mano')};</script></html>";
+
+static esp_err_t send_file(httpd_req_t *r, bool download)
+{
+    FILE *f = fopen(portal_file, "r");
+    if (!f) {
+        httpd_resp_set_type(r, "text/html; charset=utf-8");
+        return httpd_resp_sendstr(r, "<!doctype html><meta charset=utf-8><p>File non trovato sulla microSD.</p>");
+    }
+    char *b = malloc(1025);
+    if (!b) { fclose(f); return httpd_resp_send_500(r); }
+    size_t n;
+    esp_err_t e = ESP_OK;
+    if (download) {
+        char disp[80];
+        httpd_resp_set_type(r, "text/plain; charset=utf-8");
+        snprintf(disp, sizeof(disp), "attachment; filename=\"%s\"", portal_dl);
+        httpd_resp_set_hdr(r, "Content-Disposition", disp);
+        while (e == ESP_OK && (n = fread(b, 1, 1024, f)) > 0) e = httpd_resp_send_chunk(r, b, n);
+    } else {
+        httpd_resp_set_type(r, "text/html; charset=utf-8");
+        httpd_resp_sendstr_chunk(r, PAGE_HEAD);
+        httpd_resp_sendstr_chunk(r, FILE_HEAD);
+        httpd_resp_sendstr_chunk(r, "<h1>");
+        html_escape(r, portal_title);
+        httpd_resp_sendstr_chunk(r, "</h1><p>Copia il testo e incollalo nella chat di un'IA, oppure scarica il file.</p>"
+                                    "<button class=s id=cp>Copia tutto</button><a class=d href=\"/");
+        html_escape(r, portal_dl);
+        httpd_resp_sendstr_chunk(r, "\" download>Scarica il file</a><p id=ok></p><textarea id=t readonly>");
+        while ((n = fread(b, 1, 1024, f)) > 0) { b[n] = 0; html_escape(r, b); }
+        e = httpd_resp_sendstr_chunk(r, FILE_TAIL);
+    }
+    free(b);
+    fclose(f);
+    return e == ESP_OK ? httpd_resp_send_chunk(r, NULL, 0) : e;
+}
+
 static esp_err_t page_get(httpd_req_t *r)
 {
+    if (portal_kind == 2 && r->uri[0] == '/' && !strcmp(r->uri + 1, portal_dl)) return send_file(r, true);
     if (strcmp(r->uri, "/") != 0) {
         // qualsiasi altro indirizzo (es. i controlli captive di Android/iOS) porta al portale
         httpd_resp_set_status(r, "302 Found");
         httpd_resp_set_hdr(r, "Location", "http://192.168.4.1/");
         return httpd_resp_send(r, NULL, 0);
     }
+    if (portal_kind == 2) return send_file(r, false);
     if (portal_kind == 1) {
         httpd_resp_set_type(r, "text/html; charset=utf-8");
         httpd_resp_sendstr_chunk(r, PAGE_CLIPS);
@@ -661,6 +716,14 @@ void wifi_mgr_portal_poll(void)
 
 void wifi_mgr_portal_start(void)      { portal_kind = 0; wifi_mgr_portal_open(); }
 void wifi_mgr_portal_start_clips(void) { portal_kind = 1; wifi_mgr_portal_open(); }
+void wifi_mgr_portal_start_file(const char *path, const char *download_name, const char *title)
+{
+    strlcpy(portal_file, path, sizeof(portal_file));
+    strlcpy(portal_dl, download_name, sizeof(portal_dl));
+    strlcpy(portal_title, title, sizeof(portal_title));
+    portal_kind = 2;
+    wifi_mgr_portal_open();
+}
 
 void wifi_mgr_portal_open(void)
 {

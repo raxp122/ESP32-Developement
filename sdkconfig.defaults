@@ -46,3 +46,6 @@ CONFIG_TINYUSB_HID_COUNT=1
 # Scacchi: il motore gira in un task con lo stack in PSRAM
 CONFIG_FREERTOS_TASK_CREATE_ALLOW_EXT_MEM=y
 CONFIG_SPIRAM_ALLOW_STACK_EXTERNAL_MEMORY=y
+
+# QR (Scacchi: esportazione sul telefono)
+CONFIG_LV_USE_QRCODE=y

@@ -132,7 +132,11 @@ Dal launcher: **Scacchi**. Un motore scritto apposta per il Gadget gira sulla sc
 - **Allenamento**: le posizioni dove hai commesso un errore o un grave errore (nelle partite analizzate) diventano esercizi: trova la mossa migliore.
   - Se giochi una mossa diversa ma buona quanto quella del Gadget, il Gadget la controlla e la accetta.
   - Gli esercizi sbagliati tornano più spesso.
-- **Esporta per un'IA**: scrive `scacchi/per_IA.txt` con istruzioni, riepilogo (Elo e andamento, risultati, aperture che scegli, precisione media) e tutte le partite contro il Gadget in PGN, con i commenti dell'analisi dove c'è. Lo copi in un assistente come Claude per un'analisi del tuo stile e un piano di allenamento.
+- **Esporta per un'IA**: scrive `scacchi/per_IA.txt` con istruzioni, riepilogo (Elo e andamento, risultati, aperture che scegli, precisione media) e tutte le partite contro il Gadget in PGN, con i commenti dell'analisi dove c'è. Poi passa al telefono, senza Internet:
+  1. inquadra il primo QR: il telefono si collega all'hotspot del Gadget e di solito la pagina si apre da sola (se no, il secondo QR apre http://192.168.4.1);
+  2. sulla pagina **Copia tutto** e incolla nella chat di un assistente come Claude, per un'analisi del tuo stile e un piano di allenamento; oppure **Scarica il file**.
+
+  Sul tondo i QR si vedono uno alla volta (su/giù). Su iPhone, nella finestrina che si apre al collegamento i pulsanti possono non funzionare: chiudila restando collegato e apri 192.168.4.1 nel browser. Uscendo dalla schermata l'hotspot si spegne e il Wi-Fi torna com'era.
 - **Sulla microSD** (cartella `scacchi/`): `partite/0001.pgn`… (PGN standard, si aprono con qualunque programma di scacchi), `indice.csv`, `elo.csv`, `esercizi.csv`, `incorso.txt`. Senza scheda si gioca lo stesso, ma le partite non restano; l'Elo sì, nella memoria interna.
 - **Notazione**: italiana (C A T D R) o inglese (N B R Q K), solo sullo schermo; i file sono sempre in PGN inglese.
 
@@ -235,6 +239,7 @@ Dalla 0.14 le impostazioni (NVS) stanno in fondo alla flash (`0xFF0000`): né l'
 - `main/clips.*` Appunti (testi dal PC) · `main/clip_ble.c` servizio Bluetooth di ricezione · `main/usbhid.*` tastiera USB · `main/apps/app_clips.c` le schermate
 - `main/backup.*` backup e ripristino su microSD · `main/ota.*` aggiornamenti via internet · `main/settings.*` impostazioni (con migrazione dalla vecchia tabella)
 - `main/chess_engine.*` regole e motore degli Scacchi · `main/chess_game.*` partite, analisi, Elo, archivio PGN · `main/apps/chess_ui.c` scacchiera · `main/apps/app_chessplay.c` le schermate · `tools/chess/` prove sul PC (perft, notazione, livelli, archivio)
+- `main/apps/app_share.c` "Sul telefono": hotspot + QR per passare un file di testo al telefono (Copia tutto / Scarica)
 - `main/apps/` le app (`app_pet.c` + `pet_art.c` per il Polipetto, `app_ota.c` per gli aggiornamenti, `app_backup.c`, `app_level.c` per la livella)
 - `components/axs15231b` driver Waveshare inclusi nel progetto
 

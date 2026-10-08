@@ -214,6 +214,11 @@ int main(int argc, char **argv)
         ui_pop(); run(300);
         nav(NAV_NEXT); nav(NAV_NEXT); nav(NAV_SELECT); run(400);
         shot("35_scacchi_elo");
+        ui_pop(); run(300);
+        nav(NAV_NEXT); nav(NAV_SELECT); run(400);   // Esporta per un'IA: QR sul telefono
+        shot("36_scacchi_telefono");
+        nav(NAV_NEXT); run(200);
+        shot("37_scacchi_telefono_2");
         ui_pop(); run(300); ui_pop(); run(300);
         #undef GOTO
     }

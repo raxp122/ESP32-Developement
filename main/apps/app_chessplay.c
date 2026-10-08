@@ -10,6 +10,7 @@
 #include "chess_ui.h"
 #include "chess_game.h"
 #include "settings.h"
+#include "sd.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -1117,11 +1118,10 @@ static void a_export(void)
 {
     init_once();
     char p[64];
-    if (cg_export_llm(p, sizeof(p))) {
-        char m[96];
-        snprintf(m, sizeof(m), "Salvato in %s", p);
-        ui_toast(m);
-    } else ui_toast(cg_store_ok() ? "Non riesco a scrivere sulla microSD" : "Serve la microSD");
+    if (!cg_export_llm(p, sizeof(p))) { ui_toast(cg_store_ok() ? "Non riesco a scrivere sulla microSD" : "Serve la microSD"); return; }
+    // e subito sul telefono: QR dell'hotspot, pagina con Copia tutto e Scarica
+    static const share_req_t sr = {SD_MOUNT "/scacchi/per_IA.txt", "scacchi-per-IA.txt", "Scacchi per un'IA"};
+    ui_push(&app_share, (void *)&sr);
 }
 static void v_level(char *b, int n)
 {
@@ -1159,7 +1159,7 @@ static const menu_item_t items[] = {
     {.icon = LV_SYMBOL_LIST, .label = "Partite giocate", .value = v_games, .app = &app_clist},
     {.icon = ICON_EYE, .label = "Allenamento", .value = v_train, .app = &app_ctrain},
     {.icon = ICON_SLIDERS, .label = "Il tuo Elo", .value = v_elo, .app = &app_celo},
-    {.icon = LV_SYMBOL_SD_CARD, .label = "Esporta per un'IA", .hint = "Partite e riepilogo in scacchi/per_IA.txt", .on_select = a_export},
+    {.icon = LV_SYMBOL_SD_CARD, .label = "Esporta per un'IA", .hint = "Sul telefono con un QR (e in scacchi/per_IA.txt)", .on_select = a_export},
     {.icon = ICON_CHIP, .label = "Livello del Gadget", .value = v_level, .on_adjust = j_level},
     {.icon = LV_SYMBOL_SHUFFLE, .label = "Il tuo colore", .value = v_color, .on_adjust = j_color},
     {.icon = LV_SYMBOL_EDIT, .label = "Notazione", .value = v_not, .on_select = a_not},
