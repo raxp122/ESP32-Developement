@@ -6,6 +6,7 @@
 #include "settings.h"
 #include "wifi_mgr.h"
 #include "ble_mgr.h"
+#include "pet.h"
 #include <stdio.h>
 #include <string.h>
 #include <time.h>
@@ -318,6 +319,7 @@ void ui_power_off(void)
     lv_label_set_text(l, "Spegnimento…");
     lv_obj_center(l);
     lv_refr_now(NULL);
+    pet_save();   // il polipetto si salva ogni tanto: allo spegnimento va scritto ora
     board_power_off();
     lv_timer_t *t = lv_timer_create(power_off_check, 1500, NULL);
     lv_timer_set_repeat_count(t, 1);
@@ -454,13 +456,15 @@ static void list_view_set_round(list_view_t *v, const char *t, bool has_sub, int
 void list_view_create(list_view_t *v, lv_obj_t *root)
 {
     if (SCR_ROUND) { list_view_create_round(v, root); return; }
+    // altezza di una riga: con l'altezza automatica i puntini non scattano e un testo
+    // lungo andrebbe a capo, sopra la riga sotto
     v->prev = mk_label(root, &font_m, C_DIM);
     lv_obj_set_pos(v->prev, 76, 8);
-    lv_obj_set_width(v->prev, 520);
+    lv_obj_set_size(v->prev, 520, lv_font_get_line_height(&font_m));
 
     v->next = mk_label(root, &font_m, C_DIM);
     lv_obj_set_pos(v->next, 76, CONTENT_H - 30);
-    lv_obj_set_width(v->next, 520);
+    lv_obj_set_size(v->next, 520, lv_font_get_line_height(&font_m));
 
     v->marker = lv_obj_create(root);
     lv_obj_remove_style_all(v->marker);
@@ -475,10 +479,10 @@ void list_view_create(list_view_t *v, lv_obj_t *root)
     lv_obj_set_pos(v->icon, 12, CONTENT_H / 2 - 24);
 
     v->main = mk_label(root, &font_l, C_TEXT);
-    lv_obj_set_width(v->main, 530);
+    lv_obj_set_size(v->main, 530, lv_font_get_line_height(&font_l));
 
     v->sub = mk_label(root, &font_m, ui_accent());
-    lv_obj_set_width(v->sub, 530);
+    lv_obj_set_size(v->sub, 530, lv_font_get_line_height(&font_m));
     lv_obj_set_style_pad_hor(v->sub, 0, 0);
     lv_obj_set_style_radius(v->sub, 4, 0);
 

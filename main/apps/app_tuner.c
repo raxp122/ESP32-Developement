@@ -59,7 +59,6 @@ static const char *n_us[12] = {"C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", 
 static const char *n_it[12] = {"Do", "Do#", "Re", "Re#", "Mi", "Fa", "Fa#", "Sol", "Sol#", "La", "La#", "Si"};
 
 static float a4(void) { return g_set.a4_x10 / 10.0f; }
-static float midi_hz(float m) { return a4() * powf(2.0f, (m - 69.0f) / 12.0f); }
 static float hz_midi(float f) { return 69.0f + 12.0f * log2f(f / a4()); }
 
 static void tuning_notes(const tuning_t *t, char *b, int n)
@@ -412,8 +411,8 @@ static void ui_cb(lv_timer_t *t)
 
     if (tun) {
         int tm = (int)target;
-        snprintf(b, sizeof(b), "%+.0f cent · corda %s%d (%s) %.1f Hz", cents, n_us[tm % 12], tm / 12 - 1,
-                 n_it[tm % 12], midi_hz(target));
+        // una riga sola: la frequenza della corda andava a capo sopra il LA di riferimento
+        snprintf(b, sizeof(b), "%+.0f cent · corda %s%d (%s)", cents, n_us[tm % 12], tm / 12 - 1, n_it[tm % 12]);
     } else {
         snprintf(b, sizeof(b), "%+.1f cent", cents);
     }
