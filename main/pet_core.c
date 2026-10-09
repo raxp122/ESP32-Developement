@@ -328,8 +328,9 @@ uint32_t pet_core_step(pet_t *p, uint32_t dt, const pet_clock_t *c)
     p->t_play_cd = p->t_play_cd > dt ? p->t_play_cd - dt : 0;
     p->t_reward = p->t_reward > dt ? p->t_reward - dt : 0;
 
-    // nanna: a orari fissi; al risveglio la luce si riaccende da sola
-    bool night = sleep_now(p->stage, c);
+    // nanna: a orari fissi; al risveglio la luce si riaccende da sola. Senza un'ora valida
+    // (es. subito dopo l'accensione) non si sa se è notte: resta com'era, luce compresa
+    bool night = c->hour < 0 ? p->asleep : sleep_now(p->stage, c);
     if (night && !p->asleep) {
         p->asleep = 1;
         p->tantrum = 0;

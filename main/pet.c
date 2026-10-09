@@ -305,7 +305,8 @@ static void timer_cb(lv_timer_t *tm)
     if (runs && dt) {
         // senza un'ora valida la modalità ibrida non sa quando è notte: avanza come
         // "solo a scheda accesa" (nessun recupero, nessun orario)
-        pet_clock_t c = clock_at(known ? lt.tm_hour : -1);
+        // (chi dormiva resta a dormire; dopo un'ora senza orologio però si fa giorno)
+        pet_clock_t c = clock_at(known ? lt.tm_hour : sim_unknown >= 3600 ? 12 : -1);
         ev |= pet_core_step(&P, dt, &c);
         if (!known) sim_unknown += dt;
     }
@@ -445,6 +446,8 @@ uint32_t pet_do(pet_action_t a, pet_result_t *res)
     uint32_t ev = pet_core_action(&P, a, &r);
     if (res) *res = r;
     dirty = true;
+    // la luce si salva subito: spesso la si spegne e poi si spegne anche la scheda
+    if (a == ACT_LIGHT) pet_save();
     int snd = -1;
     if (r == RES_OK) {
         switch (a) {

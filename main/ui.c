@@ -6,6 +6,7 @@
 #include "settings.h"
 #include "wifi_mgr.h"
 #include "ble_mgr.h"
+#include "pet.h"
 #include <stdio.h>
 #include <string.h>
 #include <time.h>
@@ -318,6 +319,7 @@ void ui_power_off(void)
     lv_label_set_text(l, "Spegnimento…");
     lv_obj_center(l);
     lv_refr_now(NULL);
+    pet_save();   // il polipetto si salva ogni tanto: allo spegnimento va scritto ora
     board_power_off();
     lv_timer_t *t = lv_timer_create(power_off_check, 1500, NULL);
     lv_timer_set_repeat_count(t, 1);
