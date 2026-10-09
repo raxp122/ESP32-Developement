@@ -278,7 +278,10 @@ static void a_reset(void)
     ui_toast("Impostazioni ripristinate");
 }
 
+static void v_board(char *b, int n) { snprintf(b, n, "%s", board_name() + 9); }   // senza "ESP32-S3-"
+
 static const menu_item_t sys_items[] = {
+    {.icon = ICON_CHIP, .label = "Scheda", .value = v_board},
     {.icon = LV_SYMBOL_BATTERY_FULL, .label = "Batteria", .value = v_batt},
     {.icon = ICON_CHIP, .label = "Memoria libera", .value = v_mem},
     {.icon = ICON_INFO, .label = "Firmware", .value = v_fw},

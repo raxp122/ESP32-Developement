@@ -21,7 +21,7 @@ wifi_state_t sim_wifi = WIFI_CONNECTED;
 ota_state_t sim_ota = OTA_AVAILABLE;
 
 board_kind_t board_kind(void) { return sim_round ? BOARD_AMOLED175 : BOARD_LCD349; }
-const char *board_name(void) { return "sim"; }
+const char *board_name(void) { return sim_round ? "ESP32-S3-Touch-AMOLED-1.75" : "ESP32-S3-Touch-LCD-3.49 V1"; }
 void board_power_off(void) {}
 float board_battery_volts(void) { return 3.9f; }
 int board_battery_percent(float v) { return 76; }

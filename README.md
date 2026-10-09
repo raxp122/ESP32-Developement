@@ -1,7 +1,7 @@
-# Gadget — launcher per Waveshare ESP32-S3-Touch-LCD-3.49 (V1) e ESP32-S3-Touch-AMOLED-1.75
+# Gadget — launcher per Waveshare ESP32-S3-Touch-LCD-3.49 (V1 e V2) e ESP32-S3-Touch-AMOLED-1.75
 
 Firmware ESP-IDF 5.4 + LVGL 9.2 con menu a gesti e app modulari. Lo stesso firmware gira su due schede e all'avvio riconosce su quale si trova:
-- **ESP32-S3-Touch-LCD-3.49**: schermo in orizzontale 640×172;
+- **ESP32-S3-Touch-LCD-3.49** (V1 e V2): schermo in orizzontale 640×172;
 - **ESP32-S3-Touch-AMOLED-1.75** (anche -B e -G): AMOLED tondo 466×466, interfaccia in stile smartwatch.
 
 Si aggiorna via Wi-Fi: ogni modifica unita su `main` diventa una release che la scheda scarica e installa da Impostazioni › Sistema (vedi [Aggiornamenti](#aggiornamenti)).
@@ -12,6 +12,11 @@ Le schermate di questo README vengono dal simulatore (`tools/sim`): a sinistra l
 
 **Le app** (nel launcher in ordine alfabetico, con *Cerca* in cima):
 [8-Ball veggente](#8-ball-veggente) · [Accordatore](#accordatore) · [Appunti](#appunti-testo-dal-pc--tastiera-usb) · [Berciometro](#berciometro) · [Dadi](#dadi) · [Doom](#doom) · [Livella](#livella) · [Morse](#morse) · [Orologio](#orologio) · [Orologio scacchi](#orologio-scacchi) · [Polipetto](#polipetto) · [Q-20](#q-20) · [Radar](#radar) · [Scacchi](#scacchi) · [Scanner Wi-Fi e Bluetooth](#scanner-wi-fi-e-bluetooth) · [Sismografo](#sismografo) · [Snake](#snake) · [Spada laser](#spada-laser) · [Tester Wi-Fi](#tester-wi-fi) · [Theremin](#theremin) · [Torcia](#torcia) · [Impostazioni](#impostazioni)
+
+## 3.49: V1 e V2
+Dal giugno 2026 Waveshare vende la 3.49 **V2** (sul PCB c'è scritto "Rev1.1", sull'etichetta della scatola "V2"). Cambiano tre pin del display: la retroilluminazione passa dal GPIO8 al GPIO42 (con in più un'accensione sul TCA9554, EXIO1), il reset del display passa dal GPIO21 al TCA9554 (EXIO5) e sul GPIO21 arriva il TE; il GPIO8 diventa l'interrupt del TCA9554. Il resto (touch, microSD, audio, sensori, batteria, pulsanti) è uguale.
+
+Il firmware riconosce la versione da solo all'avvio, senza pilotare niente: legge il GPIO8 e il GPIO42 con il pull-down interno. Sulla V2 il GPIO8 resta alto (pull-up da 10K dell'interrupt del TCA9554), sulla V1 è il pin della retroilluminazione e resta basso. Quale ha riconosciuto si vede in Impostazioni › Sistema › Scheda e nel rapporto della [Diagnostica](#impostazioni). Il primo flash è lo stesso per tutte e due (`gadget.bin` a `0x0`).
 
 ## Scheda tonda (AMOLED 1.75)
 Il riconoscimento è automatico: se sul bus I2C dei pin 47/48 risponde il TCA9554 è la 3.49, se sui pin 15/14 risponde l'AXP2101 è l'AMOLED. Pin, display, touch, alimentazione, batteria, microSD e audio si configurano di conseguenza. Il primo flash si fa via USB (`gadget.bin` a `0x0`), poi gli aggiornamenti OTA sono gli stessi della 3.49.
@@ -387,7 +392,7 @@ Dal launcher: **Impostazioni**.
 - **App all'avvio**: vedi sotto.
 - **Polipetto**: vedi [Polipetto](#polipetto).
 - **Backup e ripristino**, **Data e ora**: vedi sotto.
-- **Sistema**: batteria, memoria libera (RAM interna e PSRAM), versione del firmware, [aggiornamento](#aggiornamenti) e controllo automatico degli aggiornamenti, tempo da quando è acceso, riavvia, spegni, ripristina le impostazioni.
+- **Sistema**: scheda riconosciuta (per la 3.49 anche V1 o V2), batteria, memoria libera (RAM interna e PSRAM), versione del firmware, [aggiornamento](#aggiornamenti) e controllo automatico degli aggiornamenti, tempo da quando è acceso, riavvia, spegni, ripristina le impostazioni.
 
 ### Wi-Fi
 Impostazioni › Wi-Fi › **Cerca reti e collegati**: elenco delle reti vicine, swipe a destra per collegarti (con la tastiera per la password). È la stessa schermata dello Scanner Wi-Fi, che funziona anche mentre sei connesso. Tocco prolungato: nuova scansione. In alternativa "Configura dal telefono" apre un hotspot con una pagina web.
