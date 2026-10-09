@@ -13,6 +13,8 @@
 #include "pet.h"
 #include "pet_art.h"
 #include <math.h>
+#include <unistd.h>
+#include "board.h"
 
 extern int sim_round;
 extern int16_t g_scr_w, g_scr_h;
@@ -54,6 +56,7 @@ int main(int argc, char **argv)
     sim_round = argc > 1 && !strcmp(argv[1], "round");
     if (!sim_round) { g_scr_w = 640; g_scr_h = 172; }
     g_set.brightness = 80; g_set.accent = 0; g_set.wifi_on = 1; g_set.pet_clock = 1; g_set.pet_steps = 1;
+    g_set.a4_x10 = 4400; g_set.volume = 70; g_set.saber_clash = 1;
     snprintf(g_set.wifi_ssid, sizeof(g_set.wifi_ssid), "Casa");
     ui_fonts_init();
     lv_init();
@@ -67,6 +70,7 @@ int main(int argc, char **argv)
     ui_init();
     pet_init();
     if (argc > 2 && !strcmp(argv[2], "pet")) goto pet;
+    if (argc > 2 && !strcmp(argv[2], "apps")) goto apps;
     shot("1_home");
     ui_push(&app_menu, &settings_menu);
     shot("2_impostazioni");
@@ -334,6 +338,115 @@ int main(int argc, char **argv)
     nav(NAV_SELECT);
     shot("48_diagnostica");
     ui_home(); run(300);
+apps:
+    // Le altre app (solo 3,49": sul tondo non si aprono ancora), per il README
+    if (!sim_round) {
+        extern int sim_tasks, sim_audio, sim_touch, sim_tx, sim_ty;
+        extern float sim_mic_hz, sim_mic_amp;
+        extern long long sim_timer_us;
+        extern vec3_t sim_acc;
+        #define TAP(x, y) do { sim_tx = (x); sim_ty = (y); sim_touch = 1; run(60); sim_touch = 0; run(300); } while (0)
+        extern const app_t app_8ball, app_tuner, app_bercio, app_level, app_q20, app_theremin, app_torch,
+                           app_search, app_blescan, app_clip_list;
+        extern menu_t tuner_menu, clips_menu, chess_menu, saber_menu;
+        // 8-Ball
+        ui_home(); run(300);
+        ui_push(&app_8ball, NULL);
+        shot("100_8ball");
+        nav(NAV_SELECT); run(3000);
+        shot("101_8ball_risposta");
+        // Accordatore: chitarra standard, un La appena calante; poi cromatico
+        ui_home(); run(300);
+        ui_push(&app_menu, &tuner_menu); run(200);
+        shot("102_accordatore_menu");
+        sim_tasks = 1; sim_audio = 1; sim_mic_amp = 6000; sim_mic_hz = 108.6f;
+        nav(NAV_NEXT); nav(NAV_SELECT); nav(NAV_SELECT);
+        for (int i = 0; i < 20; i++) { usleep(100000); run(100); }
+        shot("103_accordatore_chitarra");
+        ui_home(); run(300);
+        sim_mic_hz = 442.0f;
+        ui_push(&app_tuner, NULL);
+        for (int i = 0; i < 20; i++) { usleep(100000); run(100); }
+        shot("104_accordatore_cromatico");
+        ui_home(); run(300);
+        // Berciometro: una voce forte
+        sim_mic_hz = 300; sim_mic_amp = 1200;
+        ui_push(&app_bercio, NULL);
+        for (int i = 0; i < 25; i++) { usleep(100000); run(100); }
+        shot("105_berciometro");
+        ui_home(); run(300);
+        sim_mic_amp = 0; sim_audio = 0;
+        // Appunti
+        ui_push(&app_menu, &clips_menu); run(200);
+        shot("106_appunti_menu");
+        ui_push(&app_clip_list, NULL); run(300);
+        shot("107_appunti_codici");
+        ui_home(); run(300);
+        // Livella: calibrazione, poi in piano e sul lato
+        ui_push(&app_level, NULL); run(300);
+        shot("108_livella_calibrazione");
+        sim_acc = (vec3_t){0, 0, 1}; nav(NAV_SELECT); run(2500);
+        sim_acc = (vec3_t){0, -1, 0}; nav(NAV_SELECT); run(2500);
+        sim_acc = (vec3_t){0.035f, -0.02f, 0.999f}; run(2500);
+        shot("109_livella_piano");
+        sim_acc = (vec3_t){0.06f, -0.998f, 0}; run(2500);
+        shot("110_livella_lato");
+        sim_acc = (vec3_t){0, 0, 1};
+        ui_home(); run(300);
+        // Orologio scacchi: menu e una partita in corso
+        ui_push(&app_menu, &chess_menu); run(200);
+        shot("111_orologio_scacchi_menu");
+        nav(NAV_SELECT); run(300);
+        TAP(160, 90);                                  // il nero fa partire il bianco
+        for (int i = 0; i < 37; i++) { sim_timer_us += 1000000; run(100); }
+        TAP(480, 90);                                  // il bianco muove
+        for (int i = 0; i < 12; i++) { sim_timer_us += 1000000; run(100); }
+        shot("112_orologio_scacchi_partita");
+        sim_nav(NAV_BTN); run(300);
+        sim_nav(NAV_BACK); run(300);
+        ui_home(); run(300);
+        // Q-20: una partita a metà
+        ui_push(&app_q20, NULL); run(300);
+        shot("113_q20");
+        TAP(150, 140);
+        TAP(80, 140); TAP(560, 140);
+        shot("114_q20_domanda");
+        ui_home(); run(300);
+        // Spada laser
+        ui_push(&app_menu, &saber_menu); run(200);
+        shot("115_spada_menu");
+        nav(NAV_SELECT); run(300);
+        nav(NAV_SELECT); run(3500);
+        shot("116_spada_accesa");
+        sim_nav(NAV_BACK); run(1500);
+        ui_home(); run(300);
+        // Theremin: il dito sulla zona a sinistra
+        sim_audio = 1;
+        ui_push(&app_theremin, NULL); run(300);
+        sim_acc = (vec3_t){0, 0.42f, 0.91f};          // inclinata: la nota sale
+        sim_tx = 60; sim_ty = 60; sim_touch = 1; run(600);
+        shot("117_theremin");
+        sim_touch = 0; run(600);
+        sim_audio = 0; sim_acc = (vec3_t){0, 0, 1};
+        ui_home(); run(300);
+        // Torcia
+        ui_push(&app_torch, NULL); run(300);
+        shot("118_torcia");
+        nav(NAV_NEXT); run(300);
+        shot("119_torcia_colore");
+        ui_home(); run(300);
+        // Cerca: "dadi"
+        ui_push(&app_search, NULL); run(300);
+        TAP(2 * 64 + 32, 46 + 42 + 21); TAP(0 * 64 + 32, 46 + 42 + 21); TAP(2 * 64 + 32, 46 + 42 + 21); TAP(7 * 64 + 32, 46 + 21);
+        shot("120_cerca");
+        ui_home(); run(300);
+        // Scanner Bluetooth
+        ui_push(&app_blescan, NULL); run(1500);
+        shot("121_scanner_bt");
+        ui_home(); run(300);
+        sim_tasks = 0;
+    }
+    if (argc > 2 && !strcmp(argv[2], "apps")) return 0;
 pet:
     // Polipetto: una polpa saggia viola a puntini, con corona e una decorazione
     ui_home(); run(300);

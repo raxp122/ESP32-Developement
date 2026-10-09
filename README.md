@@ -6,6 +6,10 @@ Firmware ESP-IDF 5.4 + LVGL 9.2 con menu a gesti e app modulari. Lo stesso firmw
 
 Si aggiorna via Wi-Fi: ogni modifica unita su `main` diventa una release che la scheda scarica e installa da Impostazioni › Sistema (vedi [Aggiornamenti](#aggiornamenti)).
 
+<p><img src="docs/img/349_home.png" width="400" alt="home (3,49)"> <img src="docs/img/tondo_home.png" width="150" alt="home (tondo)"></p>
+
+Le schermate di questo README vengono dal simulatore (`tools/sim`): a sinistra la 3,49", a destra il tondo per le app che lì si aprono già.
+
 **Le app** (nel launcher in ordine alfabetico, con *Cerca* in cima):
 [8-Ball veggente](#8-ball-veggente) · [Accordatore](#accordatore) · [Appunti](#appunti-testo-dal-pc--tastiera-usb) · [Berciometro](#berciometro) · [Dadi](#dadi) · [Doom](#doom) · [Livella](#livella) · [Morse](#morse) · [Orologio](#orologio) · [Orologio scacchi](#orologio-scacchi) · [Polipetto](#polipetto) · [Q-20](#q-20) · [Radar](#radar) · [Scacchi](#scacchi) · [Scanner Wi-Fi e Bluetooth](#scanner-wi-fi-e-bluetooth) · [Sismografo](#sismografo) · [Snake](#snake) · [Spada laser](#spada-laser) · [Tester Wi-Fi](#tester-wi-fi) · [Theremin](#theremin) · [Torcia](#torcia) · [Impostazioni](#impostazioni)
 
@@ -34,16 +38,24 @@ Gli swipe lenti sono supportati: il dito si considera sollevato solo dopo ~85 ms
 
 **Cerca** (dal launcher): scrivi con la tastiera e trova app e voci di tutti i menu. Prima vengono i nomi che iniziano con quello che hai scritto, poi le parole interne; a parità, le app del launcher prima delle voci dei sottomenu (così "polipetto" apre l'app, e sotto ci sono le sue impostazioni). Su/giù scorre i risultati, destra apre.
 
+<p><img src="docs/img/349_cerca.png" width="400" alt="cerca (3,49)"></p>
+
 ## 8-Ball veggente
+<p><img src="docs/img/349_8ball.png" width="400" alt="8ball (3,49)"> <img src="docs/img/349_8ball_risposta.png" width="400" alt="8ball_risposta (3,49)"></p>
+
 Dal launcher: **8-Ball veggente**. Pensa a una domanda (da sì o no), scuoti la scheda o fai swipe a destra: la sfera ondeggia e dalla finestrella affiora il triangolo con una delle 20 risposte classiche (10 sì, 5 vaghe, 5 no; verde, colore d'accento, rosso). Mai la stessa due volte di fila.
 
 ## Accordatore
+<p><img src="docs/img/349_accordatore_chitarra.png" width="400" alt="accordatore_chitarra (3,49)"> <img src="docs/img/349_accordatore_cromatico.png" width="400" alt="accordatore_cromatico (3,49)"></p>
+
 Dal launcher: **Accordatore**. Ascolta con i due microfoni e riconosce la nota (algoritmo YIN, da circa 30 Hz, il Si grave del basso a 5 corde, a oltre 1,3 kHz).
 - **Cromatico**: qualsiasi strumento o voce: nota, ottava e scostamento in centesimi.
 - **Chitarra**, **Basso** (4, 5 e 6 corde), **Ukulele** (Sol acuto, Low G, Re, baritono): accordatura guidata corda per corda, anche con le accordature alternative.
 - **LA di riferimento** regolabile, con i **LA storici** (440, 442, 432, 415 barocco…) e il ritorno a 440 Hz. Lo usa anche il Theremin.
 
 ## Appunti (testo dal PC → tastiera USB)
+<p><img src="docs/img/349_appunti.png" width="400" alt="appunti (3,49)"> <img src="docs/img/349_appunti_codici.png" width="400" alt="appunti_codici (3,49)"></p>
+
 Serve per ridigitare codici e stringhe su un PC facendo da tastiera USB. Dal launcher: **Appunti**.
 
 1. **Ricevi dal PC** (Bluetooth): il Gadget si fa trovare per qualche minuto. Dal PC apri la pagina Appunti in Chrome o Edge, premi *Collega il Gadget*, scegli il nome `Gadget-xxxx`. Poi ogni testo che incolli nella pagina arriva nella lista del Gadget. Se il collegamento cade, *Invia* ricollega da solo il Gadget già scelto. Se la pagina dice che il Gadget non risponde, riapri *Ricevi dal PC*; se il Gadget compare tra i dispositivi associati nelle impostazioni Bluetooth di Windows, rimuovilo da lì (Windows ricorderebbe un elenco di servizi vecchio). Dopo questo aggiornamento scarica di nuovo la pagina dall'hotspot: la copia salvata prima ha la versione vecchia. Per ricevere la radio passa al Bluetooth: se prima c'era il Wi-Fi, uscendo da questa schermata il Bluetooth si spegne e torna il Wi-Fi.
@@ -54,9 +66,13 @@ Serve per ridigitare codici e stringhe su un PC facendo da tastiera USB. Dal lau
 Solo il PC collegato da *Ricevi dal PC* (o un dispositivo associato) può mandare testi: altri dispositivi nei paraggi vengono rifiutati. I testi restano salvati finché non li cancelli tu. Attenzione: mentre la tastiera USB è attiva la console seriale su USB si sospende (sull'ESP32-S3 la porta fa una cosa per volta) e torna quando esci.
 
 ## Berciometro
+<p><img src="docs/img/349_berciometro.png" width="400" alt="berciometro (3,49)"></p>
+
 Dal launcher: **Berciometro**. Misura il livello sonoro dal microfono (RMS su blocchi da 50 ms, media "Fast" da 125 ms come i fonometri), con grafico in tempo reale e record. BOOT o swipe a destra azzerano il record, su/giù regolano la calibrazione. I dB sono stimati (sensibilità del microfono e guadagno non sono documentati): ottimo per confronti, non è uno strumento certificato.
 
 ## Dadi
+<p><img src="docs/img/349_dadi_preferito.png" width="400" alt="dadi_preferito (3,49)"> <img src="docs/img/349_dadi_tiro.png" width="400" alt="dadi_tiro (3,49)"></p>
+
 Dal launcher: **Dadi**. Si compone un "pool" di dadi misti, con la somma automatica:
 - **d4, d6, d8, d10, d12, d20, d100**: quanti di ciascuno (destra per regolare, su/giù cambia); **Modificatore** da aggiungere; **Svuota il pool**.
 - **Tira**: risultato di ogni dado e totale. Swipe a destra o una scossa ritira, sinistra torna al pool.
@@ -83,6 +99,8 @@ Configurazione e salvataggi vanno in `doom/` sulla microSD. Audio non ancora imp
 Il motore è prboom (dal progetto retro-go, GPL): il firmware che lo include è distribuito sotto GPL.
 
 ## Livella
+<p><img src="docs/img/349_livella_piano.png" width="400" alt="livella_piano (3,49)"> <img src="docs/img/349_livella_lato.png" width="400" alt="livella_lato (3,49)"></p>
+
 Dal launcher: Livella. La prima volta chiede una calibrazione in due passi (appoggiata, poi in piedi sul lato lungo): così sa come è montato l'accelerometro. A ogni passo fai lo swipe e lascia la scheda: aspetta che smetta di muoversi e misura per circa un secondo (se la tocchi ricomincia). Poi riconosce da sola il modo:
 - **appoggiata**: bolla circolare con inclinazione X e Y;
 - **sul lato lungo**: tubo orizzontale;
@@ -97,6 +115,8 @@ Dal launcher: Livella. La prima volta chiede una calibrazione in due passi (appo
 | Swipe a sinistra | esce |
 
 ## Morse
+<p><img src="docs/img/349_morse_ascolta.png" width="400" alt="morse_ascolta (3,49)"> <img src="docs/img/tondo_morse_ascolta.png" width="150" alt="morse_ascolta (tondo)"> <img src="docs/img/349_morse_batti.png" width="400" alt="morse_batti (3,49)"> <img src="docs/img/tondo_morse_batti.png" width="150" alt="morse_batti (tondo)"></p>
+
 Dal launcher: **Morse**. Per imparare il codice Morse e usarlo fra Gadget vicini.
 
 - **Impara ad ascoltare** (metodo Koch): il Gadget suona una lettera e tu scegli quale era fra quattro (su/giù, destra conferma, BOOT la fa risentire). Si parte da K e M. Quando nelle ultime 20 risposte arrivi al 90%, si apre una lettera nuova, fino a 40 (lettere, numeri e punteggiatura). Le lettere nuove e quelle che sbagli escono più spesso. Dopo ogni risposta vedi la lettera e i suoi segni (• —).
@@ -111,9 +131,13 @@ Dal launcher: **Morse**. Per imparare il codice Morse e usarlo fra Gadget vicini
 - **Impostazioni**: velocità (5-35 parole al minuto), velocità effettiva (spaziatura di Farnsworth: lettere veloci e pause lunghe, il modo consigliato per imparare), tono (400-1200 Hz), canale del Telegrafo, ricomincia il corso. Progressi e impostazioni entrano nei backup.
 
 ## Orologio
+<p><img src="docs/img/349_orologio.png" width="400" alt="orologio (3,49)"> <img src="docs/img/tondo_orologio.png" width="150" alt="orologio (tondo)"> <img src="docs/img/349_orologio_polipetto.png" width="400" alt="orologio_polipetto (3,49)"></p>
+
 Dal launcher: **Orologio**. Ora grande con la data; swipe a destra mostra o nasconde i secondi. Sul tondo l'ora sta al centro del cerchio, secondi e data sotto. Il Polipetto passeggia accanto all'ora (a destra sul 3,49", sotto la data sul tondo); si toglie da Impostazioni › Polipetto › Sull'orologio. L'ora arriva da Internet (Wi-Fi) e si conserva nell'orologio della scheda: vedi [Data e ora](#data-e-ora).
 
 ## Orologio scacchi
+<p><img src="docs/img/349_orologio_scacchi.png" width="400" alt="orologio_scacchi (3,49)"></p>
+
 Dal launcher: **Orologio scacchi** → *Nuova partita*. Lo schermo è diviso in due: chi ha mosso tocca la sua metà e parte l'orologio dell'avversario (all'inizio il nero tocca la sua metà per far partire il bianco). **BOOT** mette in pausa (con *Riprendi* e *Azzera*); in partita gli swipe non fanno nulla, si esce dalla pausa con swipe a sinistra.
 
 Impostazioni nel menu:
@@ -124,6 +148,10 @@ Impostazioni nel menu:
 - **Lato del bianco**, **Suoni** (clic della mossa, avvisi, tempo scaduto), **Avviso tempo basso** (10 s – 1 min: tempo in rosso, un bip, poi un tic al secondo negli ultimi 10), **Conta le mosse**.
 
 ## Polipetto
+<p><img src="docs/img/349_polipetto.png" width="400" alt="polipetto (3,49)"> <img src="docs/img/349_polipetto_stella.png" width="400" alt="polipetto_stella (3,49)"></p>
+
+<p><img src="docs/img/349_polipetto_negozio.png" width="400" alt="polipetto_negozio (3,49)"> <img src="docs/img/349_polipetto_visita.png" width="400" alt="polipetto_visita (3,49)"></p>
+
 Un Tamagotchi originale con un polpetto in pixel art. Dal launcher: Polipetto (al primo avvio compare un uovo che si schiude in un minuto). Gira sul 3,49"; sul tondo si vede nell'Orologio.
 
 | Comando | Azione |
@@ -231,6 +259,8 @@ Impostazioni › Polipetto: scorrere del tempo, orari di nanna e sveglia, versi,
 - *Tempo reale*, *Solo a scheda accesa*, *Solo con l'app aperta*.
 
 ## Q-20
+<p><img src="docs/img/349_q20.png" width="400" alt="q20 (3,49)"></p>
+
 Dal launcher: **Q-20**. Pensa a qualcosa (animale, oggetto, cibo, luogo, persona…) e rispondi alle domande toccando *Sì*, *Forse sì*, *Non so*, *Forse no*, *No*. Dopo una ventina di domande (prima, se è sicuro) prova a indovinare; se sbaglia continua, fino a 30. Se vince lui, ricorda ancora meglio quella cosa; se perde ti chiede cosa pensavi e la impara. Il pulsante ← (o BOOT) torna indietro all'ultima domanda se cambi idea, anche quando sta già provando a indovinare.
 
 - Conosce all'inizio 250 cose e 100 domande (tabella generata da `tools/q20_gen.py`).
@@ -240,6 +270,8 @@ Dal launcher: **Q-20**. Pensa a qualcosa (animale, oggetto, cibo, luogo, persona
 - Ampliare la conoscenza iniziale: modifica `tools/q20_gen.py` (le domande nuove solo in fondo), lancia `python3 tools/q20_gen.py` e aumenta `SEED_VERSION`: il Gadget aggiunge le cose nuove al suo file senza toccare quello che ha imparato.
 
 ## Radar
+<p><img src="docs/img/349_radar.png" width="400" alt="radar (3,49)"> <img src="docs/img/349_radar_handshake.png" width="400" alt="radar_handshake (3,49)"></p>
+
 Dal launcher: **Radar**. Un "radar" Wi-Fi passivo con personalità, in stile pwnagotchi: una mascotte in pixel art (un pupazzetto arancione a blocchi con le braccine e quattro zampette, nello stile di quella di Claude Code) che reagisce a quello che sente: cammina guardandosi intorno, salta contenta a ogni rete nuova, si agita con gli occhi a stellina per un handshake, si annoia quando non c'è nessuno, mette gli occhiali da sole in mezzo a tante reti e dorme quando il radar è fermo; livello ed esperienza che crescono scoprendo reti nuove e captando handshake. **Tutto l'ascolto è passivo**: il Gadget non trasmette nulla e non disconnette nessuno.
 - **Apri il radar** (faccia e statistiche), **Avvia / ferma**.
 - **Pokédex reti**: le reti scoperte, salvate sulla microSD (`pwn/pokedex.dat`, anche nei backup).
@@ -248,6 +280,8 @@ Dal launcher: **Radar**. Un "radar" Wi-Fi passivo con personalità, in stile pwn
 Mentre il radar ascolta (modalità promiscua) il Wi-Fi normale è sospeso: la radio fa una cosa per volta.
 
 ## Scacchi
+<p><img src="docs/img/349_scacchi.png" width="400" alt="scacchi (3,49)"> <img src="docs/img/tondo_scacchi.png" width="150" alt="scacchi (tondo)"> <img src="docs/img/349_scacchi_analisi.png" width="400" alt="scacchi_analisi (3,49)"> <img src="docs/img/tondo_scacchi_analisi.png" width="150" alt="scacchi_analisi (tondo)"></p>
+
 Dal launcher: **Scacchi**. Un motore scritto apposta per il Gadget gira sulla scheda, senza Internet. Sullo schermo tondo la scacchiera è più grande, ma si gioca bene anche sul 3,49".
 
 - **Gioca contro il Gadget**: livello da 400 a 2400 Elo, oppure *Adattivo*, che gioca al tuo Elo. Scegli il tuo colore: bianco, nero o a caso.
@@ -283,10 +317,14 @@ Dal launcher: **Scacchi**. Un motore scritto apposta per il Gadget gira sulla sc
 - **Notazione**: italiana (C A T D R) o inglese (N B R Q K), solo sullo schermo; i file sono sempre in PGN inglese.
 
 ## Scanner Wi-Fi e Bluetooth
+<p><img src="docs/img/349_scanner_wifi.png" width="400" alt="scanner_wifi (3,49)"> <img src="docs/img/tondo_scanner_wifi.png" width="150" alt="scanner_wifi (tondo)"> <img src="docs/img/349_scanner_bt.png" width="400" alt="scanner_bt (3,49)"></p>
+
 - **Scanner Wi-Fi**: le reti vicine con banda, potenza (dBm e percentuale), sicurezza e canale; quella a cui sei collegato è segnata. Swipe a destra su una rete per collegarti (con la tastiera per la password); il dito tenuto rifà la scansione. È la stessa schermata di Impostazioni › Wi-Fi › Cerca reti e funziona anche mentre sei connesso.
 - **Scanner Bluetooth**: i dispositivi Bluetooth LE nei paraggi; swipe a destra per collegarti a uno collegabile e vederne i servizi, dito tenuto (o BOOT tenuto) per una nuova scansione. Si apre anche da Impostazioni › Bluetooth.
 
 ## Sismografo
+<p><img src="docs/img/349_sismografo.png" width="400" alt="sismografo (3,49)"> <img src="docs/img/tondo_sismografo.png" width="150" alt="sismografo (tondo)"></p>
+
 Dal launcher: **Sismografo** → *Avvia*. Appoggia il Gadget su una superficie ferma (tavolo, pavimento): l'accelerometro misura le vibrazioni 200 volte al secondo e, tolta la gravità, il grafico mostra l'asse verticale con la scala che si adatta da sola. In alto la vibrazione attuale e il picco in mg (millesimi di g), con un'intensità locale stimata sulla scala Mercalli (Wald 1999: è quella che sente il Gadget, non quella del terremoto). BOOT azzera il picco, swipe a destra apre gli eventi. Lo schermo può spegnersi: le letture continuano finché l'app è aperta.
 
 - **Eventi**: all'avvio 3 s di attesa ("Appoggia la scheda e lasciala ferma": lo swipe che apre la schermata non finisce nel grafico né nella calibrazione), poi 20 s di calibrazione; dopo, un evento scatta quando la media breve dell'energia (STA, 0,5 s) supera di 3,5–5 volte quella lunga (LTA, 20 s) e la vibrazione supera la soglia scelta (metodo STA/LTA dei sismografi). Finisce dopo 2 s di calma (al massimo 2 minuti).
@@ -294,6 +332,8 @@ Dal launcher: **Sismografo** → *Avvia*. Appoggia il Gadget su una superficie f
 - **Registra sulla microSD**: ogni evento, con 5 s prima e 5 s dopo, va in `sismo/AAAAMMGG-hhmmss.csv` (100 campioni al secondo, x/y/z in mg: si apre con Excel); il registro di tutti è `sismo/eventi.csv`. Dal menu si consultano gli ultimi 50 e si cancellano.
 
 ## Snake
+<p><img src="docs/img/349_snake.png" width="400" alt="snake (3,49)"> <img src="docs/img/tondo_snake.png" width="150" alt="snake (tondo)"></p>
+
 Dal launcher: **Snake**, in pixel art con i colori del Polipetto: un serpente di quadratini arancioni (la testa ha gli occhi) che mangia i pesci gialli. Con gli swipe nelle quattro direzioni si gira: la svolta parte appena il dito si sposta, senza aspettare che si stacchi, e un solo gesto a "L" (per esempio giù e poi a sinistra, senza alzare il dito) fa l'inversione a U su due quadratini di fila. Fino a tre svolte restano in coda; muri e coda fanno perdere, e ogni pesce lo rende un po' più veloce. Lo schermo resta tutto per il gioco: sul 3,49" una griglia 53×12, sul tondo 20×20 con quadratini più grandi.
 
 - **Partenza**: uno swipe qualsiasi (sinistra esce).
@@ -301,11 +341,15 @@ Dal launcher: **Snake**, in pixel art con i colori del Polipetto: un serpente di
 - **Record**: resta in memoria anche spegnendo.
 
 ## Spada laser
+<p><img src="docs/img/349_spada_laser.png" width="400" alt="spada_laser (3,49)"></p>
+
 Dal launcher: **Spada laser** › *Accendi*. BOOT accende e spegne la lama; i suoni sono sintetizzati in tempo reale (nessun campione registrato) e seguono i movimenti dal giroscopio:
 - **swing** muovendo la scheda, **scontro** con un colpo secco, **affondo**, **tocco** sullo schermo = colpo di blaster, **dito tenuto** = lockup.
 - Nel menu: **Colore** della lama, **Volume** (lo stesso di Impostazioni › Audio), **Sensibilità scontro** (bassa, media, alta).
 
 ## Tester Wi-Fi
+<p><img src="docs/img/349_tester_wifi.png" width="400" alt="tester_wifi (3,49)"> <img src="docs/img/tondo_tester_wifi.png" width="150" alt="tester_wifi (tondo)"></p>
+
 Dal launcher: **Tester Wi-Fi**. Per controllare la copertura di una rete girando per le stanze.
 
 - **Elenco**: le reti vicine, dalla più forte, una voce per nome anche se la rete esce da più apparecchi (router, ripetitori, mesh). Sotto ogni voce: potenza, giudizio, numero di apparecchi e canali. Swipe a destra apre la misura, il dito tenuto rifà la scansione.
@@ -315,6 +359,8 @@ Dal launcher: **Tester Wi-Fi**. Per controllare la copertura di una rete girando
 - **Come misura**: scansiona solo quella rete e solo sui suoi canali, così aggiorna 3-5 volte al secondo; ogni 12 misure guarda tutti i canali, per trovare apparecchi nuovi. Il Gadget riceve solo i 2,4 GHz: le reti a 5 GHz non si vedono. Non salva nulla.
 
 ## Theremin
+<p><img src="docs/img/349_theremin.png" width="400" alt="theremin (3,49)"></p>
+
 Dal launcher: **Theremin**. Inclina la scheda avanti/indietro per cambiare la nota, ruotala a destra/sinistra per il volume (a sinistra fino al silenzio). Suona finché tieni il dito sulla zona grande a sinistra; **BOOT** imposta la posizione zero (la nota a metà dell'estensione). Dal menu Comandi puoi scambiare i due movimenti.
 
 Pulsanti a destra:
@@ -326,9 +372,13 @@ Pulsanti a destra:
 - **Registrazioni**: elenco per riascoltarle (swipe a destra) o cancellarle (BOOT due volte).
 
 ## Torcia
+<p><img src="docs/img/349_torcia.png" width="400" alt="torcia (3,49)"></p>
+
 Dal launcher: **Torcia** (o come *azione rapida*, tenendo il dito). Lo schermo diventa una luce piena alla massima luminosità: destra accende e spegne, su/giù cambia colore (bianca, calda, rossa per la visione notturna, verde…).
 
 ## Impostazioni
+<p><img src="docs/img/349_impostazioni.png" width="400" alt="impostazioni (3,49)"> <img src="docs/img/tondo_impostazioni.png" width="150" alt="impostazioni (tondo)"> <img src="docs/img/349_diagnostica.png" width="400" alt="diagnostica (3,49)"> <img src="docs/img/tondo_diagnostica.png" width="150" alt="diagnostica (tondo)"></p>
+
 Dal launcher: **Impostazioni**.
 - **Wi-Fi** e **Bluetooth**: vedi sotto. Wi-Fi e Bluetooth non sono mai accesi insieme.
 - **Schermo**: luminosità, spegnimento automatico, ruota di 180°, inverti lo scorrimento (su/giù), colore d'accento.
@@ -378,6 +428,8 @@ Il file è di testo con un controllo CRC: un backup rovinato o incompleto viene 
 Impostazioni › App all'avvio: se scegli un'app (o una sua schermata interna, stesso elenco automatico dell'Azione rapida), all'accensione si apre quella; swipe indietro torna al menu. "Nessuna" lascia tutto com'era. Le scelte fatte con i firmware precedenti vengono convertite da sole.
 
 ## Aggiornamenti
+<p><img src="docs/img/349_aggiornamento.png" width="400" alt="aggiornamento (3,49)"> <img src="docs/img/tondo_aggiornamento.png" width="150" alt="aggiornamento (tondo)"></p>
+
 - **Dalla scheda (OTA):** Impostazioni › Sistema › Aggiornamento firmware. Ogni merge su `main` pubblica una release su GitHub con il firmware; la scheda la scarica via Wi-Fi e si riavvia. Se il nuovo firmware non riesce ad avviarsi, al riavvio torna da solo quello precedente. Mentre sei nella schermata di aggiornamento il Bluetooth va in pausa (la radio è condivisa col Wi-Fi) e si riaccende uscendo. Con "Cerca aggiornamenti da solo" avvisa quando ne esce uno nuovo. Se il controllo fallisce due volte, il Gadget ricollega da capo il Wi-Fi (indirizzo e DNS nuovi, con un DNS di riserva) e riprova. Sotto l'errore compare il motivo (DNS, connessione rifiutata, nessuna risposta, tempo scaduto, con il codice); nel log seriale c'è il dettaglio.
 - **Via USB:** `gadget.bin` a `0x0` (immagine unica) oppure solo `gadget-app.bin` a `0x20000`.
 
@@ -395,7 +447,7 @@ Immagine unica per il flasher web (indirizzo 0x0), come fa la build su GitHub:
 
 ## Prove sul PC
 Senza la scheda si possono provare parecchie cose sul PC:
-- **Simulatore dell'interfaccia** (`tools/sim/run.sh`): compila LVGL e le schermate con gcc e salva le immagini in `tools/sim/png/`, sia per il 3,49" (`349_*`) sia per il tondo (`tondo_*`). Le scene (in `sim_main.c`) percorrono menu, Tester Wi-Fi, Sismografo, Snake, Scacchi e Polipetto (`run.sh pet` fa solo il Polipetto); la "microSD" è la cartella `/sdcard` del PC. Serve prima un `idf.py build` (per `build/config/sdkconfig.h`) e Python con Pillow.
+- **Simulatore dell'interfaccia** (`tools/sim/run.sh`): compila LVGL e le schermate con gcc e salva le immagini in `tools/sim/png/`, sia per il 3,49" (`349_*`) sia per il tondo (`tondo_*`). Le scene (in `sim_main.c`) percorrono menu e app (`run.sh pet` fa solo il Polipetto, `run.sh apps` solo le app aggiunte per il README); microfono, sensori, Bluetooth e USB sono finti (in `stubs.c`) e la "microSD" è la cartella `/sdcard` del PC. `tools/sim/docs_img.sh` copia poi in `docs/img/` le schermate usate in questo README. Serve prima un `idf.py build` (per `build/config/sdkconfig.h`) e Python con Pillow.
 - **Polipetto** (`tools/pet/pet_test.c`): genetica (dominanza, eredità, mutazioni), spuntino come premio, "Gioca" veloce, salvataggi vecchi, partenza con l'uovo nel nido.
 - **Morse** (`tools/morse/morse_test.c`): il testo diventa audio con rumore a varie velocità, frequenze e volumi, e il rilevatore con la decodifica devono restituirlo; prova anche una battuta a mano irregolare.
 - **Motore degli Scacchi** (`tools/chess/chess_test.c`): perft su posizioni di riferimento, notazione, libro delle aperture, problemi tattici e partite fra livelli; `tools/chess/store_test.c` prova l'archivio (salvataggio, analisi, rilettura PGN, Elo, esportazione). I comandi sono in cima ai file.

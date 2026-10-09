@@ -17,7 +17,7 @@ if [ ! -f obj/liblvgl.a ]; then
     wait
     ar rcs obj/liblvgl.a obj/*.o
 fi
-SRC="$M/ui.c $M/menu.c $M/apps/home.c $M/apps/keyboard.c $M/apps/app_ota.c $M/apps/app_clock.c $M/apps/app_wifiscan.c $M/apps/app_portal.c $M/apps/app_settings.c $M/apps/app_seismo.c $M/seismo.c $M/apps/app_wifitest.c $M/apps/app_snake.c $M/apps/app_pwn.c $M/apps/app_dice2.c $M/apps/pet_art.c $M/apps/app_pet.c $M/apps/pet_games.c $M/apps/pet_book.c $M/apps/pet_social.c $M/apps/pet_mini.c $M/pet.c $M/pet_core.c $M/apps/app_share.c $M/apps/shortcuts.c $M/apps/app_morse.c $M/morse.c $M/apps/app_chessplay.c $M/apps/chess_ui.c $M/chess_game.c $M/chess_engine.c $M/fonts_sel.c $M/fonts/*.c"
+SRC="$M/ui.c $M/menu.c $M/apps/home.c $M/apps/keyboard.c $M/apps/app_ota.c $M/apps/app_clock.c $M/apps/app_wifiscan.c $M/apps/app_portal.c $M/apps/app_settings.c $M/apps/app_seismo.c $M/seismo.c $M/apps/app_wifitest.c $M/apps/app_snake.c $M/apps/app_pwn.c $M/apps/app_dice2.c $M/apps/app_8ball.c $M/apps/app_tuner.c $M/apps/app_bercio.c $M/apps/app_level.c $M/apps/app_chess.c $M/apps/app_q20.c $M/q20.c $M/q20_seed.c $M/apps/app_saber.c $M/apps/app_theremin.c $M/theremin.c $M/apps/app_torch.c $M/apps/app_search.c $M/textnorm.c $M/apps/app_blescan.c $M/apps/app_clips.c $M/apps/pet_art.c $M/apps/app_pet.c $M/apps/pet_games.c $M/apps/pet_book.c $M/apps/pet_social.c $M/apps/pet_mini.c $M/pet.c $M/pet_core.c $M/apps/app_share.c $M/apps/shortcuts.c $M/apps/app_morse.c $M/morse.c $M/apps/app_chessplay.c $M/apps/chess_ui.c $M/chess_game.c $M/chess_engine.c $M/fonts_sel.c $M/fonts/*.c"
 gcc $CFLAGS -DSEISMO_SIM -I$M -I$M/apps $SRC stubs.c sim_main.c obj/liblvgl.a -lm -o obj/sim
 ./obj/sim round $1
 ./obj/sim lcd $1

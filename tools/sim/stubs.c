@@ -30,7 +30,8 @@ rtc_status_t board_rtc_get(struct tm *t) { time_t n = time(NULL); gmtime_r(&n, t
 rtc_status_t board_rtc_boot_status(void) { return RTC_OK; }
 void display_set_brightness(int p) {}
 void display_set_flipped(bool f) {}
-long long esp_timer_get_time(void) { return 0; }
+long long sim_timer_us;   // fermo, tranne nelle scene che lo fanno avanzare (Orologio scacchi)
+long long esp_timer_get_time(void) { return sim_timer_us; }
 const char *esp_get_idf_version(void) { return "v5.4.2"; }
 void esp_restart(void) {}
 uint32_t input_idle_ms(void) { return 0; }
@@ -40,7 +41,8 @@ int sim_touch, sim_tx = 100, sim_ty = 80;
 bool input_touch(int *x, int *y) { if (x) *x = sim_tx; if (y) *y = sim_ty; return sim_touch; }
 bool display_is_dark(void) { return false; }
 bool board_imu_ok(void) { return true; }
-bool board_imu_accel(vec3_t *g) { g->x = 0; g->y = 0; g->z = 1; return true; }
+vec3_t sim_acc = {0, 0, 1};
+bool board_imu_accel(vec3_t *g) { *g = sim_acc; return true; }
 static bool sim_locked;
 void input_set_locked(bool l) { sim_locked = l; }
 bool input_locked(void) { return sim_locked; }
@@ -72,7 +74,6 @@ void radio_only_wifi(void) {}
 void settings_defer(bool on) {}
 void settings_reset(void) {}
 void settings_save(void) {}
-void text_norm(const char *in, char *out, size_t n) { snprintf(out, n, "%s", in); }
 void wifi_mgr_apply(void) {}
 const char *wifi_mgr_auth_name(int a) { return a ? "WPA2" : "aperta"; }
 const char *wifi_mgr_band(int c) { return c > 14 ? "5" : "2.4"; }
@@ -113,10 +114,8 @@ int wifi_mgr_scan_results(wifi_ap_t *o, int max)
 }
 bool wifi_mgr_scan_start(void) { return true; }
 bool wifi_mgr_scan_start_ex(const char *ssid, uint16_t m) { return true; }
-bool audio_init(void) { return false; }
-void audio_start(audio_synth_t s) {}
-void audio_stop_if(audio_synth_t s) {}
-audio_synth_t audio_current(void) { return NULL; }
+int sim_audio;   // 1: l'altoparlante risponde (per il Theremin)
+bool audio_init(void) { return sim_audio; }
 bool audio_mic_active(void) { return false; }
 bool audio_mic_ok(void) { return true; }
 bool audio_mic_probe(int ms, int *pk, int *rms, int *z) { *pk = 9000; *rms = 800; *z = 0; return true; }
@@ -128,18 +127,11 @@ bool wifi_mgr_time_saved(void) { return true; }
 bool wifi_mgr_time_synced(void) { return true; }
 
 #define DUMMY_APP(n) static void n##_e(lv_obj_t *r, void *a) {} const app_t n = {.name = #n, .enter = n##_e};
-DUMMY_APP(app_8ball) DUMMY_APP(app_bercio) DUMMY_APP(app_ble_conns) DUMMY_APP(app_ble_pair) DUMMY_APP(app_blescan)
-DUMMY_APP(app_level) DUMMY_APP(app_q20) DUMMY_APP(app_search)
-DUMMY_APP(app_theremin) DUMMY_APP(app_torch)
+DUMMY_APP(app_ble_conns) DUMMY_APP(app_ble_pair)
 static const menu_item_t none[] = {{.label = "x"}};
-menu_t backup_menu = {"Backup", none, 1, 0, NULL}, chess_menu = {"Scacchi", none, 1, 0, NULL},
-       clips_menu = {"Appunti", none, 1, 0, NULL},
-       doom_menu = {"Doom", none, 1, 0, NULL},
-       saber_menu = {"Spada", none, 1, 0, NULL},
-       tuner_menu = {"Accordatore", none, 1, 0, NULL};
-void chess_menu_init(void) {}
+menu_t backup_menu = {"Backup", none, 1, 0, NULL},
+       doom_menu = {"Doom", none, 1, 0, NULL};
 bool sd_ok(void) { return true; }
-void tuner_menu_init(void) {}
 const char *logcon_reset_reason(void) { return "errore (panic)"; }
 bool logcon_has_prev(void) { return true; }
 bool logcon_write_report(const char *p) { return true; }
@@ -161,3 +153,111 @@ int pwn_aps_near(void) { return sim_pwn_near; }
 void pwn_save(void) {}
 void pwn_reset_pokedex(void) {}
 const char *pwn_last_event(void) { return "guardo in giro"; }
+
+/* app aggiunte per gli screenshot del README: microfono, BLE, USB e giroscopio finti */
+#include "usbhid.h"
+bool audio_mic_start(void) { return true; }
+void audio_mic_stop(void) {}
+bool ble_mgr_ready(void) { return true; }
+void ble_mgr_scan_acquire(void) {}
+void ble_mgr_scan_release(void) {}
+bool ble_mgr_scan_start(int ms) { return true; }
+bool ble_mgr_scan_busy(void) { return false; }
+uint32_t ble_mgr_scan_gen(void) { return 1; }
+int ble_mgr_scan_results(ble_dev_t *out, int max)
+{
+    static const struct { const char *n; int8_t r; uint16_t app, svc; } D[] = {
+        {"Cuffie di Marco", -48, 0x0941, 0x110B}, {"Mi Band 8", -61, 0x00C1, 0x180D},
+        {"", -70, 0, 0xFE9F}, {"Termometro bagno", -79, 0x0300, 0x181A}, {"", -88, 0, 0}};
+    int n = 0;
+    for (; n < 5 && n < max; n++) {
+        memset(&out[n], 0, sizeof(out[n]));
+        for (int k = 0; k < 6; k++) out[n].addr[k] = 0x10 * n + k;
+        snprintf(out[n].name, sizeof(out[n].name), "%s", D[n].n);
+        out[n].rssi = D[n].r; out[n].appearance = D[n].app; out[n].svc16 = D[n].svc;
+        out[n].connectable = n < 3;
+    }
+    return n;
+}
+void ble_mgr_pair_start(int s) {}
+void ble_mgr_pair_stop(void) {}
+int ble_mgr_pair_left(void) { return 0; }
+const char *ble_mgr_svc_name(uint16_t u) { return u == 0x180D ? "Battito" : u == 0x110B ? "Audio" : u == 0x181A ? "Ambiente" : NULL; }
+const char *ble_mgr_appearance_name(uint16_t a) { return a == 0x0941 ? "Cuffie" : a == 0x00C1 ? "Orologio" : a == 0x0300 ? "Termometro" : NULL; }
+void board_imu_gyro_enable(bool on) {}
+const char *settings_layout_name(int i) { return i ? "US" : "Italiano"; }
+bool usbhid_supported(void) { return true; }
+void usbhid_begin(void) {}
+void usbhid_end(void) {}
+bool usbhid_mounted(void) { return true; }
+void usbhid_cancel(void) {}
+void usbhid_arm(void) {}
+int usbhid_type(const char *t, int l, int lay) { return l; }
+void wifi_mgr_portal_start_clips(void) {}
+DUMMY_APP(app_ble_device)
+#include "clips.h"
+static const char *const CLIPS[] = {"Riunione spostata alle 15:30, sala Verdi", "https://github.com/raxp122/ESP32-Developement", "WiFi ospiti: Gadget-2026!"};
+int clips_count(void) { return 3; }
+bool clips_get(int i, clip_t *o)
+{
+    if (i < 0 || i >= 3) return false;
+    memset(o, 0, sizeof(*o));
+    o->id = 3 - i; o->ts = time(NULL) - 600 * (i + 1) * (i + 1); o->used = i > 0;
+    snprintf(o->text, sizeof(o->text), "%s", CLIPS[i]);
+    o->len = strlen(o->text);
+    return true;
+}
+bool clips_delete_id(uint32_t id) { return true; }
+void clips_clear(void) {}
+uint32_t clips_gen(void) { return 1; }
+
+/* task veri (pthread) per le scene che li chiedono, e un microfono che "sente" un tono */
+#include <pthread.h>
+#include <unistd.h>
+#include <math.h>
+#include "freertos/task.h"
+int sim_tasks;
+float sim_mic_hz, sim_mic_amp;   // tono che arriva ai microfoni (0 = silenzio)
+int xTaskCreatePinnedToCore(void (*f)(void *), const char *n, uint32_t s, void *a, int p, TaskHandle_t *h, int c)
+{
+    if (!sim_tasks) return 1;
+    pthread_t t;
+    if (pthread_create(&t, NULL, (void *(*)(void *))f, a)) return 0;
+    pthread_detach(t);
+    if (h) *h = (TaskHandle_t)t;
+    return 1;
+}
+void vTaskDelay(TickType_t t) { usleep(t * 1000); }
+void vTaskDelete(TaskHandle_t h) { if (!h) pthread_exit(NULL); }
+int audio_mic_read(int16_t *st, int frames, int timeout_ms)
+{
+    static double ph;
+    usleep(frames * 1000000 / AUDIO_RATE);
+    for (int i = 0; i < frames; i++) {
+        double v = sim_mic_amp * (sin(ph) + 0.3 * sin(2 * ph)) + (rand() % 201 - 100) * 0.5;
+        ph += 2 * M_PI * sim_mic_hz / AUDIO_RATE;
+        st[2 * i] = st[2 * i + 1] = (int16_t)v;
+    }
+    return frames;
+}
+vec3_t sim_gyro;
+bool board_imu_read6(vec3_t *g, vec3_t *w) { board_imu_accel(g); *w = sim_gyro; return true; }
+void clips_mark_used(uint32_t id) {}
+
+/* uscita audio: con sim_audio il sintetizzatore gira davvero (in un thread), senza suono */
+static audio_synth_t volatile cur_synth;
+static void *synth_thread(void *a)
+{
+    int16_t buf[240];
+    while (cur_synth == (audio_synth_t)a) { ((audio_synth_t)a)(buf, 240); usleep(10000); }
+    return NULL;
+}
+void audio_start(audio_synth_t s)
+{
+    cur_synth = s;
+    pthread_t t;
+    if (sim_tasks && !pthread_create(&t, NULL, synth_thread, (void *)s)) pthread_detach(t);
+}
+void audio_stop(void) { cur_synth = NULL; }
+void audio_stop_if(audio_synth_t s) { if (cur_synth == s) cur_synth = NULL; }
+audio_synth_t audio_current(void) { return cur_synth; }
