@@ -114,7 +114,7 @@ static void backlight_init(void)
     };
     ledc_timer_config(&t);
     ledc_channel_config_t c = {
-        .gpio_num = PIN_LCD_BL,
+        .gpio_num = board_lcd_v2() ? PIN_LCD_BL_V2 : PIN_LCD_BL,
         .speed_mode = LEDC_LOW_SPEED_MODE,
         .channel = LEDC_CHANNEL_1,
         .timer_sel = LEDC_TIMER_3,
@@ -165,6 +165,7 @@ void display_set_brightness(int pct)
         display_unlock();
     }
     dark = pct == 0;
+    board_lcd_v2_bl_en(pct > 0);   // V2: a zero si spegne anche il convertitore
     uint32_t duty = 255 - (pct * 255) / 100;
     ledc_set_duty(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_1, duty);
     ledc_update_duty(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_1);
@@ -188,8 +189,11 @@ void display_init(bool flipped)
     backlight_init();
     flush_sem = xSemaphoreCreateBinary();
 
-    gpio_config_t rst = {.pin_bit_mask = 1ULL << PIN_LCD_RST, .mode = GPIO_MODE_OUTPUT, .pull_up_en = 1};
-    gpio_config(&rst);
+    // V1: reset sul GPIO21. V2: reset dal TCA9554 e sul GPIO21 il TE del display (un ingresso)
+    if (!board_lcd_v2()) {
+        gpio_config_t rst = {.pin_bit_mask = 1ULL << PIN_LCD_RST, .mode = GPIO_MODE_OUTPUT, .pull_up_en = 1};
+        gpio_config(&rst);
+    }
 
     spi_bus_config_t bus = {
         .sclk_io_num = PIN_LCD_PCLK,
@@ -228,9 +232,12 @@ void display_init(bool flipped)
     };
     ESP_ERROR_CHECK(esp_lcd_new_panel_axs15231b(io, &pc, &panel));
 
-    gpio_set_level(PIN_LCD_RST, 1); vTaskDelay(pdMS_TO_TICKS(30));
-    gpio_set_level(PIN_LCD_RST, 0); vTaskDelay(pdMS_TO_TICKS(250));
-    gpio_set_level(PIN_LCD_RST, 1); vTaskDelay(pdMS_TO_TICKS(30));
+    for (int i = 0; i < 3; i++) {   // alto, basso, alto
+        bool lv = i != 1;
+        if (board_lcd_v2()) board_lcd_v2_reset(lv);
+        else gpio_set_level(PIN_LCD_RST, lv);
+        vTaskDelay(pdMS_TO_TICKS(i == 1 ? 250 : 30));
+    }
     ESP_ERROR_CHECK(esp_lcd_panel_init(panel));
 
     lv_init();

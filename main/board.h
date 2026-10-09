@@ -1,7 +1,8 @@
 // board.h — pin e periferiche di bordo. Lo stesso firmware gira su due schede, riconosciute
 // all'avvio (board_init):
-//   - Waveshare ESP32-S3-Touch-LCD-3.49 V1: LCD 640×172 (AXS15231B), touch AXS su un bus
-//     a parte, latch di alimentazione sul TCA9554, batteria sull'ADC;
+//   - Waveshare ESP32-S3-Touch-LCD-3.49 (V1 e V2, "Rev1.1" sul PCB): LCD 640×172 (AXS15231B),
+//     touch AXS su un bus a parte, latch di alimentazione sul TCA9554, batteria sull'ADC.
+//     La V2 sposta retroilluminazione e reset del display (vedi sotto): si riconosce da sola;
 //   - Waveshare ESP32-S3-Touch-AMOLED-1.75 (anche -B e -G): AMOLED tondo 466×466 (CO5300),
 //     touch CST9217, alimentazione e batteria dall'AXP2101, PWR letto dal TCA9554.
 // Stesso ESP32-S3R8 (8 MB PSRAM ottale) e 16 MB di flash: un solo file per tutte e due.
@@ -13,6 +14,9 @@
 
 typedef enum { BOARD_LCD349, BOARD_AMOLED175 } board_kind_t;
 board_kind_t board_kind(void);
+bool board_lcd_v2(void);   // ESP32-S3-Touch-LCD-3.49 V2 (venduta da giugno 2026)
+void board_lcd_v2_reset(bool level);   // V2: linea di reset del display (dal TCA9554)
+void board_lcd_v2_bl_en(bool on);      // V2: convertitore della retroilluminazione
 #define BOARD_IS_ROUND() (board_kind() == BOARD_AMOLED175)
 const char *board_name(void);
 
@@ -25,8 +29,11 @@ const char *board_name(void);
 #define PIN_LCD_D1      12
 #define PIN_LCD_D2      13
 #define PIN_LCD_D3      14
-#define PIN_LCD_RST     21
-#define PIN_LCD_BL      8   // V1. Sulla V2 la retroilluminazione è su un altro pin!
+#define PIN_LCD_RST     21  // V1 (sulla V2 qui c'è il TE del display: non va pilotato)
+#define PIN_LCD_BL      8   // V1 (sulla V2 qui c'è l'INT del TCA9554, con pull-up)
+#define PIN_LCD_BL_V2   42  // V2: PWM della retroilluminazione (stessa logica invertita)
+#define EXIO_V2_BL_EN   1   // V2: accende il convertitore della retroilluminazione
+#define EXIO_V2_LCD_RST 5   // V2: reset del display
 #define LCD_W           172 // risoluzione fisica (verticale)
 #define LCD_H           640
 

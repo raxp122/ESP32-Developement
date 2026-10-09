@@ -122,10 +122,10 @@ void logcon_info(char *b, int n)
     char ts[200];
     input_touch_stats(ts, sizeof(ts));
     snprintf(b, n,
-             "Gadget %s · ESP-IDF %s · acceso da %dh%02dm%02ds\n"
+             "Gadget %s su %s · ESP-IDF %s · acceso da %dh%02dm%02ds\n"
              "RAM libera %u KB (minimo %u KB, blocco %u KB) · PSRAM libera %u KB\n"
              "Motivo dell'ultimo reset: %s (%d) · recuperi del touch: %d\n%s\n",
-             esp_app_get_description()->version, esp_get_idf_version(), s / 3600, (s / 60) % 60, s % 60,
+             esp_app_get_description()->version, board_name(), esp_get_idf_version(), s / 3600, (s / 60) % 60, s % 60,
              (unsigned)(heap_caps_get_free_size(MALLOC_CAP_INTERNAL) / 1024),
              (unsigned)(heap_caps_get_minimum_free_size(MALLOC_CAP_INTERNAL) / 1024),
              (unsigned)(heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL) / 1024),

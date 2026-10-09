@@ -17,7 +17,13 @@ static i2c_master_dev_handle_t dev_tca, dev_rtc, dev_imu, dev_touch, dev_axp;
 static board_kind_t kind = BOARD_LCD349;
 
 board_kind_t board_kind(void) { return kind; }
-const char *board_name(void) { return kind == BOARD_AMOLED175 ? "ESP32-S3-Touch-AMOLED-1.75" : "ESP32-S3-Touch-LCD-3.49"; }
+static bool lcd_v2;
+bool board_lcd_v2(void) { return lcd_v2; }
+const char *board_name(void)
+{
+    if (kind == BOARD_AMOLED175) return "ESP32-S3-Touch-AMOLED-1.75";
+    return lcd_v2 ? "ESP32-S3-Touch-LCD-3.49 V2" : "ESP32-S3-Touch-LCD-3.49 V1";
+}
 static adc_oneshot_unit_handle_t adc;
 static adc_cali_handle_t adc_cali;
 static bool imu_ok;
@@ -55,6 +61,52 @@ static void tca_init(void)
     cfg &= ~((1 << EXIO_POWER_HOLD) | (1 << EXIO_AUX));
     if (reg_write(dev_tca, 0x01, out) != ESP_OK || reg_write(dev_tca, 0x03, cfg) != ESP_OK)
         ESP_LOGW(TAG, "TCA9554 non risponde");
+}
+
+// Uscita del TCA9554 (e la rende uscita): per la V2, reset e accensione della retroilluminazione
+static void tca_out(int bit, bool level)
+{
+    uint8_t out = 0xFF, cfg = 0xFF;
+    if (reg_read(dev_tca, 0x01, &out, 1) != ESP_OK || reg_read(dev_tca, 0x03, &cfg, 1) != ESP_OK) return;
+    out = level ? out | (1 << bit) : out & ~(1 << bit);
+    reg_write(dev_tca, 0x01, out);
+    reg_write(dev_tca, 0x03, cfg & ~(1 << bit));
+}
+void board_lcd_v2_reset(bool level) { if (lcd_v2) tca_out(EXIO_V2_LCD_RST, level); }
+void board_lcd_v2_bl_en(bool on)
+{
+    static int8_t cur = -1;   // si scrive solo quando cambia (la luminosità si regola spesso)
+    if (!lcd_v2 || cur == on) return;
+    cur = on;
+    tca_out(EXIO_V2_BL_EN, on);
+}
+
+// V1 o V2? Sulla V2 il GPIO8 è l'INT del TCA9554 (open drain con pull-up da 10K, alto a riposo)
+// e il GPIO42 va alla retroilluminazione (10K verso il nodo di retroazione del convertitore,
+// pochi decimi di volt); sulla V1 i due pin sono scambiati. Si leggono solo, con il pull-down
+// interno, prima di pilotare qualsiasi cosa: un pin pilotato contro l'INT del TCA sarebbe un corto.
+static void detect_lcd_rev(void)
+{
+    gpio_config_t io = {.pin_bit_mask = (1ULL << PIN_LCD_BL) | (1ULL << PIN_LCD_BL_V2),
+                        .mode = GPIO_MODE_INPUT, .pull_down_en = GPIO_PULLDOWN_ENABLE};
+    gpio_config(&io);
+    int hi8 = 0, hi42 = 0;
+    for (int i = 0; i < 8; i++) {
+        uint8_t in;
+        reg_read(dev_tca, 0x00, &in, 1);   // la lettura degli ingressi rilascia l'INT
+        esp_rom_delay_us(300);
+        hi8 += gpio_get_level(PIN_LCD_BL);
+        hi42 += gpio_get_level(PIN_LCD_BL_V2);
+    }
+    lcd_v2 = hi8 >= 6 && hi42 <= 1;
+    ESP_LOGI(TAG, "3.49: GPIO8 alto %d/8, GPIO42 alto %d/8 -> %s", hi8, hi42, lcd_v2 ? "V2" : "V1");
+    if (lcd_v2) {
+        // GPIO8 resta un ingresso (senza pull-down); retroilluminazione spenta finché il
+        // primo frame non è pronto, display tenuto fuori dal reset
+        gpio_set_pull_mode(PIN_LCD_BL, GPIO_FLOATING);
+        board_lcd_v2_bl_en(false);
+        tca_out(EXIO_V2_LCD_RST, true);
+    }
 }
 
 static void imu_init(void)
@@ -231,8 +283,7 @@ void board_init(void)
         }
         if (d) i2c_master_bus_rm_device(d);
     }
-    ESP_LOGI(TAG, "scheda: %s", board_name());
-    if (kind == BOARD_AMOLED175) { amoled_init(); return; }
+    if (kind == BOARD_AMOLED175) { ESP_LOGI(TAG, "scheda: %s", board_name()); amoled_init(); return; }
 
     bus1 = touch_bus_new();
 
@@ -242,6 +293,8 @@ void board_init(void)
     if (bus1) dev_touch = add_dev(bus1, ADDR_TOUCH);
 
     tca_init();
+    detect_lcd_rev();
+    ESP_LOGI(TAG, "scheda: %s", board_name());
     imu_init();
 
     gpio_config_t io = {
