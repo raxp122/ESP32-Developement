@@ -4,7 +4,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#define PWN_MAX_NETS 256
+#define PWN_MAX_NETS 2048   // reti tenute nel Pokédex (in PSRAM). A pieno si sostituisce la più vecchia
 #define PWN_NAME_MAX 20
 
 typedef struct {
