@@ -157,18 +157,22 @@ static void on_beacon(const uint8_t *p, int len, int8_t rssi, uint8_t channel)
     if (idx < 0) {
         if (n_nets < PWN_MAX_NETS) {
             idx = n_nets++;
-            memset(&nets[idx], 0, sizeof(pwn_net_t));
-            memcpy(nets[idx].bssid, bssid, 6);
-            nets[idx].first_seen = now_s();
-            nets[idx].rssi = -127;
-            stats.nets_total++;
-            add_xp(10);
-            snprintf(last_event, sizeof(last_event), "nuova rete: %s", ssid[0] ? ssid : "(nascosta)");
-            auth_from_beacon(ies, ie_len, &nets[idx]);
         } else {
-            xSemaphoreGive(mtx);
-            return;
+            // Pokédex pieno: si riusa la rete vista meno di recente (LRU), così si continua
+            // a seguire quelle fresche senza perdere le nuove. Il contatore "reti mai viste"
+            // va avanti lo stesso; una rete sostituita e poi rivista conterà come nuova.
+            idx = 0;
+            for (int i = 1; i < n_nets; i++)
+                if (nets[i].last_seen < nets[idx].last_seen) idx = i;
         }
+        memset(&nets[idx], 0, sizeof(pwn_net_t));
+        memcpy(nets[idx].bssid, bssid, 6);
+        nets[idx].first_seen = now_s();
+        nets[idx].rssi = -127;
+        stats.nets_total++;
+        add_xp(10);
+        snprintf(last_event, sizeof(last_event), "nuova rete: %s", ssid[0] ? ssid : "(nascosta)");
+        auth_from_beacon(ies, ie_len, &nets[idx]);
     }
     pwn_net_t *nw = &nets[idx];
     if (ssid[0]) strlcpy(nw->ssid, ssid, sizeof(nw->ssid));
