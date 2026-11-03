@@ -10,7 +10,8 @@ for s in \
     home:1_home impostazioni:2_impostazioni diagnostica:48_diagnostica aggiornamento:9_aggiornamento \
     orologio:12_orologio sismografo:15_sismo_evento tester_wifi:19_tester_misura scanner_wifi:5_reti \
     snake:22_snake_gioco scacchi:26_scacchi_partita scacchi_analisi:30_scacchi_analisi \
-    morse_ascolta:41_morse_ascolta morse_batti:43_morse_batti; do
+    morse_ascolta:41_morse_ascolta morse_batti:43_morse_batti \
+    insegna:131_insegna; do
     cp png/349_${s#*:}.png $D/349_${s%%:*}.png
     cp png/tondo_${s#*:}.png $D/tondo_${s%%:*}.png
 done
@@ -23,6 +24,7 @@ for s in \
     orologio_scacchi:112_orologio_scacchi_partita polipetto:50_polipetto polipetto_stella:54_stella \
     polipetto_negozio:64_negozio_cuffia polipetto_visita:68c_amico_visita q20:114_q20_domanda \
     radar:80_radar_guarda radar_handshake:82_radar_handshake scanner_bt:121_scanner_bt \
+    insegna_arcobaleno:132_insegna_arcobaleno insegna_menu:130_insegna_menu \
     spada_laser:116_spada_accesa theremin:117_theremin torcia:119_torcia_colore; do
     cp png/349_${s#*:}.png $D/349_${s%%:*}.png
 done

@@ -330,6 +330,23 @@ int main(int argc, char **argv)
         shot("95_dadi_modifica");
         ui_home(); run(300);
     }
+    // Insegna LED: menu, insegna a colore fisso, arcobaleno (su entrambe le schede)
+    {
+        extern menu_t ledsign_menu;
+        extern void ledsign_sim_config(int color, int rainbow, int speed, int dir);
+        extern void ledsign_sim_show(const char *t);
+        ui_home(); run(300);
+        ui_push(&app_menu, &ledsign_menu); run(200);
+        shot("130_insegna_menu");
+        ledsign_sim_config(1, 0, 1, 0);   // ambra, fisso-colore, media, verso sinistra
+        ledsign_sim_show("Buon compleanno!"); run(1500);
+        shot("131_insegna");
+        ui_pop(); run(200);
+        ledsign_sim_config(0, 1, 1, 0);   // arcobaleno
+        ledsign_sim_show("Gadget LED"); run(1500);
+        shot("132_insegna_arcobaleno");
+        ui_home(); run(300);
+    }
     // Diagnostica senza monitor seriale
     ui_home(); run(300);
     ui_push(&app_menu, &settings_menu); run(200);
