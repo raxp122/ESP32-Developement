@@ -30,6 +30,7 @@ static menu_item_t items[] = {
     {.icon = ICON_GAMEPAD,  .label = "Scacchi",           .app = &app_menu, .arg = &chessplay_menu},
     {.icon = ICON_EYE,      .label = "Morse",             .app = &app_menu, .arg = &morse_menu},
     {.icon = ICON_CLOCK,    .label = "Orologio scacchi",  .app = &app_menu, .arg = &chess_menu},
+    {.icon = ICON_TERMINAL, .label = "Insegna LED",        .app = &app_menu, .arg = &ledsign_menu},
     {.icon = LV_SYMBOL_SETTINGS, .label = "Impostazioni", .app = &app_menu, .arg = &settings_menu},
 };
 
@@ -51,6 +52,7 @@ void home_init(void)
 {
     tuner_menu_init();
     chess_menu_init();
+    ledsign_init();
     qsort(items + 1, home_menu.count - 1, sizeof(menu_item_t), by_label);
 }
 

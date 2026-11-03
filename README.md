@@ -11,7 +11,7 @@ Si aggiorna via Wi-Fi: ogni modifica unita su `main` diventa una release che la 
 Le schermate di questo README vengono dal simulatore (`tools/sim`): a sinistra la 3,49", a destra il tondo per le app che lì si aprono già.
 
 **Le app** (nel launcher in ordine alfabetico, con *Cerca* in cima):
-[8-Ball veggente](#8-ball-veggente) · [Accordatore](#accordatore) · [Appunti](#appunti-testo-dal-pc--tastiera-usb) · [Berciometro](#berciometro) · [Dadi](#dadi) · [Doom](#doom) · [Livella](#livella) · [Morse](#morse) · [Orologio](#orologio) · [Orologio scacchi](#orologio-scacchi) · [Polipetto](#polipetto) · [Q-20](#q-20) · [Radar](#radar) · [Scacchi](#scacchi) · [Scanner Wi-Fi e Bluetooth](#scanner-wi-fi-e-bluetooth) · [Sismografo](#sismografo) · [Snake](#snake) · [Spada laser](#spada-laser) · [Tester Wi-Fi](#tester-wi-fi) · [Theremin](#theremin) · [Torcia](#torcia) · [Impostazioni](#impostazioni)
+[8-Ball veggente](#8-ball-veggente) · [Accordatore](#accordatore) · [Appunti](#appunti-testo-dal-pc--tastiera-usb) · [Berciometro](#berciometro) · [Dadi](#dadi) · [Doom](#doom) · [Insegna LED](#insegna-led) · [Livella](#livella) · [Morse](#morse) · [Orologio](#orologio) · [Orologio scacchi](#orologio-scacchi) · [Polipetto](#polipetto) · [Q-20](#q-20) · [Radar](#radar) · [Scacchi](#scacchi) · [Scanner Wi-Fi e Bluetooth](#scanner-wi-fi-e-bluetooth) · [Sismografo](#sismografo) · [Snake](#snake) · [Spada laser](#spada-laser) · [Tester Wi-Fi](#tester-wi-fi) · [Theremin](#theremin) · [Torcia](#torcia) · [Impostazioni](#impostazioni)
 
 ## 3.49: V1 e V2
 Dal giugno 2026 Waveshare vende la 3.49 **V2** (sul PCB c'è scritto "Rev1.1", sull'etichetta della scatola "V2"). Cambiano tre pin del display: la retroilluminazione passa dal GPIO8 al GPIO42 (con in più un'accensione sul TCA9554, EXIO1), il reset del display passa dal GPIO21 al TCA9554 (EXIO5) e sul GPIO21 arriva il TE; il GPIO8 diventa l'interrupt del TCA9554. Il resto (touch, microSD, audio, sensori, batteria, pulsanti) è uguale.
@@ -102,6 +102,15 @@ Prima di giocare usa Doom › Prova inclinazione e, se serve, le voci Inverti.
 Configurazione e salvataggi vanno in `doom/` sulla microSD. Audio non ancora implementato.
 
 Il motore è prboom (dal progetto retro-go, GPL): il firmware che lo include è distribuito sotto GPL.
+
+## Insegna LED
+<p><img src="docs/img/349_insegna.png" width="400" alt="insegna (3,49)"> <img src="docs/img/tondo_insegna.png" width="150" alt="insegna (tondo)"> <img src="docs/img/349_insegna_arcobaleno.png" width="400" alt="insegna arcobaleno (3,49)"></p>
+
+Dal launcher: **Insegna LED**. Scrivi una frase e lo schermo diventa un pannello a matrice di LED con il testo che scorre, a tutta luminosità, da mostrare come un cartello. Funziona su entrambe le schede. Si esce con swipe a sinistra (o BOOT); mentre scorre, su/giù cambiano la velocità al volo.
+- **Scrivi e mostra**: scrivi la frase con la tastiera e parte subito; il Gadget ricorda l'ultima.
+- **Mostra l'ultima**: rimostra l'ultima frase scritta.
+- **Frasi salvate**: salvi più frasi con un nome (es. "Buon compleanno", "Sala riunioni") e le richiami dall'elenco; da lì le puoi rinominare o eliminare.
+- Impostazioni: **Colore** (otto tinte) o **Arcobaleno** (ogni colonna un colore che scorre), **Velocità** (quattro livelli), **Luminosità**, **Direzione** (verso sinistra, verso destra, oppure fissa se la frase entra tutta), **Stile LED** (tondi o quadrati) e **Griglia spenta** (i LED spenti appena visibili, come un pannello vero). Le lettere accentate si disegnano con la lettera base.
 
 ## Livella
 <p><img src="docs/img/349_livella_piano.png" width="400" alt="livella_piano (3,49)"> <img src="docs/img/349_livella_lato.png" width="400" alt="livella_lato (3,49)"></p>

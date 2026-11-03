@@ -47,6 +47,8 @@ extern const app_t app_wifitest;       // Tester Wi-Fi: elenco delle reti
 extern const app_t app_wifitest_meter; // Tester Wi-Fi: misura di una rete (arg = la rete)
 extern menu_t chess_menu;              // Orologio per scacchi
 void chess_menu_init(void);
+extern menu_t ledsign_menu;            // Insegna LED: testo che scorre a matrice di LED
+void ledsign_init(void);
 
 // Scorciatoie (shortcuts.c): tutte le app del launcher e le loro voci interne, per l'Azione
 // rapida e l'App all'avvio. Si scelgono per nome (g_set.quick_name, g_set.boot_name).
