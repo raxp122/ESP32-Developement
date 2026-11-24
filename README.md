@@ -1,5 +1,7 @@
 # Gadget — launcher per Waveshare ESP32-S3-Touch-LCD-3.49 (V1 e V2) e ESP32-S3-Touch-AMOLED-1.75
 
+<p><a href="https://ko-fi.com/raxp122"><img src="https://ko-fi.com/img/githubbutton_sm.svg" alt="Sostienimi su Ko-fi"></a></p>
+
 Firmware ESP-IDF 5.4 + LVGL 9.2 con menu a gesti e app modulari. Lo stesso firmware gira su due schede e all'avvio riconosce su quale si trova:
 - **ESP32-S3-Touch-LCD-3.49** (V1 e V2): schermo in orizzontale 640×172;
 - **ESP32-S3-Touch-AMOLED-1.75** (anche -B e -G): AMOLED tondo 466×466, interfaccia in stile smartwatch.
@@ -526,3 +528,7 @@ Impostazioni › Diagnostica › Memoria mostra la RAM interna libera, il minimo
 
 Il callback `tick` viene chiamato ogni 200 ms mentre l'app è aperta. Tutto gira nel task LVGL:
 dagli altri task non toccare oggetti LVGL senza `display_lock()`.
+
+## Sostieni il progetto
+
+Gadget è gratuito e open source. Se ti è utile e vuoi offrirmi un caffè: **[ko-fi.com/raxp122](https://ko-fi.com/raxp122)**. Grazie!
